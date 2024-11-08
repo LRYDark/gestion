@@ -8,7 +8,7 @@ if (!defined('GLPI_ROOT')) {
 class PluginGestionTicket extends CommonDBTM {
 
    public static $rightname = 'gestion';
-   public  static  $EntitieAddress = 0 ;
+   public  static  $gestion = 0 ;
 
 //*--------------------------------------------------------------------------------------------- GESTION ONGLET
    static function getTypeName($nb = 0) { // voir doc glpi 
@@ -228,13 +228,13 @@ class PluginGestionTicket extends CommonDBTM {
    }
 
    static function postShowItemNewTaskGESTION($params) {
-      global $DB, $EntitieAddress;
+      global $DB, $gestion;
   
       // Vérifier que la page actuelle est ticket.form.php
       if (strpos($_SERVER['REQUEST_URI'], 'ticket.form.php') !== false) {
           $ticketId = $_GET['id'];
-          if ($EntitieAddress == 0 && $ticketId != 0 && !empty($ticketId)) {
-              $EntitieAddress = 1;
+          if ($gestion == 0 && $ticketId != 0 && !empty($ticketId)) {
+              $gestion = 1;
   
               // Récupérer toutes les valeurs 'bl' pour le ticket spécifié
               $result = $DB->query("SELECT * FROM glpi_plugin_gestion_tickets WHERE tickets_id = $ticketId AND signed = 0");
