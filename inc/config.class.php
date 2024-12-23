@@ -34,7 +34,7 @@ class PluginGestionConfig extends CommonDBTM
 
    static function getTypeName($nb = 0)
    {
-      return __("Chrono / Temps de trajet ", "gestion");
+      return __("Gestion Bl ", "gestion");
    }
 
    static function getInstance()
@@ -46,18 +46,6 @@ class PluginGestionConfig extends CommonDBTM
          }
       }
       return self::$_instance;
-   }
-
-   static function getConfig($update = false)
-   {
-      static $config = null;
-      if (is_null(self::$config)) {
-         $config = new self();
-      }
-      if ($update) {
-         $config->getFromDB(1);
-      }
-      return $config;
    }
 
    static function showConfigForm() //formulaire de configuration du plugin
@@ -173,6 +161,28 @@ class PluginGestionConfig extends CommonDBTM
       }
       return true;
    }
+
+
+   //Cryptage des données
+      // Méthode pour chiffrer une valeur
+      function encrypt($data) {
+         $encryptionKey = 'gJVmnGWOUAamHntf15TDUlmh6LOPRknj'; // Clé secrète pour le chiffrement
+         return base64_encode(openssl_encrypt($data, 'AES-256-CBC', $encryptionKey, 0, $this->getIv()));
+      }
+   
+      // Méthode pour déchiffrer une valeur
+      function decrypt($data) {
+         $encryptionKey = 'gJVmnGWOUAamHntf15TDUlmh6LOPRknj'; // Clé secrète pour le chiffrement
+         return openssl_decrypt(base64_decode($data), 'AES-256-CBC', $encryptionKey, 0, $this->getIv());
+      }
+
+      function getIv()
+      {
+         // IV (vecteur d'initialisation), doit être de 16 octets
+         $encryptionKey = 'gJVmnGWOUAamHntf15TDUlmh6LOPRknj'; // Clé secrète pour le chiffrement
+         return substr(hash('sha256', $encryptionKey), 0, 16);
+      }
+   //Cryptage des données
 
    static function install(Migration $migration)
    {
