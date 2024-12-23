@@ -13,7 +13,7 @@ $config = new PluginGestionConfig();
 if (isset($_POST["update"])) {
    $config->check($_POST['id'], UPDATE);
    $config->update($_POST);
-   Html::back();
+   //Html::back();
 }/*elseif(isset($_POST["defaut"])){
   $config->check($_POST['id'], UPDATE);
   $default = ['id'                     => 1,
@@ -31,4 +31,4 @@ if (isset($_POST["update"])) {
   Html::back();
 }*/
 
-Html::redirect($CFG_GLPI["root_doc"] . "/front/config.form.php?forcetab=" . urlencode('PluginGestionConfig$1'));
+//Html::redirect($CFG_GLPI["root_doc"] . "/front/config.form.php?forcetab=" . urlencode('PluginGestionConfig$1'));
