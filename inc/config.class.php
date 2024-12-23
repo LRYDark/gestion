@@ -66,125 +66,93 @@ class PluginGestionConfig extends CommonDBTM
       $config->getFromDB(1);
 
       $config->showFormHeader(['colspan' => 4]);
-      echo "<tr><th colspan='2'>" . __('Chronomètre', 'rp') . "</th></tr>";
+      echo "<tr><th colspan='2'>" . __('Gestion', 'rp') . "</th></tr>";
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Affichage du chronomètre dans le ticket", "gestion") . "</td><td>";
-            Dropdown::showYesNo('showtimer', $config->showTimer(), -1);
-         echo "</td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Activation automatique du chronomètre à l'ouverture du ticket", "gestion") . "</td><td>";
-            Dropdown::showYesNo('showactivatetimer', $config->showactivatetimer(), -1);
-            if ($config->showactivatetimer() == 0){
-               echo ' Un bouton Play/Pause apparaitra pour lancé le chronomètre';
-            }
-         echo "</td>";
-      echo "</tr>";
-
-      if ($config->showactivatetimer() == 1){
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Possibilité de mettre sur Play/Pause et remettre à zéro le chronomètre", "gestion") . "</td><td>";
-               Dropdown::showYesNo('showPlayPauseButton', $config->showPlayPauseButton(), -1);
-            echo "</td>";
-         echo "</tr>";
-      }
-
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Couleur du text du chronomètre", "gestion") . "</td><td>";
-            echo '<input type="color" name="showColorTimer" value="'.$config->showColorTimer().'">';
-         echo "</td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Couleur de fond du chronomètre", "gestion") . "</td><td>";
-            echo '<input type="color" name="showBackgroundTimer" value="'.$config->showBackgroundTimer().'">';
-         echo "</td>";
-      echo "</tr>";
-
-      if ($config->showactivatetimer() == 0 || $config->showPlayPauseButton() == 1){
+      // Mode de configuration de récupération
          $values = [
-            0 => __('Blanc (default)','gestion'),
-            1 => __('Noir','gestion'),
+            0 => __('Dossier Local','gestion'),
+            1 => __('SharePoint (Graph)','gestion'),
          ];
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Couleur des boutons Play/Pause", "gestion") . "</td><td>";
+            echo "<td>" . __("Mode de configuration des Sauvegardes/Récupérations des PDF", "gestion") . "</td><td>";
                Dropdown::showFromArray(
-                  'showcolorbutton',
+                  'ConfigModes',
                   $values,
                   [
-                     'value' => $config->fields['showcolorbutton']
+                     'value' => $config->fields['ConfigModes']
                   ]
                );
             echo "</td>";
          echo "</tr>";
+      // -----------------------------------------------------------------------
+
+      if($config->fields['ConfigModes'] == 1){
+         echo "<tr><th colspan='2'>" . __('Configuration de SharePoint (API Graph)', 'rp') . "</th></tr>";
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
+               echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Client ID", "gestion") . "</td><td>";
+               echo Html::input('ClientID', ['value' => $config->ClientID(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Client Secret", "gestion") . "</td><td>";
+               echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("URL du Site", "gestion") . "</td><td>";
+               echo Html::input('SiteUrl', ['value' => $config->SiteUrl(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Nom d’hôte", "gestion") . "</td><td>";
+               echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Chemin du Site", "gestion") . "</td><td>";
+               echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
       }
-
-      /*echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __("Appliquée les couleurs par défaut", "gestion") . "</td><td>";
-      echo Html::submit('defaut', ['name' => 'default', 'value' => 'Defaut', 'class' => 'btn btn-info me-2']); // bouton / config par defaut
-      echo "</td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_2 center'><td colspan='2'>";
-      echo Html::submit(_sx('button', 'Save'), ['name' => 'update_config', 'class' => 'btn btn-primary']); // bouton save
-      echo "</td></tr>";*/
-
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Affichage du recapitulatif des durées dans le ticket.", "gestion") . "</td><td>";
-            Dropdown::showYesNo('showtime', $config->showTime(), -1);
-         echo "</td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Affichage de l'onglet temps de trajet dans le ticket.", "gestion") . "</td><td>";
-            Dropdown::showYesNo('fromonglettrajet', $config->fromOngletTrajet(), -1);
-         echo "</td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Token GitHub.", "gestion") . "</td><td>";
-            echo Html::input('token', ['value' => $config->showToken(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
-         echo "</td>";
-      echo "</tr>";
 
       $config->showFormButtons(['candel' => false]);
       return false;
    }
 
    // return fonction (retourn les values enregistrées en bdd)
-   function fromOngletTrajet()
+   function TenantID()
    {
-      return ($this->fields['fromonglettrajet'] ? true : false);
+      return ($this->fields['TenantID']);
    }
-   function showTime()
+   function ClientID()
    {
-      return ($this->fields['showtime'] ? true : false);
+      return ($this->fields['ClientID']);
    }
-   function showTimer()
+   function ClientSecret()
    {
-      return ($this->fields['showtimer'] ? true : false);
+      return ($this->fields['ClientSecret']);
    }
-   function showColorTimer()
+   function SiteUrl()
    {
-      return ($this->fields['showColorTimer']);
+      return ($this->fields['SiteUrl']);
    }
-   function showBackgroundTimer()
+   function Hostname()
    {
-      return ($this->fields['showBackgroundTimer']);
+      return ($this->fields['Hostname']);
    }
-   function showactivatetimer()
+   function SitePath()
    {
-      return ($this->fields['showactivatetimer'] ? true : false);
-   }
-   function showPlayPauseButton()
-   {
-      return ($this->fields['showPlayPauseButton'] ? true : false);
-   }
-   function showToken()
-   {
-      return ($this->fields['token']);
+      return ($this->fields['SitePath']);
    }
    // return fonction
 
@@ -192,7 +160,7 @@ class PluginGestionConfig extends CommonDBTM
    {
 
       if ($item->getType() == 'Config') {
-         return __("Chrono / Temps de trajet ", "gestion");
+         return __("Gestion BL", "gestion");
       }
       return '';
    }
@@ -226,15 +194,13 @@ class PluginGestionConfig extends CommonDBTM
 
          $query = "CREATE TABLE IF NOT EXISTS $table (
                   `id` int {$default_key_sign} NOT NULL auto_increment,
-                  `showtimer` TINYINT NOT NULL DEFAULT '1',
-                  `showColorTimer` VARCHAR(255) NOT NULL DEFAULT '#000000',
-                  `showBackgroundTimer` VARCHAR(255) NOT NULL DEFAULT '#fec95c',
-                  `showcolorbutton` TINYINT NOT NULL DEFAULT '0',
-                  `showactivatetimer` TINYINT NOT NULL DEFAULT '1',
-                  `showPlayPauseButton` TINYINT NOT NULL DEFAULT '1',
-                  `fromonglettrajet` TINYINT NOT NULL DEFAULT '1',
-                  `showtime` TINYINT NOT NULL DEFAULT '1',
-                  `token` VARCHAR(255) NULL,
+                  `ConfigModes` TINYINT NOT NULL DEFAULT '0',
+                  `TenantID` VARCHAR(255) NULL,
+                  `ClientID` VARCHAR(255) NULL,
+                  `ClientSecret` VARCHAR(255) NULL,
+                  `SiteUrl` VARCHAR(255) NULL,
+                  `Hostname` VARCHAR(255) NULL,
+                  `SitePath` VARCHAR(255) NULL,
                   PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
          $DB->query($query) or die($DB->error());
