@@ -96,12 +96,6 @@ class PluginGestionConfig extends CommonDBTM
          echo "</tr>";
 
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("URL du Site", "gestion") . "</td><td>";
-               echo Html::input('SiteUrl', ['value' => $config->SiteUrl(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
-
-         echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Nom d’hôte", "gestion") . "</td><td>";
                echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 80]);// bouton configuration du bas de page line 1
             echo "</td>";
@@ -112,6 +106,65 @@ class PluginGestionConfig extends CommonDBTM
                echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
             echo "</td>";
          echo "</tr>";
+
+         if(!empty($config->TenantID())){
+            require_once 'SharePointGraph.php';
+            $sharepoint = new PluginGestionSharepoint();
+
+            // Utilisation
+            try {
+               // Étape 1 : Obtenir le token d'accès
+               $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
+               echo "Token d'accès obtenu avec succès !\n";
+       
+               // Étape 2 : Récupérer l'ID du site
+               $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
+               echo "Site ID : $siteId\n";
+       
+               // Vous pouvez maintenant utiliser $siteId pour d'autres appels API
+            } catch (Exception $e) {
+                  echo "Erreur : " . $e->getMessage();
+            }
+
+            // Utilisation
+            try {
+
+               // Étape 2 : Récupérer les bibliothèques de documents du site
+               $drives = $sharepoint->getDrives($accessToken, $siteId);
+
+               // Afficher toutes les bibliothèques disponibles
+               echo "<br><br>Bibliothèques disponibles sur le site :<br>";
+               foreach ($drives as $drive) {
+                     echo "- Nom : " . $drive['name'] . " | ID : " . $drive['id'] . "<br>";
+               }
+
+               // Trouver la bibliothèque "Documents partagés"
+               $driveId = null;
+               foreach ($drives as $drive) {
+                     if ($drive['name'] === 'Documents') {
+                        $driveId = $drive['id'];
+                        break;
+                     }
+               }
+
+               if (!$driveId) {
+                     echo "<br><br>";
+                     throw new Exception("Bibliothèque 'Documents partagés' introuvable.");
+               }
+
+               // Étape 3 : Lister le contenu du dossier "BL"
+               $folderPath = "BL"; // Chemin relatif dans la bibliothèque
+               $contents = $sharepoint->listFolderContents($accessToken, $driveId, $folderPath);
+
+               // Affichage des résultats
+               echo "<br><br>Contenu du dossier 'BL':<br>";
+               foreach ($contents as $item) {
+                     echo "- " . $item['name'] . " (" . ($item['folder'] ? "Dossier" : "Fichier") . ")<br>";
+               }
+            } catch (Exception $e) {
+               echo "Erreur : " . $e->getMessage();
+            }
+         }
       }
 
       $config->showFormButtons(['candel' => false]);
@@ -138,9 +191,6 @@ class PluginGestionConfig extends CommonDBTM
    }
    function ClientSecret(){
       return openssl_decrypt(base64_decode($this->fields['ClientSecret']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
-   }
-   function SiteUrl(){
-      return openssl_decrypt(base64_decode($this->fields['SiteUrl']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
    }
    function Hostname(){
       return openssl_decrypt(base64_decode($this->fields['Hostname']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
