@@ -113,7 +113,7 @@ class PluginGestionConfig extends CommonDBTM
                   require_once 'SharePointGraph.php';
                   $sharepoint = new PluginGestionSharepoint();
          
-            ?><button id="openModalButton" type="button" class="btn btn-primary">Ouvrir le modal</button>
+            ?><button id="openModalButton" type="button" class="btn btn-primary">Test de connexion</button>
 
             <script type="text/javascript">
                $(document).ready(function() {
@@ -215,6 +215,28 @@ class PluginGestionConfig extends CommonDBTM
             HTML;
          echo "</td>";
       echo "</tr>";
+
+      echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (si vide -> Racine de documents du Site)", 'rp') . "</th></tr>";
+
+      /*echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Ajouter un dossier ", "gestion") . "</td><td>";
+         ?><button id="openModalButton" type="button" class="btn btn-primary">Ajouter un dossier</button>
+
+         <script type="text/javascript">
+            $(document).ready(function() {
+               $('#openModalButton').on('click', function() {
+                     $('#customModal').modal('show');
+               });
+            });
+         </script><?php
+         echo "</td>";
+      echo "</tr>";*/
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Global ", "gestion") . "</td><td>";
+            echo Html::input('Global', ['value' => $config->Global(), 'size' => 80]);// bouton configuration du bas de page line 1
+         echo "</td>";
+      echo "</tr>";
       }
 
       $config->showFormButtons(['candel' => false]);
@@ -232,6 +254,10 @@ class PluginGestionConfig extends CommonDBTM
    function key()
    {
       return ($this->fields['key']);
+   }
+   function Global()
+   {
+      return ($this->fields['Global']);
    }
    function TenantID(){
       return openssl_decrypt(base64_decode($this->fields['TenantID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
@@ -295,12 +321,13 @@ class PluginGestionConfig extends CommonDBTM
          $query = "CREATE TABLE IF NOT EXISTS $table (
                   `id` int {$default_key_sign} NOT NULL auto_increment,
                   `ConfigModes` TINYINT NOT NULL DEFAULT '0',
-                  `TenantID` VARCHAR(255) NULL,
-                  `ClientID` VARCHAR(255) NULL,
-                  `ClientSecret` VARCHAR(255) NULL,
-                  `SiteUrl` VARCHAR(255) NULL,
-                  `Hostname` VARCHAR(255) NULL,
-                  `SitePath` VARCHAR(255) NULL,
+                  `TenantID` TEXT NULL,
+                  `ClientID` TEXT NULL,
+                  `ClientSecret` TEXT NULL,
+                  `SiteUrl` TEXT NULL,
+                  `Hostname` TEXT NULL,
+                  `SitePath` TEXT NULL,
+                  `Global` VARCHAR(255) NULL,
                   PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
          $DB->query($query) or die($DB->error());
