@@ -10,24 +10,28 @@ Session::checkRight('config', UPDATE);
 
 $config = new PluginGestionConfig();
 
-function encryptData($data, $encryption_key) {
+// Fonction pour charger la clé de cryptage à partir du fichier
+function loadEncryptionKey() {
+   // Chemin vers le fichier de clé de cryptage
+   $file_path = GLPI_ROOT . '/config/glpicrypt.key';
+   return file_get_contents($file_path);
+}
+
+function encryptData($data) {
+   // Chargez la clé de cryptage
+   $encryption_key = loadEncryptionKey();
    return base64_encode(openssl_encrypt($data, 'aes-256-cbc', $encryption_key, 0, '1234567890123456'));
 }
 
 function encryptArray($array) {
    $exclude_keys = ['update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'key'];
    $encrypted_array = [];
-   $special_encryption_key = '82}4G)Ar2?WwYR4hsT[3d4]s+'; // Clé différente pour EncryptionKey
 
    foreach ($array as $key => $value) {
        if (in_array($key, $exclude_keys) || empty($value)) {
            $encrypted_array[$key] = $value;
        } else {
-           if ($key === 'EncryptionKey') {
-               $encrypted_array[$key] = encryptData($value, $special_encryption_key); // Utilise la clé différente
-           } else {
-               $encrypted_array[$key] = encryptData($value, $_POST['EncryptionKey']);
-           }
+           $encrypted_array[$key] = encryptData($value);
        }
    }
 

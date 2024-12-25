@@ -78,19 +78,6 @@ class PluginGestionConfig extends CommonDBTM
          echo "<tr><th colspan='2'>" . __('Configuration de SharePoint (API Graph)', 'rp') . "</th></tr>";
 
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Crypoté les données share point : ", "rt") . "</td><td>";
-               Dropdown::showYesNo('key', $config->key(), -1);
-            echo "</td>";
-         echo "</tr>";
-         if($config->fields['key'] == 1){
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Clé de cryptage", "gestion") . "</td><td>";
-                  echo Html::input('EncryptionKey', ['value' => $config->EncryptionKey(), 'size' => 30, 'maxlength' => 30]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
-         }
-
-         echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
                echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 80]);// bouton configuration du bas de page line 1
             echo "</td>";
@@ -131,69 +118,35 @@ class PluginGestionConfig extends CommonDBTM
       return false;
    }
 
-   // return fonction (retourn les values enregistrées en bdd)
-   function EncryptionKey()
-   {
-      $special_encryption_key = '82}4G)Ar2?WwYR4hsT[3d4]s+'; // Clé différente pour EncryptionKey
-      return openssl_decrypt(base64_decode($this->fields['EncryptionKey']), 'aes-256-cbc', $special_encryption_key, 0, '1234567890123456');   
+   // Fonction pour charger la clé de cryptage à partir du fichier
+   private function loadEncryptionKey() {
+      // Chemin vers le fichier de clé de cryptage
+      $file_path = GLPI_ROOT . '/config/glpicrypt.key';
+      return file_get_contents($file_path);
    }
+
+   // return fonction (retourn les values enregistrées en bdd)
    function key()
    {
       return ($this->fields['key']);
    }
    function TenantID(){
-      $config = new self();
-      $config->getFromDB(1);
-      if($config->fields['key'] == 0){
-         return ($this->fields['TenantID']);
-      }else{
-         return openssl_decrypt(base64_decode($this->fields['TenantID']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');   
-      }
+      return openssl_decrypt(base64_decode($this->fields['TenantID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
    }
    function ClientID(){
-      $config = new self();
-      $config->getFromDB(1);
-      if($config->fields['key'] == 0){
-         return ($this->fields['ClientID']);
-      }else{
-         return openssl_decrypt(base64_decode($this->fields['ClientID']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');
-      }
+      return openssl_decrypt(base64_decode($this->fields['ClientID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
    }
    function ClientSecret(){
-      $config = new self();
-      $config->getFromDB(1);
-      if($config->fields['key'] == 0){
-         return ($this->fields['ClientSecret']);
-      }else{
-         return openssl_decrypt(base64_decode($this->fields['ClientSecret']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');
-      }  
+      return openssl_decrypt(base64_decode($this->fields['ClientSecret']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
    }
    function SiteUrl(){
-      $config = new self();
-      $config->getFromDB(1);
-      if($config->fields['key'] == 0){
-         return ($this->fields['SiteUrl']);
-      }else{
-         return openssl_decrypt(base64_decode($this->fields['SiteUrl']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');
-      }  
+      return openssl_decrypt(base64_decode($this->fields['SiteUrl']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
    }
    function Hostname(){
-      $config = new self();
-      $config->getFromDB(1);
-      if($config->fields['key'] == 0){
-         return ($this->fields['Hostname']);
-      }else{
-         return openssl_decrypt(base64_decode($this->fields['Hostname']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');
-      }  
+      return openssl_decrypt(base64_decode($this->fields['Hostname']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
    }
    function SitePath(){
-      $config = new self();
-      $config->getFromDB(1);
-      if($config->fields['key'] == 0){
-         return ($this->fields['SitePath']);
-      }else{
-         return openssl_decrypt(base64_decode($this->fields['SitePath']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');
-      }  
+      return openssl_decrypt(base64_decode($this->fields['SitePath']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
    }
    // return fonction
 
