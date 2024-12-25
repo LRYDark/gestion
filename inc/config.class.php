@@ -76,39 +76,53 @@ class PluginGestionConfig extends CommonDBTM
 
       if($config->fields['ConfigModes'] == 1){
          echo "<tr><th colspan='2'>" . __('Configuration de SharePoint (API Graph)', 'rp') . "</th></tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Crypoté les données share point : ", "rt") . "</td><td>";
+               Dropdown::showYesNo('key', $config->key(), -1);
+            echo "</td>";
+         echo "</tr>";
+         if($config->fields['key'] == 1){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Clé de cryptage", "gestion") . "</td><td>";
+                  echo Html::input('EncryptionKey', ['value' => $config->EncryptionKey(), 'size' => 30, 'maxlength' => 30]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+         }
+
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
-               echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+               echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 80]);// bouton configuration du bas de page line 1
             echo "</td>";
          echo "</tr>";
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Client ID", "gestion") . "</td><td>";
-               echo Html::input('ClientID', ['value' => $config->ClientID(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+               echo Html::input('ClientID', ['value' => $config->ClientID(), 'size' => 80]);// bouton configuration du bas de page line 1
             echo "</td>";
          echo "</tr>";
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Client Secret", "gestion") . "</td><td>";
-               echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+               echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'size' => 80]);// bouton configuration du bas de page line 1
             echo "</td>";
          echo "</tr>";
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("URL du Site", "gestion") . "</td><td>";
-               echo Html::input('SiteUrl', ['value' => $config->SiteUrl(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+               echo Html::input('SiteUrl', ['value' => $config->SiteUrl(), 'size' => 80]);// bouton configuration du bas de page line 1
             echo "</td>";
          echo "</tr>";
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Nom d’hôte", "gestion") . "</td><td>";
-               echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+               echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 80]);// bouton configuration du bas de page line 1
             echo "</td>";
          echo "</tr>";
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Chemin du Site", "gestion") . "</td><td>";
-               echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 60, 'maxlength' => 80]);// bouton configuration du bas de page line 1
+               echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
             echo "</td>";
          echo "</tr>";
       }
@@ -118,29 +132,68 @@ class PluginGestionConfig extends CommonDBTM
    }
 
    // return fonction (retourn les values enregistrées en bdd)
-   function TenantID()
+   function EncryptionKey()
    {
-      return ($this->fields['TenantID']);
+      $special_encryption_key = '82}4G)Ar2?WwYR4hsT[3d4]s+'; // Clé différente pour EncryptionKey
+      return openssl_decrypt(base64_decode($this->fields['EncryptionKey']), 'aes-256-cbc', $special_encryption_key, 0, '1234567890123456');   
    }
-   function ClientID()
+   function key()
    {
-      return ($this->fields['ClientID']);
+      return ($this->fields['key']);
    }
-   function ClientSecret()
-   {
-      return ($this->fields['ClientSecret']);
+   function TenantID(){
+      $config = new self();
+      $config->getFromDB(1);
+      if($config->fields['key'] == 0){
+         return ($this->fields['TenantID']);
+      }else{
+         return openssl_decrypt(base64_decode($this->fields['TenantID']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');   
+      }
    }
-   function SiteUrl()
-   {
-      return ($this->fields['SiteUrl']);
+   function ClientID(){
+      $config = new self();
+      $config->getFromDB(1);
+      if($config->fields['key'] == 0){
+         return ($this->fields['ClientID']);
+      }else{
+         return openssl_decrypt(base64_decode($this->fields['ClientID']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');
+      }
    }
-   function Hostname()
-   {
-      return ($this->fields['Hostname']);
+   function ClientSecret(){
+      $config = new self();
+      $config->getFromDB(1);
+      if($config->fields['key'] == 0){
+         return ($this->fields['ClientSecret']);
+      }else{
+         return openssl_decrypt(base64_decode($this->fields['ClientSecret']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');
+      }  
    }
-   function SitePath()
-   {
-      return ($this->fields['SitePath']);
+   function SiteUrl(){
+      $config = new self();
+      $config->getFromDB(1);
+      if($config->fields['key'] == 0){
+         return ($this->fields['SiteUrl']);
+      }else{
+         return openssl_decrypt(base64_decode($this->fields['SiteUrl']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');
+      }  
+   }
+   function Hostname(){
+      $config = new self();
+      $config->getFromDB(1);
+      if($config->fields['key'] == 0){
+         return ($this->fields['Hostname']);
+      }else{
+         return openssl_decrypt(base64_decode($this->fields['Hostname']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');
+      }  
+   }
+   function SitePath(){
+      $config = new self();
+      $config->getFromDB(1);
+      if($config->fields['key'] == 0){
+         return ($this->fields['SitePath']);
+      }else{
+         return openssl_decrypt(base64_decode($this->fields['SitePath']), 'aes-256-cbc', $config->EncryptionKey(), 0, '1234567890123456');
+      }  
    }
    // return fonction
 
@@ -162,28 +215,12 @@ class PluginGestionConfig extends CommonDBTM
       return true;
    }
 
-
-   //Cryptage des données
-      // Méthode pour chiffrer une valeur
-      function encrypt($data) {
-         $encryptionKey = 'gJVmnGWOUAamHntf15TDUlmh6LOPRknj'; // Clé secrète pour le chiffrement
-         return base64_encode(openssl_encrypt($data, 'AES-256-CBC', $encryptionKey, 0, $this->getIv()));
-      }
-   
-      // Méthode pour déchiffrer une valeur
-      function decrypt($data) {
-         $encryptionKey = 'gJVmnGWOUAamHntf15TDUlmh6LOPRknj'; // Clé secrète pour le chiffrement
-         return openssl_decrypt(base64_decode($data), 'AES-256-CBC', $encryptionKey, 0, $this->getIv());
-      }
-
-      function getIv()
-      {
-         // IV (vecteur d'initialisation), doit être de 16 octets
-         $encryptionKey = 'gJVmnGWOUAamHntf15TDUlmh6LOPRknj'; // Clé secrète pour le chiffrement
-         return substr(hash('sha256', $encryptionKey), 0, 16);
-      }
-   //Cryptage des données
-
+   function decryptData($data) {
+      // Clé de cryptage - Doit correspondre à la clé utilisée pour le cryptage
+      $encryption_key = 'votre_clé_de_cryptage';
+      return openssl_decrypt(base64_decode($data), 'aes-256-cbc', $encryption_key, 0, '1234567890123456');
+   }
+  
    static function install(Migration $migration)
    {
       global $DB;
