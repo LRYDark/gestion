@@ -107,64 +107,114 @@ class PluginGestionConfig extends CommonDBTM
             echo "</td>";
          echo "</tr>";
 
-         if(!empty($config->TenantID())){
-            require_once 'SharePointGraph.php';
-            $sharepoint = new PluginGestionSharepoint();
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Test de connexion", "gestion") . "</td><td>";
+               if(!empty($config->TenantID())){
+                  require_once 'SharePointGraph.php';
+                  $sharepoint = new PluginGestionSharepoint();
+         
+            ?><button id="openModalButton" type="button" class="btn btn-primary">Ouvrir le modal</button>
 
+            <script type="text/javascript">
+               $(document).ready(function() {
+                  $('#openModalButton').on('click', function() {
+                        $('#customModal').modal('show');
+                  });
+               });
+            </script><?php
+
+            // Modal HTML
+            echo <<<HTML
+            <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
+                  <div class="modal-dialog">
+                     <div class="modal-content">
+                        <div class="modal-header">
+                              <h5 class="modal-title" id="AddGestionModalLabel">Test de connexion</h5>
+                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+            HTML;
+            // Utilisation
+            try {
+               $result = $sharepoint->validateSharePointConnection($config->TenantID(), $config->ClientID(), $config->ClientSecret(), $config->Hostname().':'.$config->SitePath());
+               if ($result['status']) {
+                  echo $result['message'] . "\n";
+               } else {
+                  echo $result['message'] . "\n";
+               }
+            } catch (Exception $e) {
+               echo "Erreur inattendue : " . $e->getMessage() . "\n";
+            }
+
+            echo '<br><br><br>';
             // Utilisation
             try {
                // Étape 1 : Obtenir le token d'accès
                $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
                echo "Token d'accès obtenu avec succès !\n";
-       
+      
                // Étape 2 : Récupérer l'ID du site
+               $siteId = '';
                $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
                echo "Site ID : $siteId\n";
-       
+      
                // Vous pouvez maintenant utiliser $siteId pour d'autres appels API
             } catch (Exception $e) {
                   echo "Erreur : " . $e->getMessage();
             }
 
-            // Utilisation
-            try {
+            /*// Utilisation affiche des dossiers du site
+               try {
 
-               // Étape 2 : Récupérer les bibliothèques de documents du site
-               $drives = $sharepoint->getDrives($accessToken, $siteId);
+                  // Étape 2 : Récupérer les bibliothèques de documents du site
+                  $drives = $sharepoint->getDrives($accessToken, $siteId);
 
-               // Afficher toutes les bibliothèques disponibles
-               echo "<br><br>Bibliothèques disponibles sur le site :<br>";
-               foreach ($drives as $drive) {
-                     echo "- Nom : " . $drive['name'] . " | ID : " . $drive['id'] . "<br>";
-               }
+                  // Afficher toutes les bibliothèques disponibles
+                  echo "<br><br>Bibliothèques disponibles sur le site :<br>";
+                  foreach ($drives as $drive) {
+                        echo "- Nom : " . $drive['name'] . " | ID : " . $drive['id'] . "<br>";
+                  }
 
-               // Trouver la bibliothèque "Documents partagés"
-               $driveId = null;
-               foreach ($drives as $drive) {
-                     if ($drive['name'] === 'Documents') {
-                        $driveId = $drive['id'];
-                        break;
-                     }
-               }
+                  // Trouver la bibliothèque "Documents partagés"
+                  $driveId = null;
+                  foreach ($drives as $drive) {
+                        if ($drive['name'] === 'Documents') {
+                           $driveId = $drive['id'];
+                           break;
+                        }
+                  }
 
-               if (!$driveId) {
-                     echo "<br><br>";
-                     throw new Exception("Bibliothèque 'Documents partagés' introuvable.");
-               }
+                  if (!$driveId) {
+                        echo "<br><br>";
+                        throw new Exception("Bibliothèque 'Documents partagés' introuvable.");
+                  }
 
-               // Étape 3 : Lister le contenu du dossier "BL"
-               $folderPath = "BL"; // Chemin relatif dans la bibliothèque
-               $contents = $sharepoint->listFolderContents($accessToken, $driveId, $folderPath);
+                  // Étape 3 : Lister le contenu du dossier "BL"
+                  $folderPath = "BL"; // Chemin relatif dans la bibliothèque
+                  $contents = $sharepoint->listFolderContents($accessToken, $driveId, $folderPath);
 
-               // Affichage des résultats
-               echo "<br><br>Contenu du dossier 'BL':<br>";
-               foreach ($contents as $item) {
-                     echo "- " . $item['name'] . " (" . ($item['folder'] ? "Dossier" : "Fichier") . ")<br>";
-               }
-            } catch (Exception $e) {
-               echo "Erreur : " . $e->getMessage();
-            }
+                  // Affichage des résultats
+                  echo "<br><br>Contenu du dossier 'BL':<br>";
+                  foreach ($contents as $item) {
+                        echo "- " . $item['name'] . " (" . ($item['folder'] ? "Dossier" : "Fichier") . ")<br>";
+                  }
+               } catch (Exception $e) {
+                  echo "Erreur : " . $e->getMessage();
+               }*/
          }
+            echo <<<HTML
+                                 <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                                    <button type="submit" name="save_selection" class="btn btn-primary">Sauvegarder</button>
+                                 </div>
+                              </form>
+                        </div>
+                     </div>
+                  </div>
+            </div>
+            HTML;
+         echo "</td>";
+      echo "</tr>";
       }
 
       $config->showFormButtons(['candel' => false]);

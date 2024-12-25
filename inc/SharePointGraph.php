@@ -128,6 +128,89 @@ class PluginGestionSharepoint extends CommonDBTM {
         }
     }
 
+    /**
+     * Fonction de test de connexion au SharePoint
+     */
+    function validateSharePointConnection($tenantId, $clientId, $clientSecret, $sitePath) {
+        // Étape 1 : Obtenir le token d'accès
+        $urlToken = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token";
+        $postFields = [
+            'grant_type' => 'client_credentials',
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'scope' => 'https://graph.microsoft.com/.default'
+        ];
+    
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $urlToken);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    
+        $response = curl_exec($ch);
+        $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+    
+        if ($httpStatus !== 200) {
+            return [
+                'status' => false,
+                'message' => "Erreur : Échec de l'obtention du token d'accès (HTTP $httpStatus)."
+            ];
+        }
+    
+        $responseObj = json_decode($response, true);
+        $accessToken = $responseObj['access_token'] ?? null;
+    
+        if (!$accessToken) {
+            return [
+                'status' => false,
+                'message' => "Erreur : Token d'accès introuvable."
+            ];
+        }
+    
+        // Étape 2 : Tester l'accès au site SharePoint
+        $urlSite = "https://graph.microsoft.com/v1.0/sites/$sitePath";
+    
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/json"
+        ];
+    
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $urlSite);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    
+        $responseSite = curl_exec($ch);
+        $httpStatusSite = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+    
+        if ($httpStatusSite === 200) {
+            return [
+                'status' => true,
+                'message' => "Connexion validée : Accès SharePoint réussi."
+            ];
+        } elseif ($httpStatusSite === 403) {
+            return [
+                'status' => false,
+                'message' => "Erreur : Accès refusé. Assurez-vous que l'application dispose des autorisations nécessaires."
+            ];
+        } elseif ($httpStatusSite === 401) {
+            return [
+                'status' => false,
+                'message' => "Erreur : Accès non autorisé. Vérifiez les permissions dans Azure AD."
+            ];
+        } else {
+            return [
+                'status' => false,
+                'message' => "Erreur : Impossible de récupérer l'ID du site (HTTP $httpStatusSite)."
+            ];
+        }
+    }
+    
+
+    
+
     /*
 
 
