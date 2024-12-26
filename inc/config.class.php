@@ -255,7 +255,7 @@ class PluginGestionConfig extends CommonDBTM
             echo "<tr><td colspan='2'>Aucune colonne trouvée ou erreur dans la base de données.</td></tr>";
          }
       }
-
+      
       $config->showFormButtons(['candel' => false]);
       return false;
    }

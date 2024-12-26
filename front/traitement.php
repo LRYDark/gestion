@@ -1,9 +1,13 @@
 <?php
 include ('../../../inc/includes.php'); // Inclure les fichiers nécessaires de GLPI
 require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
+require_once '../inc/SharePointGraph.php';
+
 global $DB, $CFG_GLPI;
 
 use setasign\Fpdi\Fpdi;
+$sharepoint = new PluginGestionSharepoint();
+$config = new PluginGestionConfig();
 
 function message($msg, $msgtype){
     Session::addMessageAfterRedirect(
@@ -16,6 +20,9 @@ function message($msg, $msgtype){
 $signatureBase64 = $_POST['url'] ?? ''; // Assurez-vous que la variable est définie
 $DOC_NAME = $_POST['DOC'];
 $NAME = $_POST['name'];
+
+// Générer un nombre entier aléatoire entre 1 et 100
+$nombreAleatoire = rand(1, 100000);
 
 $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_tickets` WHERE bl = '$DOC_NAME'")->fetch_object();
 $DOC_FILES = $DB->query("SELECT * FROM `glpi_documents` WHERE id = $DOC->doc_id")->fetch_object();
@@ -49,6 +56,44 @@ if (!file_exists($existingPdfPath)) {
 
 // Créer un nouvel objet FPDI / ajouter signature
 $pdf = new FPDI();
+
+
+if ($config->fields['ConfigModes'] == 0){
+
+}elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
+    try {
+        $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
+        $siteId = '';
+        $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
+        $drives = $sharepoint->getDrives($accessToken, $siteId);
+
+        // Trouver la bibliothèque "Documents partagés"
+        $globaldrive = strtolower(trim($config->Global()));
+        $driveId = null;
+        foreach ($drives as $drive) {
+            if (strtolower($drive['name']) === $globaldrive) {
+                $driveId = $drive['id'];
+                break;
+            }
+        }
+
+        if (!$driveId) {
+            Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
+        }
+
+        // Étape 3 : Définir le chemin relatif du fichier
+        $filePath = "BL_NON_SIGNE/".$DOC_NAME.".pdf";
+
+        // Étape 4 : Obtenir l'URL de téléchargement
+        $downloadUrl = $sharepoint->getDownloadUrl($accessToken, $driveId, $filePath);
+
+        // Étape 5 : Télécharger le fichier depuis l'URL
+        $destinationPath = "SharePoint_Temp_".$nombreAleatoire.".pdf";
+        $sharepoint->downloadFileFromUrl($downloadUrl, $destinationPath);
+    } catch (Exception $e) {
+        message("Erreur : " . $e->getMessage(), ERROR);
+    }
+}
 
 try {
     $pageCount = $pdf->setSourceFile($existingPdfPath);
@@ -171,5 +216,5 @@ if ($pdf->Output('F', $outputPath) === '') {
     message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
 }
 
-Html::back();
+//Html::back();
 ?>

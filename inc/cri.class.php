@@ -18,7 +18,7 @@ class PluginGestionCri extends CommonDBTM {
       $config     = PluginGestionConfig::getInstance();
       $documents  = new Document();
       $job        = new Ticket();
-      require_once '../inc/SharePointGraph.php';
+      require_once 'SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint();
       $job->getfromDB($ID);
       $email = '';
