@@ -41,77 +41,81 @@ function encryptArray($array) {
 if (isset($_POST["update"])) {
    $config->check($_POST['id'], UPDATE);
    $encrypted_post = encryptArray($_POST);
-   $tableName = 'glpi_plugin_gestion_configs';
-   $columnName = $_POST['AddFileSite'];
-   
-   $query = "SELECT COLUMN_NAME
-             FROM INFORMATION_SCHEMA.COLUMNS
-             WHERE TABLE_NAME = '$tableName'
-               AND TABLE_SCHEMA = DATABASE()
-               AND COLUMN_NAME = '$columnName';";
-   
-   $result = $DB->query($query);
-   
-   if (!$DB->numrows($result) > 0) {
-       $queryAdd = "ALTER TABLE `$tableName` ADD COLUMN `$columnName` VARCHAR(255) NULL;";
-       if ($DB->query($queryAdd)) {
-         Session::addMessageAfterRedirect(
-            __('Dossier ajouter avec succès', 'gestion'),
-            true,
-            INFO
-         );
-       }else{
-         Session::addMessageAfterRedirect(
-            __("Erreur lors de l'ajout du dossier", 'gestion'),
-            true,
-            ERROR
-         );
-       }
-   }else{
-      Session::addMessageAfterRedirect(
-         __('Le nom du dossier est déjà existant', 'gestion'),
-         true,
-         INFO
-      );
 
-      $nonRemovableColumns = ['update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
+   if (!empty($_POST["AddFileSite"])) {
+      $tableName = 'glpi_plugin_gestion_configs';
+      $columnName = $_POST['AddFileSite'];
       
-      // Vérifier si la colonne est marquée comme non supprimable
-      if (in_array($columnName, $nonRemovableColumns)) {
-         Session::addMessageAfterRedirect(
-            __("La colonne $columnName est protégée et ne peut pas être supprimée.", 'gestion'),
-            true,
-            WARNING
-         );
-         exit;
-      }
-
-      // Vérifier si la colonne est vide
-      $queryIsEmpty = "
-         SELECT COUNT(*)AS count
-         FROM `$tableName`
-         WHERE `$columnName` IS NOT NULL
-         AND `$columnName` != '';
-         ";
-      $resultEmpty = $DB->query($queryIsEmpty);
-      $rowEmpty = $DB->fetchassoc($resultEmpty);
-
-      if ($rowEmpty['count'] == 0) {
-         // La colonne est vide, on la supprime
-         $queryDrop = "ALTER TABLE `$tableName` DROP COLUMN `$columnName`;";
-
-         if ($DB->query($queryDrop)) {
+      $query = "SELECT COLUMN_NAME
+               FROM INFORMATION_SCHEMA.COLUMNS
+               WHERE TABLE_NAME = '$tableName'
+                  AND TABLE_SCHEMA = DATABASE()
+                  AND COLUMN_NAME = '$columnName';";
+      
+      $result = $DB->query($query);
+      
+      if (!$DB->numrows($result) > 0) {
+         $queryAdd = "ALTER TABLE `$tableName` ADD COLUMN `$columnName` VARCHAR(255) NULL;";
+         if ($DB->query($queryAdd)) {
             Session::addMessageAfterRedirect(
-               __("<br>La colonne $columnName a été supprimée de la table $tableName car elle était vide.", 'gestion'),
+               __('Dossier ajouter avec succès', 'gestion'),
                true,
                INFO
             );
-         } else {
+         }else{
             Session::addMessageAfterRedirect(
-               __("Erreur lors de la suppression de la colonne $columnName : " . $DB->error(), 'gestion'),
+               __("Erreur lors de l'ajout du dossier", 'gestion'),
                true,
                ERROR
             );
+         }
+      }else{
+         Session::addMessageAfterRedirect(
+            __('Le nom du dossier est déjà existant', 'gestion'),
+            true,
+            INFO
+         );
+
+         $nonRemovableColumns = ['TenantID', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
+         
+         // Vérifier si la colonne est marquée comme non supprimable
+         if (in_array($columnName, $nonRemovableColumns)) {
+            Session::addMessageAfterRedirect(
+               __("La colonne $columnName est protégée et ne peut pas être supprimée.", 'gestion'),
+               true,
+               WARNING
+            );
+            Html::back();
+            exit;
+         }
+
+         // Vérifier si la colonne est vide
+         $queryIsEmpty = "
+            SELECT COUNT(*)AS count
+            FROM `$tableName`
+            WHERE `$columnName` IS NOT NULL
+            AND `$columnName` != '';
+            ";
+         $resultEmpty = $DB->query($queryIsEmpty);
+         $rowEmpty = $DB->fetchassoc($resultEmpty);
+
+         if ($rowEmpty['count'] == 0) {
+            // La colonne est vide, on la supprime
+            $queryDrop = "ALTER TABLE `$tableName` DROP COLUMN `$columnName`;";
+
+            if ($DB->query($queryDrop)) {
+               Session::addMessageAfterRedirect(
+                  __("<br>La colonne $columnName a été supprimée de la table $tableName car elle était vide.", 'gestion'),
+                  true,
+                  INFO
+               );
+            } else {
+               Session::addMessageAfterRedirect(
+                  __("Erreur lors de la suppression de la colonne $columnName : " . $DB->error(), 'gestion'),
+                  true,
+                  ERROR
+               );
+            }
          }
       }
    }
