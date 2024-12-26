@@ -113,130 +113,123 @@ class PluginGestionConfig extends CommonDBTM
                   require_once 'SharePointGraph.php';
                   $sharepoint = new PluginGestionSharepoint();
          
-            ?><button id="openModalButton" type="button" class="btn btn-primary">Test de connexion</button>
+                        ?><button id="openModalButton" type="button" class="btn btn-primary">Test de connexion</button>
 
-            <script type="text/javascript">
-               $(document).ready(function() {
-                  $('#openModalButton').on('click', function() {
-                        $('#customModal').modal('show');
-                  });
-               });
-            </script><?php
+                        <script type="text/javascript">
+                           $(document).ready(function() {
+                              $('#openModalButton').on('click', function() {
+                                    $('#customModal').modal('show');
+                              });
+                           });
+                        </script><?php
 
-            // Modal HTML
-            echo <<<HTML
-            <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-                  <div class="modal-dialog">
-                     <div class="modal-content">
-                        <div class="modal-header">
-                              <h5 class="modal-title" id="AddGestionModalLabel">Test de connexion</h5>
-                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-            HTML;
-            // Utilisation
-            try {
-               $result = $sharepoint->validateSharePointConnection($config->TenantID(), $config->ClientID(), $config->ClientSecret(), $config->Hostname().':'.$config->SitePath());
-               if ($result['status']) {
-                  echo $result['message'] . "\n";
-               } else {
-                  echo $result['message'] . "\n";
-               }
-            } catch (Exception $e) {
-               echo "Erreur inattendue : " . $e->getMessage() . "\n";
-            }
+                        // Modal HTML
+                        echo <<<HTML
+                        <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
+                              <div class="modal-dialog">
+                                 <div class="modal-content">
+                                    <div class="modal-header">
+                                          <h5 class="modal-title" id="AddGestionModalLabel">Test de connexion</h5>
+                                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                        HTML;
+                           // Utilisation
+                           try {
+                              $result = $sharepoint->validateSharePointConnection($config->TenantID(), $config->ClientID(), $config->ClientSecret(), $config->Hostname().':'.$config->SitePath());
+                              if ($result['status']) {
+                                 echo $result['message'] . "\n";
+                              } else {
+                                 echo $result['message'] . "\n";
+                              }
+                           } catch (Exception $e) {
+                              echo "Erreur inattendue : " . $e->getMessage() . "\n";
+                           }
 
-            echo '<br><br><br>';
-            // Utilisation
-            try {
-               // Étape 1 : Obtenir le token d'accès
-               $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
-               echo "Token d'accès obtenu avec succès !\n";
-      
-               // Étape 2 : Récupérer l'ID du site
-               $siteId = '';
-               $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
-               echo "Site ID : $siteId\n";
-      
-               // Vous pouvez maintenant utiliser $siteId pour d'autres appels API
-            } catch (Exception $e) {
-                  echo "Erreur : " . $e->getMessage();
-            }
+                           echo '<br><br><br>';
+                           // Utilisation
+                           try {
+                              // Étape 1 : Obtenir le token d'accès
+                              $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
+                              echo "Token d'accès obtenu avec succès !\n";
+                     
+                              // Étape 2 : Récupérer l'ID du site
+                              $siteId = '';
+                              $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
+                              echo "Site ID : $siteId\n";
+                     
+                              // Vous pouvez maintenant utiliser $siteId pour d'autres appels API
+                           } catch (Exception $e) {
+                                 echo "Erreur : " . $e->getMessage();
+                           }
 
-            /*// Utilisation affiche des dossiers du site
-               try {
+                           /*// Utilisation affiche des dossiers du site
+                           try {
 
-                  // Étape 2 : Récupérer les bibliothèques de documents du site
-                  $drives = $sharepoint->getDrives($accessToken, $siteId);
+                              // Étape 2 : Récupérer les bibliothèques de documents du site
+                              $drives = $sharepoint->getDrives($accessToken, $siteId);
 
-                  // Afficher toutes les bibliothèques disponibles
-                  echo "<br><br>Bibliothèques disponibles sur le site :<br>";
-                  foreach ($drives as $drive) {
-                        echo "- Nom : " . $drive['name'] . " | ID : " . $drive['id'] . "<br>";
-                  }
+                              // Afficher toutes les bibliothèques disponibles
+                              echo "<br><br>Bibliothèques disponibles sur le site :<br>";
+                              foreach ($drives as $drive) {
+                                    echo "- Nom : " . $drive['name'] . " | ID : " . $drive['id'] . "<br>";
+                              }
 
-                  // Trouver la bibliothèque "Documents partagés"
-                  $driveId = null;
-                  foreach ($drives as $drive) {
-                        if ($drive['name'] === 'Documents') {
-                           $driveId = $drive['id'];
-                           break;
-                        }
-                  }
+                              // Trouver la bibliothèque "Documents partagés"
+                              $driveId = null;
+                              foreach ($drives as $drive) {
+                                    if ($drive['name'] === 'Documents') {
+                                       $driveId = $drive['id'];
+                                       break;
+                                    }
+                              }
 
-                  if (!$driveId) {
-                        echo "<br><br>";
-                        throw new Exception("Bibliothèque 'Documents partagés' introuvable.");
-                  }
+                              if (!$driveId) {
+                                    echo "<br><br>";
+                                    throw new Exception("Bibliothèque 'Documents partagés' introuvable.");
+                              }
 
-                  // Étape 3 : Lister le contenu du dossier "BL"
-                  $folderPath = "BL"; // Chemin relatif dans la bibliothèque
-                  $contents = $sharepoint->listFolderContents($accessToken, $driveId, $folderPath);
+                              // Étape 3 : Lister le contenu du dossier "BL"
+                              $folderPath = "BL"; // Chemin relatif dans la bibliothèque
+                              $contents = $sharepoint->listFolderContents($accessToken, $driveId, $folderPath);
 
-                  // Affichage des résultats
-                  echo "<br><br>Contenu du dossier 'BL':<br>";
-                  foreach ($contents as $item) {
-                        echo "- " . $item['name'] . " (" . ($item['folder'] ? "Dossier" : "Fichier") . ")<br>";
-                  }
-               } catch (Exception $e) {
-                  echo "Erreur : " . $e->getMessage();
-               }*/
-         }
-            echo <<<HTML
-                                 <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                                    <button type="submit" name="save_selection" class="btn btn-primary">Sauvegarder</button>
+                              // Affichage des résultats
+                              echo "<br><br>Contenu du dossier 'BL':<br>";
+                              foreach ($contents as $item) {
+                                    echo "- " . $item['name'] . " (" . ($item['folder'] ? "Dossier" : "Fichier") . ")<br>";
+                              }
+                           } catch (Exception $e) {
+                              echo "Erreur : " . $e->getMessage();
+                           }*/
+                     
+                        echo <<<HTML
+                                             <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                                             </div>
+                                          </form>
+                                    </div>
                                  </div>
-                              </form>
+                              </div>
                         </div>
-                     </div>
-                  </div>
-            </div>
-            HTML;
-         echo "</td>";
-      echo "</tr>";
+                        HTML;
+                     echo "</td>";
+                  echo "</tr>";
+               }
 
-      echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (si vide -> Racine de documents du Site)", 'rp') . "</th></tr>";
+         echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (si vide -> Racine de documents du Site)", 'rp') . "</th></tr>";
 
-      /*echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Ajouter un dossier ", "gestion") . "</td><td>";
-         ?><button id="openModalButton" type="button" class="btn btn-primary">Ajouter un dossier</button>
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Ajouter un dossier (Sauvegarder pour ajouter) ", "gestion") . "</td><td>";
+               echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
 
-         <script type="text/javascript">
-            $(document).ready(function() {
-               $('#openModalButton').on('click', function() {
-                     $('#customModal').modal('show');
-               });
-            });
-         </script><?php
-         echo "</td>";
-      echo "</tr>";*/
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Global ", "gestion") . "</td><td>";
+               echo Html::input('Global', ['value' => $config->Global(), 'size' => 30]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Global ", "gestion") . "</td><td>";
-            echo Html::input('Global', ['value' => $config->Global(), 'size' => 80]);// bouton configuration du bas de page line 1
-         echo "</td>";
-      echo "</tr>";
       }
 
       $config->showFormButtons(['candel' => false]);
@@ -251,9 +244,9 @@ class PluginGestionConfig extends CommonDBTM
    }
 
    // return fonction (retourn les values enregistrées en bdd)
-   function key()
+   function AddFileSite()
    {
-      return ($this->fields['key']);
+      if (isset($this->fields['AddFileSite'])) return ($this->fields['AddFileSite']);
    }
    function Global()
    {
@@ -321,12 +314,12 @@ class PluginGestionConfig extends CommonDBTM
          $query = "CREATE TABLE IF NOT EXISTS $table (
                   `id` int {$default_key_sign} NOT NULL auto_increment,
                   `ConfigModes` TINYINT NOT NULL DEFAULT '0',
-                  `TenantID` TEXT NULL,
-                  `ClientID` TEXT NULL,
-                  `ClientSecret` TEXT NULL,
-                  `SiteUrl` TEXT NULL,
-                  `Hostname` TEXT NULL,
-                  `SitePath` TEXT NULL,
+                  `TenantID` TEXT NULL DEFAULT '',
+                  `ClientID` TEXT NULL DEFAULT '',
+                  `ClientSecret` TEXT NULL DEFAULT '',
+                  `SiteUrl` TEXT NULL DEFAULT '',
+                  `Hostname` TEXT NULL DEFAULT '',
+                  `SitePath` TEXT NULL DEFAULT '',
                   `Global` VARCHAR(255) NULL,
                   PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
