@@ -231,6 +231,33 @@
             "install-path": "../setasign/fpdi"
         },
         {
+            "name": "setasign/fpdi_pdf-parser",
+            "version": "2.1.4",
+            "version_normalized": "2.1.4.0",
+            "dist": {
+                "type": "zip",
+                "url": "https://www.setasign.com/downloads/6913817/FPDI_PDF-Parser-2.1.4.zip"
+            },
+            "require": {
+                "setasign/fpdi": "^2.6.0"
+            },
+            "time": "2024-12-10T00:00:00+00:00",
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "setasign\\FpdiPdfParser\\": "src/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "support": {
+                "email": "support@setasign.com"
+            },
+            "install-path": "../setasign/fpdi_pdf-parser"
+        },
+        {
             "name": "symfony/console",
             "version": "v5.4.45",
             "version_normalized": "5.4.45.0",

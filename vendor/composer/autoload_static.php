@@ -26,6 +26,7 @@ class ComposerStaticInitd047530077b935c34fc47110c73af985
         's' => 
         array (
             'setasign\\Fpdi\\' => 14,
+            'setasign\\FpdiPdfParser\\' => 23,
         ),
         'T' => 
         array (
@@ -58,6 +59,10 @@ class ComposerStaticInitd047530077b935c34fc47110c73af985
         'setasign\\Fpdi\\' => 
         array (
             0 => __DIR__ . '/..' . '/setasign/fpdi/src',
+        ),
+        'setasign\\FpdiPdfParser\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src',
         ),
         'Twig\\' => 
         array (
@@ -453,6 +458,16 @@ class ComposerStaticInitd047530077b935c34fc47110c73af985
         'Twig\\Util\\TemplateDirIterator' => __DIR__ . '/..' . '/twig/twig/src/Util/TemplateDirIterator.php',
         'UnhandledMatchError' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/UnhandledMatchError.php',
         'ValueError' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/ValueError.php',
+        'setasign\\FpdiPdfParser\\PdfParser\\CrossReference\\CompressedReader' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/CrossReference/CompressedReader.php',
+        'setasign\\FpdiPdfParser\\PdfParser\\CrossReference\\CorruptedReader' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/CrossReference/CorruptedReader.php',
+        'setasign\\FpdiPdfParser\\PdfParser\\CrossReference\\CrossReference' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/CrossReference/CrossReference.php',
+        'setasign\\FpdiPdfParser\\PdfParser\\Filter\\Predictor' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/Filter/Predictor.php',
+        'setasign\\FpdiPdfParser\\PdfParser\\Filter\\PredictorException' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/Filter/PredictorException.php',
+        'setasign\\FpdiPdfParser\\PdfParser\\PdfParser' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/PdfParser.php',
+        'setasign\\FpdiPdfParser\\PdfParser\\SecHandler\\SaslPrep' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/SecHandler/SaslPrep.php',
+        'setasign\\FpdiPdfParser\\PdfParser\\SecHandler\\SecHandler' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/SecHandler/SecHandler.php',
+        'setasign\\FpdiPdfParser\\PdfParser\\SecHandler\\SecHandlerException' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/SecHandler/SecHandlerException.php',
+        'setasign\\FpdiPdfParser\\PdfParser\\SecHandler\\Standard' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/SecHandler/Standard.php',
         'setasign\\Fpdi\\FpdfTpl' => __DIR__ . '/..' . '/setasign/fpdi/src/FpdfTpl.php',
         'setasign\\Fpdi\\FpdfTplTrait' => __DIR__ . '/..' . '/setasign/fpdi/src/FpdfTplTrait.php',
         'setasign\\Fpdi\\FpdfTrait' => __DIR__ . '/..' . '/setasign/fpdi/src/FpdfTrait.php',
