@@ -219,7 +219,7 @@ class PluginGestionConfig extends CommonDBTM
          echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (si vide -> Racine de documents du Site)", 'rp') . "</th></tr>";
 
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Ajouter un dossier (Sauvegarder pour ajouter) ", "gestion") . "</td><td>";
+            echo "<td>" . __("Ajouter/Supprimer un dossier (Sauvegarder pour ajouter et laisser vide le dossier en ajoutant le nom ici pour le supprimer) ", "gestion") . "</td><td>";
                echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
             echo "</td>";
          echo "</tr>";
@@ -232,7 +232,6 @@ class PluginGestionConfig extends CommonDBTM
 
          
          global $DB;
-
          // Nom de la table
          $tableName = 'glpi_plugin_gestion_configs';
 
@@ -269,6 +268,9 @@ class PluginGestionConfig extends CommonDBTM
 
                if ($resultValue && $rowValue = $DB->fetchAssoc($resultValue)) {
                      $value = $rowValue[$columnName];
+                     if (isset($value)){
+                        $value = openssl_decrypt(base64_decode($value), 'aes-256-cbc', $config->loadEncryptionKey(), 0, '1234567890123456'); 
+                     }
                }
 
                // Générer le champ de texte pour la colonne
