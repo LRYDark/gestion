@@ -228,6 +228,137 @@ class PluginGestionSharepoint extends CommonDBTM {
             throw new Exception("Erreur lors du téléchargement à partir de l'URL : HTTP $httpStatus");
         }
     }
+
+    /**
+     * Fonction pour récupérer l'URL d'un fichier dans SharePoint
+     */
+    function getFileUrl($accessToken, $driveId, $filePath) {
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$filePath";
+
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/json"
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($ch);
+        $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $responseObj = json_decode($response, true);
+
+        if ($httpStatus === 200) {
+            return $responseObj['webUrl'] ?? null;
+        } else {
+            throw new Exception("Erreur : Impossible de récupérer les métadonnées du fichier (HTTP $httpStatus).");
+        }
+    }
+
+    /**
+     * Fonction pour vérifier si un fichier existe dans SharePoint
+     */
+    function checkFileExists($accessToken, $driveId, $filePath) {
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$filePath";
+
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/json"
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "GET"); // Requête GET pour récupérer les métadonnées
+
+        $response = curl_exec($ch);
+        $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpStatus === 200) {
+            return true; // Le fichier existe
+        } elseif ($httpStatus === 404) {
+            return false; // Le fichier n'existe pas
+        } else {
+            throw new Exception("Erreur lors de la vérification : HTTP $httpStatus");
+        }
+    }
+
+    /**
+     * Fonction pour générer un lien de partage public
+     */
+    function createShareLink($accessToken, $driveId, $itemId) {
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$itemId/createLink";
+
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/json"
+        ];
+
+        $postData = [
+            "type" => "view", // Lien de visualisation
+            "scope" => "anonymous" // Accessible sans authentification
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($ch);
+        $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $responseObj = json_decode($response, true);
+
+        if ($httpStatus === 200 && isset($responseObj['link']['webUrl'])) {
+            return $responseObj['link']['webUrl'];
+        } else {
+            throw new Exception("Erreur : Impossible de générer un lien de partage.");
+        }
+    }
+
+    /**
+     * Fonction pour récupérer l'ID d'un fichier spécifique dans un dossier
+     */
+    function getFileIdByName($accessToken, $driveId, $folderPath, $fileName) {
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/json"
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($ch);
+        $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpStatus === 200) {
+            $files = json_decode($response, true)['value'];
+            foreach ($files as $file) {
+                if ($file['name'] === $fileName) {
+                    return $file['id']; // Retourne l'ID du fichier si le nom correspond
+                }
+            }
+            return null; // Aucun fichier trouvé avec ce nom
+        } else {
+            throw new Exception("Erreur : Impossible de lister les fichiers dans le dossier (HTTP $httpStatus).");
+        }
+    }
+
+
+
 /*
     // Utilisation
     try {

@@ -15,8 +15,11 @@ class PluginGestionCri extends CommonDBTM {
       global $DB, $CFG_GLPI;
       
       $Doc_Name = $_POST["modal"];
-      $config = PluginGestionConfig::getInstance();
-      $job    = new Ticket();
+      $config     = PluginGestionConfig::getInstance();
+      $documents  = new Document();
+      $job        = new Ticket();
+      require_once '../inc/SharePointGraph.php';
+      $sharepoint = new PluginGestionSharepoint();
       $job->getfromDB($ID);
       $email = '';
       $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_tickets` WHERE bl = '$Doc_Name'")->fetch_object();
@@ -86,17 +89,78 @@ class PluginGestionCri extends CommonDBTM {
                echo "<strong><u>STATUS</u></strong>";
                echo '<br>';
                echo 'Non Signé';
-
+               echo '<br><br>';
+               
+               if ($config->fields['ConfigModes'] == 0){
                   // Affichage du PDF en mode image
                   echo "<tr>";
-                     // Affiche le PDF intégré avec une classe CSS pour le responsive
-                     echo "<embed src='document.send.php?docid=$doc_id' type='application/pdf' class='responsive-pdf' />";
+                  // Affiche le PDF intégré avec une classe CSS pour le responsive
+                  echo "<embed src='document.send.php?docid=$doc_id' type='application/pdf' class='responsive-pdf' />";
                   echo "</tr>";
 
                   // Bouton pour voir le PDF en plein écran
                   echo "<tr>";
                      echo '<a href="document.send.php?docid=' . $doc_id . '" target="_blank">Voir le PDF en plein écran</a>';
                   echo "</tr><br><br>";
+               }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
+                  $documents ->getFromDB($doc_id);
+                  $DocUrlSharePoint = $documents->fields['link'];
+
+                  // Utilisation
+                  try {
+                     // Étape 1 : Obtenez votre token d'accès
+                     $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
+                     $siteId = '';
+                     $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
+                     $drives = $sharepoint->getDrives($accessToken, $siteId);
+                     
+                     // Trouver la bibliothèque "Documents partagés"
+                     $globaldrive = strtolower(trim($config->Global()));
+                     $driveId = null;
+                     foreach ($drives as $drive) {
+                           if (strtolower($drive['name']) === $globaldrive) {
+                              $driveId = $drive['id'];
+                              break;
+                           }
+                     }
+
+                     if (!$driveId) {
+                        Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
+                     }
+
+                     $folderPath = 'BL_NON_SIGNE';
+                     $itemId = $Doc_Name.".pdf"; // Nom du fichier à rechercher
+
+                     // Étape 3 : Récupérez l'ID du fichier
+                     $fileId = $sharepoint->getFileIdByName($accessToken, $driveId, $folderPath, $itemId);
+
+                     if ($fileId) {
+                        $itemId = $fileId;
+                     } else {
+                        echo "Erreur : Fichier '$itemId' introuvable dans le dossier '$folderPath'.\n";
+                     }
+
+                     // Étape 3 : Obtenez le lien de partage
+                     $shareLink = $sharepoint->createShareLink($accessToken, $driveId, $itemId);
+
+                     // Étape 4 : Affichez le PDF via <embed>
+                     echo "<tr>";
+                     // Affiche le PDF intégré avec une classe CSS pour le responsive
+                     echo "<embed src='$shareLink' type='application/pdf' class='responsive-pdf' />";
+                     echo "</tr>";
+
+                     // Bouton pour voir le PDF en plein écran
+                     echo "<tr>";
+                     echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>';
+                     echo "</tr><br><br>";
+
+                  } catch (Exception $e) {
+                     // Bouton pour voir le PDF en plein écran
+                     echo "<tr>";
+                        echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>';
+                     echo "</tr><br><br>";
+                  }
+               }
 
                   echo "<tr>";   
                      // Bouton de capture photo -->
@@ -170,30 +234,114 @@ class PluginGestionCri extends CommonDBTM {
                echo '<div class="table-responsive">';
                echo "<table class='table'>"; 
 
-                  // Affichage du PDF en mode image
-                  echo "<tr>";
-                     echo "<td class='table-secondary' style='width: 20%;'>"; // Réduit la largeur de la colonne de gauche
-                        echo 'Document : <strong>'.$Doc_Name.'</strong>';
-                        echo '<br><br><br>';
-                        echo "<strong><u>STATUS</u></strong>";
-                        echo '<br>';
-                        echo 'Non Signé';
-                     echo "</td>";
-                     
-                     echo "<td style='width: 80%;'>"; // Augmente la largeur de la colonne droite pour le PDF
-                        // Affiche le PDF intégré avec une classe CSS pour le responsive
-                        echo "<embed src='document.send.php?docid=$doc_id' type='application/pdf' class='responsive-pdf' />";
-                     echo "</td>";
-                  echo "</tr>";
+                  if ($config->fields['ConfigModes'] == 0){
+                     // Affichage du PDF en mode image
+                     echo "<tr>";
+                        echo "<td class='table-secondary' style='width: 20%;'>"; // Réduit la largeur de la colonne de gauche
+                           echo 'Document : <strong>'.$Doc_Name.'</strong>';
+                           echo '<br><br><br>';
+                           echo "<strong><u>STATUS</u></strong>";
+                           echo '<br>';
+                           echo 'Non Signé';
+                        echo "</td>";
+                        
+                        echo "<td style='width: 80%;'>"; // Augmente la largeur de la colonne droite pour le PDF
+                           // Affiche le PDF intégré avec une classe CSS pour le responsive
+                           echo "<embed src='document.send.php?docid=$doc_id' type='application/pdf' class='responsive-pdf' />";
+                        echo "</td>";
+                     echo "</tr>";
 
-                  // Voir PDF
-                  echo "<tr>";
-                     echo "<td class='table-secondary'>";
-                     echo "</td>";
-                     echo "<td>";
-                        echo '<a href="document.send.php?docid=' . $doc_id . '" target="_blank">Voir le PDF en plein écran</a>';
-                     echo "</td>";
-                  echo "</tr>";
+                     // Voir PDF
+                     echo "<tr>";
+                        echo "<td class='table-secondary'>";
+                        echo "</td>";
+                        echo "<td>";
+                           echo '<a href="document.send.php?docid=' . $doc_id . '" target="_blank">Voir le PDF en plein écran</a>';
+                        echo "</td>";
+                     echo "</tr>";
+                  }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
+
+                     $documents ->getFromDB($doc_id);
+                     $DocUrlSharePoint = $documents->fields['link'];
+
+                     // Utilisation
+                     try {
+                        // Étape 1 : Obtenez votre token d'accès
+                        $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
+                        $siteId = '';
+                        $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
+                        $drives = $sharepoint->getDrives($accessToken, $siteId);
+                        
+                        // Trouver la bibliothèque "Documents partagés"
+                        $globaldrive = strtolower(trim($config->Global()));
+                        $driveId = null;
+                        foreach ($drives as $drive) {
+                              if (strtolower($drive['name']) === $globaldrive) {
+                                 $driveId = $drive['id'];
+                                 break;
+                              }
+                        }
+
+                        if (!$driveId) {
+                           Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
+                        }
+
+                        $folderPath = 'BL_NON_SIGNE';
+                        $itemId = $Doc_Name.".pdf"; // Nom du fichier à rechercher
+
+                        // Étape 3 : Récupérez l'ID du fichier
+                        $fileId = $sharepoint->getFileIdByName($accessToken, $driveId, $folderPath, $itemId);
+
+                        if ($fileId) {
+                           $itemId = $fileId;
+                        } else {
+                           echo "Erreur : Fichier '$itemId' introuvable dans le dossier '$folderPath'.\n";
+                        }
+
+                        // Étape 3 : Obtenez le lien de partage
+                        $shareLink = $sharepoint->createShareLink($accessToken, $driveId, $itemId);
+
+                        // Étape 4 : Affichez le PDF via <embed>
+                        echo "<tr>";
+                           echo "<td class='table-secondary' style='width: 20%;'>"; // Réduit la largeur de la colonne de gauche
+                              echo 'Document : <strong>'.$Doc_Name.'</strong>';
+                              echo '<br><br><br>';
+                              echo "<strong><u>STATUS</u></strong>";
+                              echo '<br>';
+                              echo 'Non Signé';
+                           echo "</td>";
+                           
+                           echo "<td style='width: 80%;'>"; // Augmente la largeur de la colonne droite pour le PDF
+                              // Affiche le PDF intégré avec une classe CSS pour le responsive
+                              echo "<embed src='$shareLink' type='application/pdf' class='responsive-pdf' />";
+                           echo "</td>";
+                        echo "</tr>";
+
+                        // Voir PDF
+                        echo "<tr>";
+                           echo "<td class='table-secondary'>";
+                           echo "</td>";
+                           echo "<td>";
+                              echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>';
+                           echo "</td>";
+                        echo "</tr>";
+                     } catch (Exception $e) {
+                        echo "<tr>";
+                           echo "<td class='table-secondary' style='width: 20%;'>"; // Réduit la largeur de la colonne de gauche
+                              echo 'Document : <strong>'.$Doc_Name.'</strong>';
+                              echo '<br><br><br>';
+                              echo "<strong><u>STATUS</u></strong>";
+                              echo '<br>';
+                              echo 'Non Signé';
+                           echo "</td>";
+                           
+                           echo "<td style='width: 80%;'>"; // Augmente la largeur de la colonne droite pour le PDF
+                              // Affiche le PDF intégré avec une classe CSS pour le responsive
+                              echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>';
+                           echo "</td>";
+                        echo "</tr>";
+                     }
+                  }
 
                   // enregistrer un fichier 
                   echo "<tr>";
