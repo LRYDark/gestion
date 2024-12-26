@@ -162,45 +162,6 @@ class PluginGestionConfig extends CommonDBTM
                            } catch (Exception $e) {
                                  echo "Erreur : " . $e->getMessage();
                            }
-
-                           /*// Utilisation affiche des dossiers du site
-                           try {
-
-                              // Étape 2 : Récupérer les bibliothèques de documents du site
-                              $drives = $sharepoint->getDrives($accessToken, $siteId);
-
-                              // Afficher toutes les bibliothèques disponibles
-                              echo "<br><br>Bibliothèques disponibles sur le site :<br>";
-                              foreach ($drives as $drive) {
-                                    echo "- Nom : " . $drive['name'] . " | ID : " . $drive['id'] . "<br>";
-                              }
-
-                              // Trouver la bibliothèque "Documents partagés"
-                              $driveId = null;
-                              foreach ($drives as $drive) {
-                                    if ($drive['name'] === 'Documents') {
-                                       $driveId = $drive['id'];
-                                       break;
-                                    }
-                              }
-
-                              if (!$driveId) {
-                                    echo "<br><br>";
-                                    throw new Exception("Bibliothèque 'Documents partagés' introuvable.");
-                              }
-
-                              // Étape 3 : Lister le contenu du dossier "BL"
-                              $folderPath = "BL"; // Chemin relatif dans la bibliothèque
-                              $contents = $sharepoint->listFolderContents($accessToken, $driveId, $folderPath);
-
-                              // Affichage des résultats
-                              echo "<br><br>Contenu du dossier 'BL':<br>";
-                              foreach ($contents as $item) {
-                                    echo "- " . $item['name'] . " (" . ($item['folder'] ? "Dossier" : "Fichier") . ")<br>";
-                              }
-                           } catch (Exception $e) {
-                              echo "Erreur : " . $e->getMessage();
-                           }*/
                      
                         echo <<<HTML
                                              <div class="modal-footer">
@@ -216,20 +177,30 @@ class PluginGestionConfig extends CommonDBTM
                   echo "</tr>";
                }
 
-         echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (si vide -> Racine de documents du Site)", 'rp') . "</th></tr>";
+         echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
 
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Global (ID de la Bibliothèques principlale du site)", "gestion") ;
+               //Récupérer les bibliothèques de documents du site
+               $drives = $sharepoint->getDrives($accessToken, $siteId);
+
+               // Afficher toutes les bibliothèques disponibles
+               echo "<br><br>Bibliothèques disponibles sur le site :<br>";
+               foreach ($drives as $drive) {
+                     echo "- Nom : " . $drive['name'] . " | ID : " . $drive['id'] . "<br>";
+               }
+            echo  "</td><td>";
+               echo Html::input('Global', ['value' => $config->Global(), 'size' => 30]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'rp') . "</th></tr>";
+         
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Ajouter/Supprimer un dossier (Sauvegarder pour ajouter et laisser vide le dossier en ajoutant le nom ici pour le supprimer) ", "gestion") . "</td><td>";
                echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
             echo "</td>";
          echo "</tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Global ", "gestion") . "</td><td>";
-               echo Html::input('Global', ['value' => $config->Global(), 'size' => 30]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
-
          
          global $DB;
          // Nom de la table

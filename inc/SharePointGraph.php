@@ -208,41 +208,9 @@ class PluginGestionSharepoint extends CommonDBTM {
         }
     }
     
-
-    
-
-    /*
-
-
-    function getDownloadUrl($accessToken, $driveId, $filePath) {
-        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$filePath";
-
-        $headers = [
-            "Authorization: Bearer $accessToken",
-            "Content-Type: application/json"
-        ];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-        $response = curl_exec($ch);
-        $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        $responseObj = json_decode($response, true);
-
-        if ($httpStatus === 200 && isset($responseObj['@microsoft.graph.downloadUrl'])) {
-            return $responseObj['@microsoft.graph.downloadUrl'];
-        } else {
-            throw new Exception("Impossible d'obtenir l'URL de téléchargement : HTTP $httpStatus");
-        }
-    }*/
-
     /**
      * Fonction pour télécharger le fichier depuis l'URL de téléchargement
-     *//*
+     */
     function downloadFileFromUrl($downloadUrl, $destinationPath) {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $downloadUrl);
@@ -260,7 +228,7 @@ class PluginGestionSharepoint extends CommonDBTM {
             throw new Exception("Erreur lors du téléchargement à partir de l'URL : HTTP $httpStatus");
         }
     }
-
+/*
     // Utilisation
     try {
         // Étape 1 : Obtenir le token d'accès

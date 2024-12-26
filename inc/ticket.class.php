@@ -229,6 +229,7 @@ class PluginGestionTicket extends CommonDBTM {
 
    static function postShowItemNewTaskGESTION($params) {
       global $DB, $gestion;
+      $config = new PluginGestionConfig();
   
       // Vérifier que la page actuelle est ticket.form.php
       if (strpos($_SERVER['REQUEST_URI'], 'ticket.form.php') !== false) {
@@ -246,18 +247,61 @@ class PluginGestionTicket extends CommonDBTM {
                   $selected_ids[] = $data['bl'];
               }
   
-              // Récupérer les fichiers PDF du dossier et les ajouter au tableau $groups sans l'extension .pdf
-              $directory = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned/";
-              if (is_dir($directory)) {
-                  foreach (scandir($directory) as $file) {
-                      if (pathinfo($file, PATHINFO_EXTENSION) === 'pdf') {
-                          $file_name = pathinfo($file, PATHINFO_FILENAME);
-                          if (!array_key_exists($file_name, $groups)) {
-                              $groups[$file_name] = $file_name; // Utiliser le nom du fichier sans extension
-                          }
-                      }
+              if ($config->fields['ConfigModes'] == 0){
+                  // Récupérer les fichiers PDF du dossier et les ajouter au tableau $groups sans l'extension .pdf
+                  $directory = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned/";
+                  if (is_dir($directory)) {
+                        foreach (scandir($directory) as $file) {
+                           if (pathinfo($file, PATHINFO_EXTENSION) === 'pdf') {
+                              $file_name = pathinfo($file, PATHINFO_FILENAME);
+                              if (!array_key_exists($file_name, $groups)) {
+                                    $groups[$file_name] = $file_name; // Utiliser le nom du fichier sans extension
+                              }
+                           }
+                        }
+                  }
+              }elseif ($config->fields['ConfigModes'] == 1){
+               require_once 'SharePointGraph.php';
+               $sharepoint = new PluginGestionSharepoint();
+                  // Utilisation affiche des dossiers du site
+                  try {
+
+                     // Étape 2 : Récupérer les bibliothèques de documents du site
+                     $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
+                     $siteId = '';
+                     $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
+                     $drives = $sharepoint->getDrives($accessToken, $siteId);
+                     
+                     // Trouver la bibliothèque "Documents partagés"
+                     $globaldrive = strtolower(trim($config->Global()));
+                     $driveId = null;
+                     foreach ($drives as $drive) {
+                           if (strtolower($drive['name']) === $globaldrive) {
+                              $driveId = $drive['id'];
+                              break;
+                           }
+                     }
+
+                     if (!$driveId) {
+                           echo "<br><br>";
+                           throw new Exception("Bibliothèque '$globaldrive' introuvable.");
+                     }
+
+                     // Étape 3 : Lister le contenu du dossier "BL"
+                     $folderPath = "BL_non_signe"; // Chemin relatif dans la bibliothèque
+                     $contents = $sharepoint->listFolderContents($accessToken, $driveId, $folderPath);
+
+                     // Affichage des résultats
+                     $groups = [];
+                     foreach ($contents as $item) {
+                           $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
+                           $groups[$file_name] = $file_name; // Utiliser le nom du fichier sans extension
+                     }
+                  } catch (Exception $e) {
+                     echo "Erreur : " . $e->getMessage();
                   }
               }
+
   
               $selected_values_json = json_encode($selected_ids);
               $csrf_token = Session::getNewCSRFToken();
