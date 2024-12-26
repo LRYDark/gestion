@@ -76,8 +76,8 @@ if (isset($_POST["update"])) {
             INFO
          );
 
-         $nonRemovableColumns = ['TenantID', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
-         
+         $nonRemovableColumns = ['TenantID', 'ClientID', 'ClientSecret', 'SiteUrl', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
+      
          // Vérifier si la colonne est marquée comme non supprimable
          if (in_array($columnName, $nonRemovableColumns)) {
             Session::addMessageAfterRedirect(
