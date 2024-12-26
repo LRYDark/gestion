@@ -150,7 +150,7 @@ if (!empty($photoBase64) && strpos($photoBase64, 'data:image') === 0) {
     }
 
     // Enregistrer temporairement l'image décodée sous forme brute
-    $tempPath = 'temp_photo';
+    $tempPath = '../FilesTempSharePoint/temp_photo'.$nombreAleatoire.'';
     if (file_put_contents($tempPath, $photoData) === false) {
         message("Erreur lors de la sauvegarde de l'image de la photo.", ERROR);
     }
@@ -162,7 +162,7 @@ if (!empty($photoBase64) && strpos($photoBase64, 'data:image') === 0) {
         message("Le fichier image n'est pas valide.", ERROR);
     }
 
-    $photoPath = 'photo_capture.png'; // Le chemin final de l'image en PNG
+    $photoPath = '../FilesTempSharePoint/photo_capture'.$nombreAleatoire.'.png'; // Le chemin final de l'image en PNG
 
     // Si l'image est au format JPEG, la convertir en PNG et corriger l'orientation
     if ($imageInfo['mime'] === 'image/jpeg') {
@@ -219,7 +219,7 @@ if ($pdf->Output('F', $outputPath) === '') {
     $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
     $savepath = "_plugins/gestion/signed/" . $DOC_NAME . ".pdf";
     if ($DB->query("UPDATE glpi_documents SET filepath = '$savepath' WHERE id = $DOC_FILES->id")){
-        //unlink($existingPdfPath);
+        unlink($existingPdfPath);
         unlink($signaturePath);
     }
     message('Documents : '. $DOC_NAME.' signé', INFO);
