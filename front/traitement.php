@@ -44,23 +44,19 @@ if (file_put_contents($signaturePath, $signatureData) === false) {
     message("Échec de la sauvegarde de l'image de signature.", ERROR);
 }
 
-$originalPath = $DOC_FILES->filepath;
-$modifiedPath = str_replace('_plugins', '', $originalPath);
-
-// Vérifiez que le PDF source existe
-$existingPdfPath = GLPI_PLUGIN_DOC_DIR . $modifiedPath;
-if (!file_exists($existingPdfPath)) {
-    echo $existingPdfPath;
-    message("Le fichier PDF source n'existe pas.", ERROR);
-}
-
-// Créer un nouvel objet FPDI / ajouter signature
-$pdf = new FPDI();
-
-
 if ($config->fields['ConfigModes'] == 0){
+    $originalPath = $DOC_FILES->filepath;
+    $modifiedPath = str_replace('_plugins', '', $originalPath);
 
+    // Vérifiez que le PDF source existe
+    $existingPdfPath = GLPI_PLUGIN_DOC_DIR . $modifiedPath;
+    if (!file_exists($existingPdfPath)) {
+        message("Le fichier PDF source n'existe pas.", ERROR);
+        Html::back();
+        exit;
+    }
 }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
+
     try {
         $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
         $siteId = '';
@@ -93,8 +89,18 @@ if ($config->fields['ConfigModes'] == 0){
     } catch (Exception $e) {
         message("Erreur : " . $e->getMessage(), ERROR);
     }
+
+    // Vérifiez que le PDF source existe
+    $existingPdfPath = "../FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";;
+    if (!file_exists($existingPdfPath)) {
+        message("Le fichier PDF source n'existe pas.", ERROR);
+        Html::back();
+        exit;
+    }
 }
 
+// Créer un nouvel objet FPDI / ajouter signature
+$pdf = new FPDI();
 try {
     $pageCount = $pdf->setSourceFile($existingPdfPath);
     $targetPage = $pageCount > 1 ? $pageCount : 1; // Utilisez la dernière page si plusieurs pages, sinon la première
@@ -209,7 +215,8 @@ if ($pdf->Output('F', $outputPath) === '') {
     $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
     $savepath = "_plugins/gestion/signed/" . $DOC_NAME . ".pdf";
     if ($DB->query("UPDATE glpi_documents SET filepath = '$savepath' WHERE id = $DOC_FILES->id")){
-        unlink($existingPdfPath);
+        //unlink($existingPdfPath);
+        unlink($signaturePath);
     }
     message('Documents : '. $DOC_NAME.' signé', INFO);
 }else{
@@ -218,3 +225,6 @@ if ($pdf->Output('F', $outputPath) === '') {
 
 //Html::back();
 ?>
+
+
+Erreur lors de l'importation du fichier PDF : This PDF document probably uses a compression technique which is not supported by the free parser shipped with FPDI. (See https://www.setasign.com/fpdi-pdf-parser for more details)
