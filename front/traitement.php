@@ -39,7 +39,7 @@ if ($signatureData === false) {
 }
 
 // Sauvegarder l'image décodée
-$signaturePath = 'signature.png';
+$signaturePath = '../FilesTempSharePoint/signature'.$nombreAleatoire.'.png';
 if (file_put_contents($signaturePath, $signatureData) === false) {
     message("Échec de la sauvegarde de l'image de signature.", ERROR);
 }
@@ -88,7 +88,7 @@ if ($config->fields['ConfigModes'] == 0){
         $downloadUrl = $sharepoint->getDownloadUrl($accessToken, $driveId, $filePath);
 
         // Étape 5 : Télécharger le fichier depuis l'URL
-        $destinationPath = "SharePoint_Temp_".$nombreAleatoire.".pdf";
+        $destinationPath = "../FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
         $sharepoint->downloadFileFromUrl($downloadUrl, $destinationPath);
     } catch (Exception $e) {
         message("Erreur : " . $e->getMessage(), ERROR);
