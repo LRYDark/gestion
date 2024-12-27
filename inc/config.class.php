@@ -172,79 +172,81 @@ class PluginGestionConfig extends CommonDBTM
                echo "</td>";
             echo "</tr>";
 
-            echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
+            if ($result['message'] == 'Connexion validée : Accès SharePoint réussi.'){
+               echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
 
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Global (ID de la Bibliothèques principlale du site)", "gestion") ;
-                  //Récupérer les bibliothèques de documents du site
-                  $drives = $sharepoint->getDrives($siteId);
+               echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __("Global (ID de la Bibliothèques principlale du site)", "gestion") ;
+                     //Récupérer les bibliothèques de documents du site
+                     $drives = $sharepoint->getDrives($siteId);
 
-                  // Afficher toutes les bibliothèques disponibles
-                  echo "<br><br>Bibliothèques disponibles sur le site :<br>";
-                  foreach ($drives as $drive) {
-                        echo "- Nom : " . $drive['name'] . "<br>";
-                  }
-               echo  "</td><td>";
-                  echo Html::input('Global', ['value' => $config->Global(), 'size' => 30]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
-
-            echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'rp') . "</th></tr>";
-            
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Ajouter/Supprimer un dossier (Sauvegarder pour ajouter et laisser vide le dossier en ajoutant le nom ici pour le supprimer) ", "gestion") . "</td><td>";
-                  echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
-            
-            global $DB;
-            // Nom de la table
-            $tableName = 'glpi_plugin_gestion_configs';
-
-            // Liste des colonnes à exclure
-            $excludedColumns = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
-
-            // Récupération des colonnes de la table
-            $queryColumns = "
-               SELECT COLUMN_NAME
-               FROM INFORMATION_SCHEMA.COLUMNS
-               WHERE TABLE_NAME = '$tableName'
-                  AND TABLE_SCHEMA = DATABASE();
-            ";
-
-            $resultColumns = $DB->query($queryColumns);
-
-            if ($resultColumns && $DB->numrows($resultColumns) > 0) {
-               while ($row = $DB->fetchAssoc($resultColumns)) {
-                  $columnName = $row['COLUMN_NAME'];
-
-                  // Vérifier si la colonne est exclue
-                  if (in_array($columnName, $excludedColumns)) {
-                        continue;
-                  }
-
-                  // Récupérer la valeur de la colonne dans la base pour le premier enregistrement
-                  $queryValue = "
-                        SELECT `$columnName`
-                        FROM `$tableName`
-                        LIMIT 1;
-                  ";
-                  $resultValue = $DB->query($queryValue);
-                  $value = '';
-
-                  if ($resultValue && $rowValue = $DB->fetchAssoc($resultValue)) {
-                        $value = $rowValue[$columnName];
-                  }
-
-                  // Générer le champ de texte pour la colonne
-                  echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __($columnName, "gestion") . "</td><td>";
-                  echo Html::input($columnName, ['value' => $value, 'size' => 30]);
+                     // Afficher toutes les bibliothèques disponibles
+                     echo "<br><br>Bibliothèques disponibles sur le site :<br>";
+                     foreach ($drives as $drive) {
+                           echo "- Nom : " . $drive['name'] . "<br>";
+                     }
+                  echo  "</td><td>";
+                     echo Html::input('Global', ['value' => $config->Global(), 'size' => 30]);// bouton configuration du bas de page line 1
                   echo "</td>";
-                  echo "</tr>";
+               echo "</tr>";
+
+               echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'rp') . "</th></tr>";
+               
+               echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __("Ajouter/Supprimer un dossier (Sauvegarder pour ajouter et laisser vide le dossier en ajoutant le nom ici pour le supprimer) ", "gestion") . "</td><td>";
+                     echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
+                  echo "</td>";
+               echo "</tr>";
+               
+               global $DB;
+               // Nom de la table
+               $tableName = 'glpi_plugin_gestion_configs';
+
+               // Liste des colonnes à exclure
+               $excludedColumns = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
+
+               // Récupération des colonnes de la table
+               $queryColumns = "
+                  SELECT COLUMN_NAME
+                  FROM INFORMATION_SCHEMA.COLUMNS
+                  WHERE TABLE_NAME = '$tableName'
+                     AND TABLE_SCHEMA = DATABASE();
+               ";
+
+               $resultColumns = $DB->query($queryColumns);
+
+               if ($resultColumns && $DB->numrows($resultColumns) > 0) {
+                  while ($row = $DB->fetchAssoc($resultColumns)) {
+                     $columnName = $row['COLUMN_NAME'];
+
+                     // Vérifier si la colonne est exclue
+                     if (in_array($columnName, $excludedColumns)) {
+                           continue;
+                     }
+
+                     // Récupérer la valeur de la colonne dans la base pour le premier enregistrement
+                     $queryValue = "
+                           SELECT `$columnName`
+                           FROM `$tableName`
+                           LIMIT 1;
+                     ";
+                     $resultValue = $DB->query($queryValue);
+                     $value = '';
+
+                     if ($resultValue && $rowValue = $DB->fetchAssoc($resultValue)) {
+                           $value = $rowValue[$columnName];
+                     }
+
+                     // Générer le champ de texte pour la colonne
+                     echo "<tr class='tab_bg_1'>";
+                     echo "<td>" . __($columnName, "gestion") . "</td><td>";
+                     echo Html::input($columnName, ['value' => $value, 'size' => 30]);
+                     echo "</td>";
+                     echo "</tr>";
+                  }
+               } else {
+                  echo "<tr><td colspan='2'>Aucune colonne trouvée ou erreur dans la base de données.</td></tr>";
                }
-            } else {
-               echo "<tr><td colspan='2'>Aucune colonne trouvée ou erreur dans la base de données.</td></tr>";
             }
          }
       }
