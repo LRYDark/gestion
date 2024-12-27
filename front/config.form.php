@@ -24,17 +24,17 @@ function encryptData($data) {
 }
 
 function encryptArray($array) {
-   $exclude_keys = ['update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
+   $include_keys = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath'];
    $encrypted_array = [];
 
    foreach ($array as $key => $value) {
-       if (in_array($key, $exclude_keys) || empty($value)) {
-           $encrypted_array[$key] = $value;
-       } else {
+       // Crypter uniquement les clés définies dans $include_keys
+       if (in_array($key, $include_keys) && !empty($value)) {
            $encrypted_array[$key] = encryptData($value);
+       } else {
+           $encrypted_array[$key] = $value;
        }
    }
-
    return $encrypted_array;
 }
 
@@ -76,7 +76,7 @@ if (isset($_POST["update"])) {
             INFO
          );
 
-         $nonRemovableColumns = ['TenantID', 'ClientID', 'ClientSecret', 'SiteUrl', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
+         $nonRemovableColumns = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
       
          // Vérifier si la colonne est marquée comme non supprimable
          if (in_array($columnName, $nonRemovableColumns)) {

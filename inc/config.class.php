@@ -202,7 +202,7 @@ class PluginGestionConfig extends CommonDBTM
             $tableName = 'glpi_plugin_gestion_configs';
 
             // Liste des colonnes à exclure
-            $excludedColumns = ['TenantID', 'ClientID', 'ClientSecret', 'SiteUrl', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
+            $excludedColumns = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
 
             // Récupération des colonnes de la table
             $queryColumns = "
@@ -234,9 +234,6 @@ class PluginGestionConfig extends CommonDBTM
 
                   if ($resultValue && $rowValue = $DB->fetchAssoc($resultValue)) {
                         $value = $rowValue[$columnName];
-                        if (isset($value)){
-                           $value = openssl_decrypt(base64_decode($value), 'aes-256-cbc', $config->loadEncryptionKey(), 0, '1234567890123456'); 
-                        }
                   }
 
                   // Générer le champ de texte pour la colonne
@@ -337,7 +334,6 @@ class PluginGestionConfig extends CommonDBTM
                   `TenantID` TEXT NULL DEFAULT '',
                   `ClientID` TEXT NULL DEFAULT '',
                   `ClientSecret` TEXT NULL DEFAULT '',
-                  `SiteUrl` TEXT NULL DEFAULT '',
                   `Hostname` TEXT NULL DEFAULT '',
                   `SitePath` TEXT NULL DEFAULT '',
                   `Global` VARCHAR(255) NULL,
