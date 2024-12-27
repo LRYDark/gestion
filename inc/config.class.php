@@ -104,7 +104,7 @@ class PluginGestionConfig extends CommonDBTM
          echo "</tr>";
 
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Chemin du Site", "gestion") . "</td><td>";
+            echo "<td>" . __("Chemin du Site (/sites/XXXX)", "gestion") . "</td><td>";
                echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
             echo "</td>";
          echo "</tr>";
@@ -193,8 +193,14 @@ class PluginGestionConfig extends CommonDBTM
                echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'rp') . "</th></tr>";
                
                echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Ajouter/Supprimer un dossier (Sauvegarder pour ajouter et laisser vide le dossier en ajoutant le nom ici pour le supprimer) ", "gestion") . "</td><td>";
+                  echo "<td>" . __("Ajouter un dossier (Nom du dossier)", "gestion") . "</td><td>";
                      echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
+                  echo "</td>";
+               echo "</tr>";
+
+               echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __("Pour valider la suppression du dossier, sauvegarder 2 fois.", "gestion") . "</td><td>";
+                     echo '';
                   echo "</td>";
                echo "</tr>";
                
@@ -240,7 +246,25 @@ class PluginGestionConfig extends CommonDBTM
                      // Générer le champ de texte pour la colonne
                      echo "<tr class='tab_bg_1'>";
                      echo "<td>" . __($columnName, "gestion") . "</td><td>";
-                     echo Html::input($columnName, ['value' => $value, 'size' => 30]);
+                     //echo Html::input($columnName, ['value' => $value, 'size' => 30]);
+                     $values2 = [
+                        0 => __('Dossier de récupération (Global)','gestion'),
+                        1 => __('Dossier de déstination (Global)','gestion'),
+                        2 => __('Dossier de récupération (Récup Doc ticket uniquement) ','gestion'),
+                        3 => __('Dossier de déstination (Dépot Doc ticket uniquement)','gestion'),
+                        4 => __('Dossier de récupération (Récup Doc gestion uniquement) ','gestion'),
+                        5 => __('Dossier de déstination (Dépot Doc gestion uniquement)','gestion'),
+                        6 => __('Supprimer le dossier','gestion'),
+                        7 => __('Mettre en pause','gestion'),
+                        8 => __(' __Non attribué__','gestion'),
+                     ];
+                        Dropdown::showFromArray(
+                           $columnName,
+                           $values2,
+                           [
+                              'value' => $value
+                           ]
+                        );
                      echo "</td>";
                      echo "</tr>";
                   }
