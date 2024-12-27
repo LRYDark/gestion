@@ -197,79 +197,48 @@ class PluginGestionConfig extends CommonDBTM
                      echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
                   echo "</td>";
                echo "</tr>";
-
-               echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Pour valider la suppression du dossier, sauvegarder 2 fois.", "gestion") . "</td><td>";
-                     echo '';
-                  echo "</td>";
-               echo "</tr>";
                
                global $DB;
-               // Nom de la table
-               $tableName = 'glpi_plugin_gestion_configs';
+               // Récupération des lignes (params) de la table
+               $queryRows = "SELECT * FROM `glpi_plugin_gestion_configsfolder`;";
 
-               // Liste des colonnes à exclure
-               $excludedColumns = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
+               $resultRows = $DB->query($queryRows);
 
-               // Récupération des colonnes de la table
-               $queryColumns = "
-                  SELECT COLUMN_NAME
-                  FROM INFORMATION_SCHEMA.COLUMNS
-                  WHERE TABLE_NAME = '$tableName'
-                     AND TABLE_SCHEMA = DATABASE();
-               ";
+               if ($resultRows && $DB->numrows($resultRows) > 0) {
+                  while ($row = $DB->fetchAssoc($resultRows)) {
+                     $folder_name = $row['folder_name'];
+                     $value = $row['params'];
 
-               $resultColumns = $DB->query($queryColumns);
-
-               if ($resultColumns && $DB->numrows($resultColumns) > 0) {
-                  while ($row = $DB->fetchAssoc($resultColumns)) {
-                     $columnName = $row['COLUMN_NAME'];
-
-                     // Vérifier si la colonne est exclue
-                     if (in_array($columnName, $excludedColumns)) {
-                           continue;
-                     }
-
-                     // Récupérer la valeur de la colonne dans la base pour le premier enregistrement
-                     $queryValue = "
-                           SELECT `$columnName`
-                           FROM `$tableName`
-                           LIMIT 1;
-                     ";
-                     $resultValue = $DB->query($queryValue);
-                     $value = '';
-
-                     if ($resultValue && $rowValue = $DB->fetchAssoc($resultValue)) {
-                           $value = $rowValue[$columnName];
-                     }
-
-                     // Générer le champ de texte pour la colonne
+                     // Générer une ligne HTML pour chaque enregistrement
                      echo "<tr class='tab_bg_1'>";
-                     echo "<td>" . __($columnName, "gestion") . "</td><td>";
-                     //echo Html::input($columnName, ['value' => $value, 'size' => 30]);
+                     echo "<td>" . __($folder_name, "gestion") . "</td><td>";
+
+                     // Tableau des options pour le champ déroulant
                      $values2 = [
-                        0 => __('Dossier de récupération (Global)','gestion'),
-                        1 => __('Dossier de déstination (Global)','gestion'),
-                        2 => __('Dossier de récupération (Récup Doc ticket uniquement) ','gestion'),
-                        3 => __('Dossier de déstination (Dépot Doc ticket uniquement)','gestion'),
-                        4 => __('Dossier de récupération (Récup Doc gestion uniquement) ','gestion'),
-                        5 => __('Dossier de déstination (Dépot Doc gestion uniquement)','gestion'),
-                        6 => __('Supprimer le dossier','gestion'),
-                        7 => __('Mettre en pause','gestion'),
-                        8 => __(' __Non attribué__','gestion'),
+                           0 => __('Dossier de récupération (Global)', 'gestion'),
+                           1 => __('Dossier de destination (Global)', 'gestion'),
+                           2 => __('Dossier de récupération (Récup Doc ticket uniquement)', 'gestion'),
+                           3 => __('Dossier de destination (Dépot Doc ticket uniquement)', 'gestion'),
+                           4 => __('Dossier de récupération (Récup Doc gestion uniquement)', 'gestion'),
+                           5 => __('Dossier de destination (Dépot Doc gestion uniquement)', 'gestion'),
+                           6 => __('Supprimer le dossier', 'gestion'),
+                           7 => __('Mettre en pause', 'gestion'),
+                           8 => __('__Non attribué__', 'gestion'),
                      ];
-                        Dropdown::showFromArray(
-                           $columnName,
+
+                     // Générer un champ déroulant avec les options
+                     Dropdown::showFromArray(
+                           $folder_name,
                            $values2,
                            [
                               'value' => $value
                            ]
-                        );
+                     );
                      echo "</td>";
                      echo "</tr>";
                   }
                } else {
-                  echo "<tr><td colspan='2'>Aucune colonne trouvée ou erreur dans la base de données.</td></tr>";
+                  echo "<tr><td colspan='2'>Aucun paramètre trouvé ou erreur dans la base de données.</td></tr>";
                }
             }
          }
@@ -357,16 +326,24 @@ class PluginGestionConfig extends CommonDBTM
          $query = "CREATE TABLE IF NOT EXISTS $table (
                   `id` int {$default_key_sign} NOT NULL auto_increment,
                   `ConfigModes` TINYINT NOT NULL DEFAULT '0',
-                  `TenantID` TEXT NULL DEFAULT '',
-                  `ClientID` TEXT NULL DEFAULT '',
-                  `ClientSecret` TEXT NULL DEFAULT '',
-                  `Hostname` TEXT NULL DEFAULT '',
-                  `SitePath` TEXT NULL DEFAULT '',
+                  `TenantID` TEXT NULL,
+                  `ClientID` TEXT NULL,
+                  `ClientSecret` TEXT NULL,
+                  `Hostname` TEXT NULL,
+                  `SitePath` TEXT NULL,
                   `Global` VARCHAR(255) NULL,
                   PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
          $DB->query($query) or die($DB->error());
          $config->add(['id' => 1,]);
+
+         $query = "CREATE TABLE IF NOT EXISTS glpi_plugin_gestion_configsfolder (
+            `id` int {$default_key_sign} NOT NULL auto_increment,
+            `folder_name` TEXT NULL,
+            `params` TINYINT NOT NULL DEFAULT '8',
+            PRIMARY KEY (`id`)
+         ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
+         $DB->query($query) or die($DB->error());
       }
    }
 
@@ -375,6 +352,11 @@ class PluginGestionConfig extends CommonDBTM
       global $DB;
 
       $table = self::getTable();
+      if ($DB->TableExists($table)) {
+         $migration->displayMessage("Uninstalling $table");
+         $migration->dropTable($table);
+      }
+      $table = 'glpi_plugin_gestion_configsfolder';
       if ($DB->TableExists($table)) {
          $migration->displayMessage("Uninstalling $table");
          $migration->dropTable($table);

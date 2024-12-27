@@ -42,85 +42,112 @@ if (isset($_POST["update"])) {
    $config->check($_POST['id'], UPDATE);
    $encrypted_post = encryptArray($_POST);
 
-   $tableName = 'glpi_plugin_gestion_configs';
-   $nonRemovableColumns = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
+   // Vérification et mise à jour des dossiers en fonction des entrées dans $_POST
+   $queryAllFolders = "SELECT `id`, `folder_name`, `params`
+                     FROM `glpi_plugin_gestion_configsfolder`;";
+   $resultFolders = $DB->query($queryAllFolders);
 
-   if (!empty($_POST["AddFileSite"])) {
-      $columnName = $_POST['AddFileSite'];
-  
-      // Vérifier si la colonne existe dans la table
-      $query = "SELECT COLUMN_NAME
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_NAME = '$tableName'
-                  AND TABLE_SCHEMA = DATABASE()
-                  AND COLUMN_NAME = '$columnName';";
-  
-      $result = $DB->query($query);
-  
-      if (!$DB->numrows($result) > 0) {
-          // Ajouter une nouvelle colonne si elle n'existe pas
-          $queryAdd = "ALTER TABLE `$tableName` ADD COLUMN `$columnName` TINYINT NOT NULL DEFAULT '8';";
-          if ($DB->query($queryAdd)) {
-              Session::addMessageAfterRedirect(
-                  __('Dossier ajouté avec succès', 'gestion'),
-                  true,
-                  INFO
-              );
-          } else {
-              Session::addMessageAfterRedirect(
-                  __("Erreur lors de l'ajout du dossier", 'gestion'),
-                  true,
-                  ERROR
-              );
-          }
-      } else {
-          Session::addMessageAfterRedirect(
-              __('Le nom du dossier est déjà existant', 'gestion'),
-              true,
-              INFO
-          );
+   while ($row = $DB->fetchassoc($resultFolders)) {
+      $folderId = $row['id'];
+      $folderName = $row['folder_name'];
+      $currentValue = $row['params']; // La valeur actuelle dans la base
+
+      // Vérifier si $_POST contient une clé correspondant au nom du dossier
+      if (isset($_POST[$folderName])) {
+         $newValue = $_POST[$folderName]; // La nouvelle valeur pour le dossier
+
+         // Mettre à jour la base de données uniquement si la valeur change
+         if ($newValue != $currentValue) {
+               $queryUpdate = "UPDATE `glpi_plugin_gestion_configsfolder`
+                              SET `params` = '$newValue'
+                              WHERE `id` = '$folderId';";
+               if ($DB->query($queryUpdate)) {
+                  Session::addMessageAfterRedirect(
+                     __("Le dossier $folderName a été mis à jour avec succès", 'gestion'),
+                     true,
+                     INFO
+                  );
+               } else {
+                  Session::addMessageAfterRedirect(
+                     __("Erreur lors de la mise à jour du dossier $folderName : " . $DB->error(), 'gestion'),
+                     true,
+                     ERROR
+                  );
+               }
+         }
       }
    }
 
-   // Vérification et suppression des colonnes
-   $queryAllColumns = "SELECT COLUMN_NAME
-                        FROM INFORMATION_SCHEMA.COLUMNS
-                        WHERE TABLE_NAME = '$tableName'
-                           AND TABLE_SCHEMA = DATABASE();";
+   // Ajouter un nouveau dossier si demandé via $_POST["AddFileSite"]
+   if (!empty($_POST["AddFileSite"])) {
+      $folderName = $_POST['AddFileSite'];
 
-   $resultColumns = $DB->query($queryAllColumns);
+      // Vérifier si le dossier existe déjà
+      $query = "SELECT COUNT(*) AS count
+               FROM `glpi_plugin_gestion_configsfolder`
+               WHERE `folder_name` = '$folderName';";
 
-   while ($row = $DB->fetchassoc($resultColumns)) {
-      $currentColumn = $row['COLUMN_NAME'];
+      $result = $DB->query($query);
+      $row = $DB->fetchassoc($result);
 
-      // Ignorer les colonnes non supprimables
-      if (in_array($currentColumn, $nonRemovableColumns)) {
-         continue;
+      if ($row['count'] == 0) {
+         // Ajouter une nouvelle ligne
+         $queryAdd = "INSERT INTO `glpi_plugin_gestion_configsfolder` (`folder_name`, `params`) 
+                        VALUES ('$folderName', 8);";
+         if ($DB->query($queryAdd)) {
+               Session::addMessageAfterRedirect(
+                  __('Dossier ajouté avec succès', 'gestion'),
+                  true,
+                  INFO
+               );
+         } else {
+               Session::addMessageAfterRedirect(
+                  __("Erreur lors de l'ajout du dossier", 'gestion'),
+                  true,
+                  ERROR
+               );
+         }
+      } else {
+         Session::addMessageAfterRedirect(
+               __('Le nom du dossier est déjà existant', 'gestion'),
+               true,
+               INFO
+         );
       }
+   }
 
-      // Vérifier si la colonne contient uniquement "6"
+   // Supprimer des dossiers si nécessaire
+   $queryAllFolders = "SELECT `id`, `folder_name`
+                     FROM `glpi_plugin_gestion_configsfolder`;";
+
+   $resultFolders = $DB->query($queryAllFolders);
+
+   while ($row = $DB->fetchassoc($resultFolders)) {
+      $folderId = $row['id'];
+
+      // Vérifier si la ligne doit être supprimée
       $queryCheckContent = "SELECT COUNT(*) AS count
-                  FROM `$tableName`
-                  WHERE `$currentColumn` = '6';";
+                           FROM `glpi_plugin_gestion_configsfolder`
+                           WHERE `id` = '$folderId' AND `params` = '6';";
 
       $resultCheck = $DB->query($queryCheckContent);
       $rowCheck = $DB->fetchassoc($resultCheck);
 
       if ($rowCheck['count'] > 0) {
-         // Supprimer la colonne si elle contient uniquement "6"
-         $queryDrop = "ALTER TABLE `$tableName` DROP COLUMN `$currentColumn`;";
-         if ($DB->query($queryDrop)) {
-            Session::addMessageAfterRedirect(
-               __("Le dossier $currentColumn a été supprimée", 'gestion'),
-               true,
-               INFO
-            );
+         // Supprimer la ligne
+         $queryDelete = "DELETE FROM `glpi_plugin_gestion_configsfolder` WHERE `id` = '$folderId';";
+         if ($DB->query($queryDelete)) {
+               Session::addMessageAfterRedirect(
+                  __("Le dossier {$row['folder_name']} a été supprimé", 'gestion'),
+                  true,
+                  INFO
+               );
          } else {
-            Session::addMessageAfterRedirect(
-               __("Erreur lors de la suppression du dossier $currentColumn : " . $DB->error(), 'gestion'),
-               true,
-               ERROR
-            );
+               Session::addMessageAfterRedirect(
+                  __("Erreur lors de la suppression du dossier {$row['folder_name']} : " . $DB->error(), 'gestion'),
+                  true,
+                  ERROR
+               );
          }
       }
    }
