@@ -211,21 +211,92 @@ if (!empty($photoBase64) && strpos($photoBase64, 'data:image') === 0) {
     unlink($photoPath); // Supprimer l'image temporaire
 }
 
-// Sauvegarder le PDF modifié avec la signature ajoutée
-$outputPath = GLPI_PLUGIN_DOC_DIR . "/gestion/signed/" . $DOC_NAME . ".pdf";
-if ($pdf->Output('F', $outputPath) === '') {
-    $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
-    $tech_id = Session::getLoginUserID();
-    $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
-    $savepath = "_plugins/gestion/signed/" . $DOC_NAME . ".pdf";
-    if ($DB->query("UPDATE glpi_documents SET filepath = '$savepath' WHERE id = $DOC_FILES->id")){
-        unlink($existingPdfPath);
-        unlink($signaturePath);
-    }
-    message('Documents : '. $DOC_NAME.' signé', INFO);
-}else{
-    message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
-}
 
-//Html::back();
+if ($config->fields['ConfigModes'] == 0){
+    // Sauvegarder le PDF modifié avec la signature ajoutée
+    $outputPath = GLPI_PLUGIN_DOC_DIR . "/gestion/signed/" . $DOC_NAME . ".pdf";
+
+    if ($pdf->Output('F', $outputPath) === '') {
+        $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
+        $tech_id = Session::getLoginUserID();
+        $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
+        $savepath = "_plugins/gestion/signed/" . $DOC_NAME . ".pdf";
+        if ($DB->query("UPDATE glpi_documents SET filepath = '$savepath' WHERE id = $DOC_FILES->id")){
+            unlink($existingPdfPath);
+            unlink($signaturePath);
+        }
+        message('Documents : '. $DOC_NAME.' signé', INFO);
+    }else{
+        message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
+    }
+}elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
+    
+    $outputPath = "../FilesTempSharePoint/SharePoint_modif_Temp_".$nombreAleatoire.".pdf";;
+
+    if ($pdf->Output('F', $outputPath) === '') {
+        $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
+        $tech_id = Session::getLoginUserID();
+        $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
+
+        // Sauvegarder le PDF modifié avec la signature ajoutée
+        try {
+            $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
+            $siteId = '';
+            $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
+            $drives = $sharepoint->getDrives($accessToken, $siteId);
+
+            // Trouver la bibliothèque "Documents partagés"
+            $globaldrive = strtolower(trim($config->Global()));
+            $driveId = null;
+            foreach ($drives as $drive) {
+                if (strtolower($drive['name']) === $globaldrive) {
+                    $driveId = $drive['id'];
+                    break;
+                }
+            }
+
+            if (!$driveId) {
+                Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
+            }
+
+            $folderPath = "BL_SIGNE"; // Dossier cible dans SharePoint
+            $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement
+
+            // Étape 3 : Téléverser le fichier
+            $sharepoint->uploadFileToFolder($accessToken, $driveId, $folderPath, $fileName, $outputPath);
+
+            // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+            $file_path = "BL_SIGNE/" . $DOC_NAME . ".pdf"; // Remplacez par le chemin exact de votre fichier
+            // Étape 4 : Récupérez l'URL du fichier
+            $fileUrl = $sharepoint->getFileUrl($accessToken, $driveId, $file_path);
+        } catch (Exception $e) {
+            message("Erreur : " . $e->getMessage(), ERROR);
+        }
+
+        if ($DB->query("UPDATE glpi_documents SET link = '$fileUrl' WHERE id = $DOC_FILES->id")){
+
+            // Utilisation
+            try {
+                $folderPath = 'BL_NON_SIGNE';
+                $itemId = $DOC_NAME.".pdf"; // Nom du fichier à rechercher
+
+                // Étape 3 : Récupérez l'ID du fichier
+                $fileId = $sharepoint->getFileIdByName($accessToken, $driveId, $folderPath, $itemId);
+
+                // Étape 3 : Supprimez le fichier
+                $sharepoint->deleteFile($accessToken, $driveId, $fileId);
+            } catch (Exception $e) {
+                message("Erreur : " . $e->getMessage(), ERROR);
+            }
+
+            unlink($existingPdfPath);
+            unlink($signaturePath);
+            unlink($outputPath);
+        }
+        message('Documents : '. $DOC_NAME.' signé', INFO);
+    }else{
+        message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
+    }
+}
+Html::back();
 ?>

@@ -386,37 +386,66 @@ class PluginGestionSharepoint extends CommonDBTM {
         }
     }
 
+    /**
+     * Fonction pour téléverser un fichier dans un dossier SharePoint
+     */
+    function uploadFileToFolder($accessToken, $driveId, $folderPath, $fileName, $sourcePath) {
+        // Construire l'URL du dossier cible
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath/$fileName:/content";
 
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/octet-stream"
+        ];
 
-/*
-    // Utilisation
-    try {
-        // Étape 1 : Obtenir le token d'accès
-        $accessToken = getAccessToken($tenantId, $clientId, $clientSecret);
+        // Lire le contenu du fichier local à téléverser
+        $fileContent = file_get_contents($sourcePath);
 
-        // Étape 2 : Identifier l'ID de la bibliothèque
-        $driveId = "b!HhaCvvwDvUiFVihE9wOc4p2C-XsAqJlFmDwulVa6XzmWhDjy_c1mRbzLqiqfq3qU"; // Remplacez par votre ID exact
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $fileContent);
 
-        // Étape 3 : Définir le chemin relatif du fichier
-        $filePath = "BL/DocumentBLTest.docx";
+        $response = curl_exec($ch);
+        $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
 
-        // Étape 4 : Obtenir l'URL de téléchargement
-        $downloadUrl = getDownloadUrl($accessToken, $driveId, $filePath);
-        echo "URL de téléchargement obtenue : $downloadUrl\n";
-
-        // Étape 5 : Télécharger le fichier depuis l'URL
-        $destinationPath = "DocumentBLTest-local.docx";
-        downloadFileFromUrl($downloadUrl, $destinationPath);
-    } catch (Exception $e) {
-        echo "Erreur : " . $e->getMessage();
+        if ($httpStatus === 200 || $httpStatus === 201) {
+            echo "Fichier téléversé avec succès dans le dossier cible.\n";
+        } else {
+            throw new Exception("Erreur lors du téléversement du fichier : HTTP $httpStatus");
+        }
     }
 
+    /**
+     * Fonction pour supprimer un fichier dans SharePoint
+     */
+    function deleteFile($accessToken, $driveId, $itemId) {
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$itemId";
 
-    echo '<br><br><br>';
-    // Affichage de l'URL complète pour le dossier BL
-    $driveId = "b!HhaCvvwDvUiFVihE9wOc4p2C-XsAqJlFmDwulVa6XzmWhDjy_c1mRbzLqiqfq3qU"; // Remplacez par votre ID
-    $folderPath = "BL"; // Chemin relatif
-    $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/json"
+        ];
 
-    echo "URL pour accéder au contenu du dossier BL : $url\n";*/
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
+
+        $response = curl_exec($ch);
+        $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpStatus === 204) {
+            echo "Fichier supprimé avec succès.\n";
+        } elseif ($httpStatus === 404) {
+            echo "Erreur : Fichier introuvable.\n";
+        } else {
+            throw new Exception("Erreur : Impossible de supprimer le fichier (HTTP $httpStatus).");
+        }
+    }
 }
