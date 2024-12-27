@@ -5,17 +5,15 @@ if (!defined('GLPI_ROOT')) {
 
 class PluginGestionSharepoint extends CommonDBTM {
         
-    // Informations de configuration
-    /*static private $tenantId = '1806800c-8bf6-4867-843f-ec45787bb03f';
-    static private $clientId = '2c4aef6d-452d-4a1e-977d-895a6a2feeec';
-    static private $clientSecret = 'Lcw8Q~cN0A5ofIs5YQM3BNHYPAi2Tgwz0UHVpbDH';
-    static private $hostname = 'globalinfo763.sharepoint.com';
-    static private $sitePath = '/sites/GLPI-BL';*/
-
     /**
      * Fonction pour obtenir un token d'accès à partir d'Azure AD
      */
-    function getAccessToken($tenantId, $clientId, $clientSecret) {
+    public function getAccessToken() {
+        $config         = new PluginGestionConfig();
+        $tenantId       = $config->TenantID();
+        $clientId       = $config->ClientID();
+        $clientSecret   = $config->ClientSecret();
+
         $url = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token";
 
         $postFields = [
@@ -46,7 +44,9 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour obtenir l'ID du site SharePoint
      */
-    function getSiteId($accessToken, $hostname, $sitePath) {
+    public function getSiteId($hostname, $sitePath) {
+        $accessToken = $this->getAccessToken();
+
         $url = "https://graph.microsoft.com/v1.0/sites/$hostname:$sitePath";
 
         $headers = [
@@ -74,7 +74,9 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour obtenir les dossiers du site SharePoint
      */
-    function getDrives($accessToken, $siteId) {
+    public function getDrives($siteId) {
+        $accessToken = $this->getAccessToken();
+
         $url = "https://graph.microsoft.com/v1.0/sites/$siteId/drives";
 
         $headers = [
@@ -102,7 +104,10 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour lister le contenu d'un dossier
      */
-    function listFolderContents($accessToken, $driveId, $folderPath) {
+    public function listFolderContents($folderPath) {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+
         $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
 
         $headers = [
@@ -131,7 +136,12 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction de test de connexion au SharePoint
      */
-    function validateSharePointConnection($tenantId, $clientId, $clientSecret, $sitePath) {
+    public function validateSharePointConnection($sitePath) {
+        $config         = new PluginGestionConfig();
+        $tenantId       = $config->TenantID();
+        $clientId       = $config->ClientID();
+        $clientSecret   = $config->ClientSecret();
+
         // Étape 1 : Obtenir le token d'accès
         $urlToken = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token";
         $postFields = [
@@ -211,7 +221,10 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour obtenir l'URL de téléchargement d'un fichier
      */
-    function getDownloadUrl($accessToken, $driveId, $filePath) {
+    public function getDownloadUrl($filePath) {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+
         $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$filePath";
 
         $headers = [
@@ -240,7 +253,7 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour télécharger le fichier depuis l'URL de téléchargement
      */
-    function downloadFileFromUrl($downloadUrl, $destinationPath) {
+    public function downloadFileFromUrl($downloadUrl, $destinationPath) {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $downloadUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -261,7 +274,10 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour récupérer l'URL d'un fichier dans SharePoint
      */
-    function getFileUrl($accessToken, $driveId, $filePath) {
+    public function getFileUrl($filePath) {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+
         $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$filePath";
 
         $headers = [
@@ -290,7 +306,10 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour vérifier si un fichier existe dans SharePoint
      */
-    function checkFileExists($accessToken, $driveId, $filePath) {
+    public function checkFileExists($filePath) {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+
         $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$filePath";
 
         $headers = [
@@ -320,7 +339,10 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour générer un lien de partage public
      */
-    function createShareLink($accessToken, $driveId, $itemId) {
+    public function createShareLink($itemId) {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+
         $url = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$itemId/createLink";
 
         $headers = [
@@ -356,7 +378,10 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour récupérer l'ID d'un fichier spécifique dans un dossier
      */
-    function getFileIdByName($accessToken, $driveId, $folderPath, $fileName) {
+    public function getFileIdByName($folderPath, $fileName) {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+
         $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
 
         $headers = [
@@ -389,7 +414,10 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour téléverser un fichier dans un dossier SharePoint
      */
-    function uploadFileToFolder($accessToken, $driveId, $folderPath, $fileName, $sourcePath) {
+    public function uploadFileToFolder($folderPath, $fileName, $sourcePath) {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+
         // Construire l'URL du dossier cible
         $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath/$fileName:/content";
 
@@ -422,7 +450,10 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction pour supprimer un fichier dans SharePoint
      */
-    function deleteFile($accessToken, $driveId, $itemId) {
+    public function deleteFile($itemId) {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+
         $url = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$itemId";
 
         $headers = [
@@ -446,6 +477,33 @@ class PluginGestionSharepoint extends CommonDBTM {
             echo "Erreur : Fichier introuvable.\n";
         } else {
             throw new Exception("Erreur : Impossible de supprimer le fichier (HTTP $httpStatus).");
+        }
+    }
+
+    /**
+     * Fonction pour récupéré l'id du répértoire cible du site
+     */
+    public function GetDriveId() {
+        $config = new PluginGestionConfig();
+
+        $siteId = '';
+        $siteId = $this->getSiteId($config->Hostname(), $config->SitePath());
+        $drives = $this->getDrives($siteId);
+
+        // Trouver la bibliothèque "Documents partagés"
+        $globaldrive = strtolower(trim($config->Global()));
+        $driveId = null;
+        foreach ($drives as $drive) {
+            if (strtolower($drive['name']) === $globaldrive) {
+                $driveId = $drive['id'];
+                break;
+            }
+        }
+
+        if (!$driveId) {
+            throw new Exception("Erreur : Bibliothèque '$globaldrive' introuvable.");
+        }else{
+            return $driveId;
         }
     }
 }

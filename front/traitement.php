@@ -61,30 +61,11 @@ if ($config->fields['ConfigModes'] == 0){
 }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
 
     try {
-        $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
-        $siteId = '';
-        $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
-        $drives = $sharepoint->getDrives($accessToken, $siteId);
-
-        // Trouver la bibliothèque "Documents partagés"
-        $globaldrive = strtolower(trim($config->Global()));
-        $driveId = null;
-        foreach ($drives as $drive) {
-            if (strtolower($drive['name']) === $globaldrive) {
-                $driveId = $drive['id'];
-                break;
-            }
-        }
-
-        if (!$driveId) {
-            Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
-        }
-
         // Étape 3 : Définir le chemin relatif du fichier
         $filePath = "BL_NON_SIGNE/".$DOC_NAME.".pdf";
 
         // Étape 4 : Obtenir l'URL de téléchargement
-        $downloadUrl = $sharepoint->getDownloadUrl($accessToken, $driveId, $filePath);
+        $downloadUrl = $sharepoint->getDownloadUrl($filePath);
 
         // Étape 5 : Télécharger le fichier depuis l'URL
         $destinationPath = "../FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
@@ -240,35 +221,16 @@ if ($config->fields['ConfigModes'] == 0){
 
         // Sauvegarder le PDF modifié avec la signature ajoutée
         try {
-            $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
-            $siteId = '';
-            $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
-            $drives = $sharepoint->getDrives($accessToken, $siteId);
-
-            // Trouver la bibliothèque "Documents partagés"
-            $globaldrive = strtolower(trim($config->Global()));
-            $driveId = null;
-            foreach ($drives as $drive) {
-                if (strtolower($drive['name']) === $globaldrive) {
-                    $driveId = $drive['id'];
-                    break;
-                }
-            }
-
-            if (!$driveId) {
-                Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
-            }
-
             $folderPath = "BL_SIGNE"; // Dossier cible dans SharePoint
             $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement
 
             // Étape 3 : Téléverser le fichier
-            $sharepoint->uploadFileToFolder($accessToken, $driveId, $folderPath, $fileName, $outputPath);
+            $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPath);
 
             // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
             $file_path = "BL_SIGNE/" . $DOC_NAME . ".pdf"; // Remplacez par le chemin exact de votre fichier
             // Étape 4 : Récupérez l'URL du fichier
-            $fileUrl = $sharepoint->getFileUrl($accessToken, $driveId, $file_path);
+            $fileUrl = $sharepoint->getFileUrl($file_path);
         } catch (Exception $e) {
             message("Erreur : " . $e->getMessage(), ERROR);
         }
@@ -281,10 +243,10 @@ if ($config->fields['ConfigModes'] == 0){
                 $itemId = $DOC_NAME.".pdf"; // Nom du fichier à rechercher
 
                 // Étape 3 : Récupérez l'ID du fichier
-                $fileId = $sharepoint->getFileIdByName($accessToken, $driveId, $folderPath, $itemId);
+                $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
 
                 // Étape 3 : Supprimez le fichier
-                $sharepoint->deleteFile($accessToken, $driveId, $fileId);
+                $sharepoint->deleteFile($fileId);
             } catch (Exception $e) {
                 message("Erreur : " . $e->getMessage(), ERROR);
             }

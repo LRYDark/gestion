@@ -20,6 +20,7 @@ class PluginGestionCri extends CommonDBTM {
       $job        = new Ticket();
       require_once 'SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint();
+      
       $job->getfromDB($ID);
       $email = '';
       $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_tickets` WHERE bl = '$Doc_Name'")->fetch_object();
@@ -108,31 +109,11 @@ class PluginGestionCri extends CommonDBTM {
 
                   // Utilisation
                   try {
-                     // Étape 1 : Obtenez votre token d'accès
-                     $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
-                     $siteId = '';
-                     $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
-                     $drives = $sharepoint->getDrives($accessToken, $siteId);
-                     
-                     // Trouver la bibliothèque "Documents partagés"
-                     $globaldrive = strtolower(trim($config->Global()));
-                     $driveId = null;
-                     foreach ($drives as $drive) {
-                           if (strtolower($drive['name']) === $globaldrive) {
-                              $driveId = $drive['id'];
-                              break;
-                           }
-                     }
-
-                     if (!$driveId) {
-                        Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
-                     }
-
                      $folderPath = 'BL_NON_SIGNE';
                      $itemId = $Doc_Name.".pdf"; // Nom du fichier à rechercher
 
                      // Étape 3 : Récupérez l'ID du fichier
-                     $fileId = $sharepoint->getFileIdByName($accessToken, $driveId, $folderPath, $itemId);
+                     $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
 
                      if ($fileId) {
                         $itemId = $fileId;
@@ -141,7 +122,7 @@ class PluginGestionCri extends CommonDBTM {
                      }
 
                      // Étape 3 : Obtenez le lien de partage
-                     $shareLink = $sharepoint->createShareLink($accessToken, $driveId, $itemId);
+                     $shareLink = $sharepoint->createShareLink($itemId);
 
                      // Étape 4 : Affichez le PDF via <embed>
                      echo "<tr>";
@@ -266,31 +247,11 @@ class PluginGestionCri extends CommonDBTM {
 
                      // Utilisation
                      try {
-                        // Étape 1 : Obtenez votre token d'accès
-                        $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
-                        $siteId = '';
-                        $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
-                        $drives = $sharepoint->getDrives($accessToken, $siteId);
-                        
-                        // Trouver la bibliothèque "Documents partagés"
-                        $globaldrive = strtolower(trim($config->Global()));
-                        $driveId = null;
-                        foreach ($drives as $drive) {
-                              if (strtolower($drive['name']) === $globaldrive) {
-                                 $driveId = $drive['id'];
-                                 break;
-                              }
-                        }
-
-                        if (!$driveId) {
-                           Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
-                        }
-
                         $folderPath = 'BL_NON_SIGNE';
                         $itemId = $Doc_Name.".pdf"; // Nom du fichier à rechercher
 
                         // Étape 3 : Récupérez l'ID du fichier
-                        $fileId = $sharepoint->getFileIdByName($accessToken, $driveId, $folderPath, $itemId);
+                        $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
 
                         if ($fileId) {
                            $itemId = $fileId;
@@ -299,7 +260,7 @@ class PluginGestionCri extends CommonDBTM {
                         }
 
                         // Étape 3 : Obtenez le lien de partage
-                        $shareLink = $sharepoint->createShareLink($accessToken, $driveId, $itemId);
+                        $shareLink = $sharepoint->createShareLink($itemId);
 
                         // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
@@ -477,31 +438,11 @@ class PluginGestionCri extends CommonDBTM {
 
                   // Utilisation
                   try {
-                     // Étape 1 : Obtenez votre token d'accès
-                     $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
-                     $siteId = '';
-                     $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
-                     $drives = $sharepoint->getDrives($accessToken, $siteId);
-                     
-                     // Trouver la bibliothèque "Documents partagés"
-                     $globaldrive = strtolower(trim($config->Global()));
-                     $driveId = null;
-                     foreach ($drives as $drive) {
-                           if (strtolower($drive['name']) === $globaldrive) {
-                              $driveId = $drive['id'];
-                              break;
-                           }
-                     }
-
-                     if (!$driveId) {
-                        Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
-                     }
-
                      $folderPath = 'BL_SIGNE';
                      $itemId = $Doc_Name.".pdf"; // Nom du fichier à rechercher
 
                      // Étape 3 : Récupérez l'ID du fichier
-                     $fileId = $sharepoint->getFileIdByName($accessToken, $driveId, $folderPath, $itemId);
+                     $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
 
                      if ($fileId) {
                         $itemId = $fileId;
@@ -510,7 +451,7 @@ class PluginGestionCri extends CommonDBTM {
                      }
 
                      // Étape 3 : Obtenez le lien de partage
-                     $shareLink = $sharepoint->createShareLink($accessToken, $driveId, $itemId);
+                     $shareLink = $sharepoint->createShareLink($itemId);
 
                      // Étape 4 : Affichez le PDF via <embed>
                      echo "<tr>";
@@ -569,31 +510,11 @@ class PluginGestionCri extends CommonDBTM {
 
                   // Utilisation
                   try {
-                     // Étape 1 : Obtenez votre token d'accès
-                     $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
-                     $siteId = '';
-                     $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
-                     $drives = $sharepoint->getDrives($accessToken, $siteId);
-                     
-                     // Trouver la bibliothèque "Documents partagés"
-                     $globaldrive = strtolower(trim($config->Global()));
-                     $driveId = null;
-                     foreach ($drives as $drive) {
-                           if (strtolower($drive['name']) === $globaldrive) {
-                              $driveId = $drive['id'];
-                              break;
-                           }
-                     }
-
-                     if (!$driveId) {
-                        Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
-                     }
-
                      $folderPath = 'BL_SIGNE';
                      $itemId = $Doc_Name.".pdf"; // Nom du fichier à rechercher
 
                      // Étape 3 : Récupérez l'ID du fichier
-                     $fileId = $sharepoint->getFileIdByName($accessToken, $driveId, $folderPath, $itemId);
+                     $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
 
                      if ($fileId) {
                         $itemId = $fileId;
@@ -602,7 +523,7 @@ class PluginGestionCri extends CommonDBTM {
                      }
 
                      // Étape 3 : Obtenez le lien de partage
-                     $shareLink = $sharepoint->createShareLink($accessToken, $driveId, $itemId);
+                     $shareLink = $sharepoint->createShareLink($itemId);
 
                      // Étape 4 : Affichez le PDF via <embed>
                         echo "<td style='width: 70%;'>"; // Augmente la largeur de la colonne droite pour le PDF

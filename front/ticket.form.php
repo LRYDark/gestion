@@ -5,6 +5,9 @@ Session::haveRight("ticket", UPDATE);
 global $DB, $CFG_GLPI;
 $doc = new Document();
 
+require_once '../inc/SharePointGraph.php';
+$sharepoint = new PluginGestionSharepoint();
+
 // Vérifier que le formulaire a été soumis
 if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     $ticketId = (int) $_POST['tickets_id'];
@@ -37,33 +40,10 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             // Chemin du fichier PDF
             $file_path = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned/" . $item . ".pdf"; 
         }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
-            require_once '../inc/SharePointGraph.php';
-            $sharepoint = new PluginGestionSharepoint();
-
-            // Étape 1 : Obtenez votre token d'accès
-            $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
-            $siteId = '';
-            $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
-            $drives = $sharepoint->getDrives($accessToken, $siteId);
-            
-            // Trouver la bibliothèque "Documents partagés"
-            $globaldrive = strtolower(trim($config->Global()));
-            $driveId = null;
-            foreach ($drives as $drive) {
-                  if (strtolower($drive['name']) === $globaldrive) {
-                     $driveId = $drive['id'];
-                     break;
-                  }
-            }
-
-            if (!$driveId) {
-                Session::addMessageAfterRedirect(__("Bibliothèque '$globaldrive' introuvable.", 'gestion'), false, ERROR);
-            }
-
             // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
             $file_path = "BL_NON_SIGNE/" . $item . ".pdf"; // Remplacez par le chemin exact de votre fichier
             // Étape 4 : Récupérez l'URL du fichier
-            $fileUrl = $sharepoint->getFileUrl($accessToken, $driveId, $file_path);
+            $fileUrl = $sharepoint->getFileUrl($file_path);
         }
 
         if ($config->fields['ConfigModes'] == 0){
@@ -101,7 +81,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                 $success = false;
             }
         }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
-            if ($sharepoint->checkFileExists($accessToken, $driveId, $file_path)) {
+            if ($sharepoint->checkFileExists($file_path)) {
                 $file_name = basename($file_path);
                 $file_path_bdd = $fileUrl;
     

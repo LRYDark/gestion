@@ -230,6 +230,8 @@ class PluginGestionTicket extends CommonDBTM {
    static function postShowItemNewTaskGESTION($params) {
       global $DB, $gestion;
       $config = new PluginGestionConfig();
+      require_once 'SharePointGraph.php';
+      $sharepoint = new PluginGestionSharepoint();
   
       // Vérifier que la page actuelle est ticket.form.php
       if (strpos($_SERVER['REQUEST_URI'], 'ticket.form.php') !== false) {
@@ -261,35 +263,11 @@ class PluginGestionTicket extends CommonDBTM {
                         }
                   }
               }elseif ($config->fields['ConfigModes'] == 1){
-               require_once 'SharePointGraph.php';
-               $sharepoint = new PluginGestionSharepoint();
                   // Utilisation affiche des dossiers du site
                   try {
-
-                     // Étape 2 : Récupérer les bibliothèques de documents du site
-                     $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
-                     $siteId = '';
-                     $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
-                     $drives = $sharepoint->getDrives($accessToken, $siteId);
-                     
-                     // Trouver la bibliothèque "Documents partagés"
-                     $globaldrive = strtolower(trim($config->Global()));
-                     $driveId = null;
-                     foreach ($drives as $drive) {
-                           if (strtolower($drive['name']) === $globaldrive) {
-                              $driveId = $drive['id'];
-                              break;
-                           }
-                     }
-
-                     if (!$driveId) {
-                           echo "<br><br>";
-                           throw new Exception("Bibliothèque '$globaldrive' introuvable.");
-                     }
-
                      // Étape 3 : Lister le contenu du dossier "BL"
-                     $folderPath = "BL_non_signe"; // Chemin relatif dans la bibliothèque
-                     $contents = $sharepoint->listFolderContents($accessToken, $driveId, $folderPath);
+                     $folderPath = "BL_NON_SIGNE"; // Chemin relatif dans la bibliothèque
+                     $contents = $sharepoint->listFolderContents($folderPath);
 
                      // Affichage des résultats
                      $groups = [];

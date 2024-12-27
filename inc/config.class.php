@@ -52,6 +52,8 @@ class PluginGestionConfig extends CommonDBTM
    {
       $config = new self();
       $config->getFromDB(1);
+      require_once 'SharePointGraph.php';
+      $sharepoint = new PluginGestionSharepoint();
 
       $config->showFormHeader(['colspan' => 4]);
       echo "<tr><th colspan='2'>" . __('Gestion', 'rp') . "</th></tr>";
@@ -107,152 +109,146 @@ class PluginGestionConfig extends CommonDBTM
             echo "</td>";
          echo "</tr>";
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Test de connexion", "gestion") . "</td><td>";
-               if(!empty($config->TenantID())){
-                  require_once 'SharePointGraph.php';
-                  $sharepoint = new PluginGestionSharepoint();
-         
-                        ?><button id="openModalButton" type="button" class="btn btn-primary">Test de connexion</button>
+         if(!empty($config->TenantID())){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Test de connexion", "gestion") . "</td><td>";
+   
+                  ?><button id="openModalButton" type="button" class="btn btn-primary">Test de connexion</button>
 
-                        <script type="text/javascript">
-                           $(document).ready(function() {
-                              $('#openModalButton').on('click', function() {
-                                    $('#customModal').modal('show');
-                              });
-                           });
-                        </script><?php
+                  <script type="text/javascript">
+                     $(document).ready(function() {
+                        $('#openModalButton').on('click', function() {
+                              $('#customModal').modal('show');
+                        });
+                     });
+                  </script><?php
 
-                        // Modal HTML
-                        echo <<<HTML
-                        <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-                              <div class="modal-dialog">
-                                 <div class="modal-content">
-                                    <div class="modal-header">
-                                          <h5 class="modal-title" id="AddGestionModalLabel">Test de connexion</h5>
-                                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                        HTML;
-                           // Utilisation
-                           try {
-                              $result = $sharepoint->validateSharePointConnection($config->TenantID(), $config->ClientID(), $config->ClientSecret(), $config->Hostname().':'.$config->SitePath());
-                              if ($result['status']) {
-                                 echo $result['message'] . "\n";
-                              } else {
-                                 echo $result['message'] . "\n";
-                              }
-                           } catch (Exception $e) {
-                              echo "Erreur inattendue : " . $e->getMessage() . "\n";
-                           }
-
-                           echo '<br><br><br>';
-                           // Utilisation
-                           try {
-                              // Étape 1 : Obtenir le token d'accès
-                              $accessToken = $sharepoint->getAccessToken($config->TenantID(), $config->ClientID(), $config->ClientSecret());
-                              echo "Token d'accès obtenu avec succès !\n";
-                     
-                              // Étape 2 : Récupérer l'ID du site
-                              $siteId = '';
-                              $siteId = $sharepoint->getSiteId($accessToken, $config->Hostname(), $config->SitePath());
-                              echo "Site ID : $siteId\n";
-                     
-                              // Vous pouvez maintenant utiliser $siteId pour d'autres appels API
-                           } catch (Exception $e) {
-                                 echo "Erreur : " . $e->getMessage();
-                           }
-                     
-                        echo <<<HTML
-                                             <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                                             </div>
-                                          </form>
-                                    </div>
-                                 </div>
+                  // Modal HTML
+                  echo <<<HTML
+                  <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
+                        <div class="modal-dialog">
+                           <div class="modal-content">
+                              <div class="modal-header">
+                                    <h5 class="modal-title" id="AddGestionModalLabel">Test de connexion</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                               </div>
+                              <div class="modal-body">
+                  HTML;
+                     // Utilisation
+                     try {
+                        $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
+                        if ($result['status']) {
+                           echo $result['message'] . "\n";
+                        } else {
+                           echo $result['message'] . "\n";
+                        }
+                     } catch (Exception $e) {
+                        echo "Erreur inattendue : " . $e->getMessage() . "\n";
+                     }
+
+                     echo '<br><br><br>';
+                     // Utilisation
+                     try {              
+                        // Étape 2 : Récupérer l'ID du site
+                        $siteId = '';
+                        $siteId = $sharepoint->getSiteId($config->Hostname(), $config->SitePath());
+                        echo "Site ID : $siteId\n";
+               
+                        // Vous pouvez maintenant utiliser $siteId pour d'autres appels API
+                     } catch (Exception $e) {
+                           echo "Erreur : " . $e->getMessage();
+                     }
+               
+                  echo <<<HTML
+                                       <div class="modal-footer">
+                                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                                       </div>
+                                    </form>
+                              </div>
+                           </div>
                         </div>
-                        HTML;
-                     echo "</td>";
+                  </div>
+                  HTML;
+               echo "</td>";
+            echo "</tr>";
+
+            echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
+
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Global (ID de la Bibliothèques principlale du site)", "gestion") ;
+                  //Récupérer les bibliothèques de documents du site
+                  $drives = $sharepoint->getDrives($siteId);
+
+                  // Afficher toutes les bibliothèques disponibles
+                  echo "<br><br>Bibliothèques disponibles sur le site :<br>";
+                  foreach ($drives as $drive) {
+                        echo "- Nom : " . $drive['name'] . "<br>";
+                  }
+               echo  "</td><td>";
+                  echo Html::input('Global', ['value' => $config->Global(), 'size' => 30]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+
+            echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'rp') . "</th></tr>";
+            
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Ajouter/Supprimer un dossier (Sauvegarder pour ajouter et laisser vide le dossier en ajoutant le nom ici pour le supprimer) ", "gestion") . "</td><td>";
+                  echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+            
+            global $DB;
+            // Nom de la table
+            $tableName = 'glpi_plugin_gestion_configs';
+
+            // Liste des colonnes à exclure
+            $excludedColumns = ['TenantID', 'ClientID', 'ClientSecret', 'SiteUrl', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
+
+            // Récupération des colonnes de la table
+            $queryColumns = "
+               SELECT COLUMN_NAME
+               FROM INFORMATION_SCHEMA.COLUMNS
+               WHERE TABLE_NAME = '$tableName'
+                  AND TABLE_SCHEMA = DATABASE();
+            ";
+
+            $resultColumns = $DB->query($queryColumns);
+
+            if ($resultColumns && $DB->numrows($resultColumns) > 0) {
+               while ($row = $DB->fetchAssoc($resultColumns)) {
+                  $columnName = $row['COLUMN_NAME'];
+
+                  // Vérifier si la colonne est exclue
+                  if (in_array($columnName, $excludedColumns)) {
+                        continue;
+                  }
+
+                  // Récupérer la valeur de la colonne dans la base pour le premier enregistrement
+                  $queryValue = "
+                        SELECT `$columnName`
+                        FROM `$tableName`
+                        LIMIT 1;
+                  ";
+                  $resultValue = $DB->query($queryValue);
+                  $value = '';
+
+                  if ($resultValue && $rowValue = $DB->fetchAssoc($resultValue)) {
+                        $value = $rowValue[$columnName];
+                        if (isset($value)){
+                           $value = openssl_decrypt(base64_decode($value), 'aes-256-cbc', $config->loadEncryptionKey(), 0, '1234567890123456'); 
+                        }
+                  }
+
+                  // Générer le champ de texte pour la colonne
+                  echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __($columnName, "gestion") . "</td><td>";
+                  echo Html::input($columnName, ['value' => $value, 'size' => 30]);
+                  echo "</td>";
                   echo "</tr>";
                }
-
-         echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Global (ID de la Bibliothèques principlale du site)", "gestion") ;
-               //Récupérer les bibliothèques de documents du site
-               $drives = $sharepoint->getDrives($accessToken, $siteId);
-
-               // Afficher toutes les bibliothèques disponibles
-               echo "<br><br>Bibliothèques disponibles sur le site :<br>";
-               foreach ($drives as $drive) {
-                     echo "- Nom : " . $drive['name'] . " | ID : " . $drive['id'] . "<br>";
-               }
-            echo  "</td><td>";
-               echo Html::input('Global', ['value' => $config->Global(), 'size' => 30]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
-
-         echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'rp') . "</th></tr>";
-         
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Ajouter/Supprimer un dossier (Sauvegarder pour ajouter et laisser vide le dossier en ajoutant le nom ici pour le supprimer) ", "gestion") . "</td><td>";
-               echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
-         
-         global $DB;
-         // Nom de la table
-         $tableName = 'glpi_plugin_gestion_configs';
-
-         // Liste des colonnes à exclure
-         $excludedColumns = ['TenantID', 'ClientID', 'ClientSecret', 'SiteUrl', 'Hostname', 'SitePath', 'update', '_glpi_csrf_token', 'is_recursive', 'ConfigModes', 'id', 'Global'];
-
-         // Récupération des colonnes de la table
-         $queryColumns = "
-            SELECT COLUMN_NAME
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_NAME = '$tableName'
-               AND TABLE_SCHEMA = DATABASE();
-         ";
-
-         $resultColumns = $DB->query($queryColumns);
-
-         if ($resultColumns && $DB->numrows($resultColumns) > 0) {
-            while ($row = $DB->fetchAssoc($resultColumns)) {
-               $columnName = $row['COLUMN_NAME'];
-
-               // Vérifier si la colonne est exclue
-               if (in_array($columnName, $excludedColumns)) {
-                     continue;
-               }
-
-               // Récupérer la valeur de la colonne dans la base pour le premier enregistrement
-               $queryValue = "
-                     SELECT `$columnName`
-                     FROM `$tableName`
-                     LIMIT 1;
-               ";
-               $resultValue = $DB->query($queryValue);
-               $value = '';
-
-               if ($resultValue && $rowValue = $DB->fetchAssoc($resultValue)) {
-                     $value = $rowValue[$columnName];
-                     if (isset($value)){
-                        $value = openssl_decrypt(base64_decode($value), 'aes-256-cbc', $config->loadEncryptionKey(), 0, '1234567890123456'); 
-                     }
-               }
-
-               // Générer le champ de texte pour la colonne
-               echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __($columnName, "gestion") . "</td><td>";
-               echo Html::input($columnName, ['value' => $value, 'size' => 30]);
-               echo "</td>";
-               echo "</tr>";
+            } else {
+               echo "<tr><td colspan='2'>Aucune colonne trouvée ou erreur dans la base de données.</td></tr>";
             }
-         } else {
-            echo "<tr><td colspan='2'>Aucune colonne trouvée ou erreur dans la base de données.</td></tr>";
          }
       }
       
