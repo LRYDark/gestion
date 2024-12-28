@@ -310,6 +310,8 @@ class PluginGestionTicket extends CommonDBTM {
                              }
                          }
                      }
+                  } catch (Exception $e) {
+                        
                   }
                }
   

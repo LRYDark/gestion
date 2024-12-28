@@ -228,23 +228,42 @@ if ($config->fields['ConfigModes'] == 0){
             $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
 
             // Étape 3 : Supprimez le fichier
-            if($sharepoint->deleteFile($fileId)){
-                // Sauvegarder le PDF modifié avec la signature ajoutée
-                try {
-                    $folderPath = "BL_SIGNE"; // Dossier cible dans SharePoint
-                    $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement
+            $sharepoint->deleteFile($fileId);
 
-                    // Étape 3 : Téléverser le fichier
-                    $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPath);
+            // Sauvegarder le PDF modifié avec la signature ajoutée
+            try {
+                // Requête SQL pour récupérer le folder_name où params = 3
+                $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
+                $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
 
-                    // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-                    $file_path = "BL_SIGNE/" . $DOC_NAME . ".pdf"; // Remplacez par le chemin exact de votre fichier
-                    // Étape 4 : Récupérez l'URL du fichier
-                    $fileUrl = $sharepoint->getFileUrl($file_path);
-                } catch (Exception $e) {
-                    message("Erreur : " . $e->getMessage(), ERROR);
+                if (!$result) {
+                    throw new Exception("Erreur lors de l'exécution de la requête SQL.");
                 }
+
+                // Vérifier si une ligne correspondante existe
+                $folderPath = ""; // Par défaut, $folderPath est vide
+                if ($row = $DB->fetchAssoc($result)) {
+                    $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
+                }
+
+                $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement
+
+                // Étape 3 : Téléverser le fichier
+                $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPath);
+
+                if (!empty($folderPath)){
+                    $folderPath = $folderPath . "/";
+                }
+                // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+                $file_path = $folderPath . $DOC_NAME . ".pdf"; // Remplacez par le chemin exact de votre fichier
+
+                // Étape 4 : Récupérez l'URL du fichier
+                $fileUrl = $sharepoint->getFileUrl($file_path);
+
+            } catch (Exception $e) {
+                message("Erreur : " . $e->getMessage(), ERROR);
             }
+            
         } catch (Exception $e) {
             message("Erreur : " . $e->getMessage(), ERROR);
         }

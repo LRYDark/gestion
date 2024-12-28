@@ -217,8 +217,8 @@ class PluginGestionConfig extends CommonDBTM
                      $values2 = [
                            0 => __('Dossier de récupération (Racine)', 'gestion'),
                            1 => __('Dossier de récupération (Global - Recursive)', 'gestion'),
-                           //2 => __('Dossier de récupération (Récup Doc ticket uniquement)', 'gestion'),
-                           //3 => __('Dossier de destination (Dépot Doc ticket uniquement)', 'gestion'),
+                           2 => __('Dossier de destination (Dépot Global)', 'gestion'),
+                           //3 => __('Dossier de récupération (Récup Doc ticket uniquement)', 'gestion'),
                            //4 => __('Dossier de récupération (Récup Doc gestion uniquement)', 'gestion'),
                            //5 => __('Dossier de destination (Dépot Doc gestion uniquement)', 'gestion'),
                            6 => __('Supprimer le dossier', 'gestion'),

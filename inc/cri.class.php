@@ -107,19 +107,27 @@ class PluginGestionCri extends CommonDBTM {
                   $documents ->getFromDB($doc_id);
                   $DocUrlSharePoint = $documents->fields['link'];
 
-                  // Utilisation
-                  try {
-                     $folderPath = 'BL_NON_SIGNE';
-                     $itemId = $Doc_Name.".pdf"; // Nom du fichier à rechercher
+                     // Utilisation
+                     try {
+                        // Requête SQL pour récupérer le folder_name où params = 3
+                        $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
+                        $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
 
-                     // Étape 3 : Récupérez l'ID du fichier
-                     $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
+                        if (!$result) {
+                           throw new Exception("Erreur lors de l'exécution de la requête SQL.");
+                        }
 
-                     if ($fileId) {
-                        $itemId = $fileId;
-                     } else {
-                        echo "Erreur : Fichier '$itemId' introuvable dans le dossier '$folderPath'.\n";
-                     }
+                        // Vérifier si une ligne correspondante existe
+                        $folderPath = ""; // Par défaut, $folderPath est vide
+                        if ($row = $DB->fetchAssoc($result)) {
+                           $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
+                        }
+
+                        if (!empty($folderPath)){
+                           $folderPath = $folderPath . "/";
+                        }
+                        // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+                        $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
 
                      // Étape 3 : Obtenez le lien de partage
                      $shareLink = $sharepoint->createShareLink($itemId);
@@ -245,10 +253,27 @@ class PluginGestionCri extends CommonDBTM {
                      $documents ->getFromDB($doc_id);
                      $DocUrlSharePoint = $documents->fields['link'];
 
-                     // Utilisation
+                    // Utilisation
                      try {
-                        $folderPath = 'BL_NON_SIGNE';
-                        $itemId = $Doc_Name.".pdf"; // Nom du fichier à rechercher
+                        // Requête SQL pour récupérer le folder_name où params = 3
+                        $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
+                        $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
+
+                        if (!$result) {
+                           throw new Exception("Erreur lors de l'exécution de la requête SQL.");
+                        }
+
+                        // Vérifier si une ligne correspondante existe
+                        $folderPath = ""; // Par défaut, $folderPath est vide
+                        if ($row = $DB->fetchAssoc($result)) {
+                           $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
+                        }
+
+                        if (!empty($folderPath)){
+                           $folderPath = $folderPath . "/";
+                        }
+                        // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+                        $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
 
                         // Étape 3 : Récupérez l'ID du fichier
                         $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
@@ -438,17 +463,25 @@ class PluginGestionCri extends CommonDBTM {
 
                   // Utilisation
                   try {
-                     $folderPath = 'BL_SIGNE';
-                     $itemId = $Doc_Name.".pdf"; // Nom du fichier à rechercher
+                     // Requête SQL pour récupérer le folder_name où params = 3
+                     $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
+                     $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
 
-                     // Étape 3 : Récupérez l'ID du fichier
-                     $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
-
-                     if ($fileId) {
-                        $itemId = $fileId;
-                     } else {
-                        echo "Erreur : Fichier '$itemId' introuvable dans le dossier '$folderPath'.\n";
+                     if (!$result) {
+                        throw new Exception("Erreur lors de l'exécution de la requête SQL.");
                      }
+
+                     // Vérifier si une ligne correspondante existe
+                     $folderPath = ""; // Par défaut, $folderPath est vide
+                     if ($row = $DB->fetchAssoc($result)) {
+                        $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
+                     }
+
+                     if (!empty($folderPath)){
+                        $folderPath = $folderPath . "/";
+                     }
+                     // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+                     $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
 
                      // Étape 3 : Obtenez le lien de partage
                      $shareLink = $sharepoint->createShareLink($itemId);
@@ -510,17 +543,25 @@ class PluginGestionCri extends CommonDBTM {
 
                   // Utilisation
                   try {
-                     $folderPath = 'BL_SIGNE';
-                     $itemId = $Doc_Name.".pdf"; // Nom du fichier à rechercher
+                     // Requête SQL pour récupérer le folder_name où params = 3
+                     $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
+                     $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
 
-                     // Étape 3 : Récupérez l'ID du fichier
-                     $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
-
-                     if ($fileId) {
-                        $itemId = $fileId;
-                     } else {
-                        echo "Erreur : Fichier '$itemId' introuvable dans le dossier '$folderPath'.\n";
+                     if (!$result) {
+                        throw new Exception("Erreur lors de l'exécution de la requête SQL.");
                      }
+
+                     // Vérifier si une ligne correspondante existe
+                     $folderPath = ""; // Par défaut, $folderPath est vide
+                     if ($row = $DB->fetchAssoc($result)) {
+                        $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
+                     }
+
+                     if (!empty($folderPath)){
+                        $folderPath = $folderPath . "/";
+                     }
+                     // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+                     $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
 
                      // Étape 3 : Obtenez le lien de partage
                      $shareLink = $sharepoint->createShareLink($itemId);
