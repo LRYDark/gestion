@@ -61,8 +61,12 @@ if ($config->fields['ConfigModes'] == 0){
 }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
 
     try {
+        $folderPath = ""; // Par défaut, $folderPath est vide
+        if (!empty($DOC->url_bl)){
+           $folderPath = $DOC->url_bl . "/";
+        }
         // Étape 3 : Définir le chemin relatif du fichier
-        $filePath = "BL_NON_SIGNE/".$DOC_NAME.".pdf";
+        $filePath = $folderPath.$DOC_NAME.".pdf";
 
         // Étape 4 : Obtenir l'URL de téléchargement
         $downloadUrl = $sharepoint->getDownloadUrl($filePath);
@@ -218,12 +222,16 @@ if ($config->fields['ConfigModes'] == 0){
         $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
         $tech_id = Session::getLoginUserID();
         $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
-
+        echo 'point de dep<br>';
         // Utilisation
         try {
-            $folderPath = 'BL_NON_SIGNE';
+            $folderPathFile = ""; // Par défaut, $folderPath est vide
+            if (!empty($DOC->url_bl)){
+               $folderPathFile = $DOC->url_bl;
+            }
+            $folderPath = $folderPathFile;
             $itemId = $DOC_NAME.".pdf"; // Nom du fichier à rechercher
-
+            
             // Étape 3 : Récupérez l'ID du fichier
             $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
 

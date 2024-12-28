@@ -439,7 +439,14 @@ class PluginGestionSharepoint extends CommonDBTM {
         $accessToken = $this->getAccessToken();
         $driveId = $this->GetDriveId();
 
-        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+        // Construire l'URL en fonction de la valeur de $folderPath
+        if (empty($folderPath)) {
+            // Si $folderPath est vide, utiliser l'URL pour le dossier racine
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children";
+        } else {
+            // Sinon, utiliser l'URL pour le dossier spécifié
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+        }
 
         $headers = [
             "Authorization: Bearer $accessToken",

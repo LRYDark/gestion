@@ -246,7 +246,11 @@ class PluginGestionTicket extends CommonDBTM {
               $selected_ids = [];
               while ($data = $result->fetch_assoc()) {
                   $groups[$data['bl']] = $data['bl']; // Utiliser 'bl' comme clé et valeur
-                  $selected_ids[] = $data['bl'];
+                  $url_bl = ""; // Par défaut, $folderPath est vide
+                  if (!empty($data['url_bl'])){
+                     $url_bl = $data['url_bl']."/";
+                  }
+                  $selected_ids[] = $url_bl.$data['bl'];
               }
   
               if ($config->fields['ConfigModes'] == 0){
@@ -277,24 +281,40 @@ class PluginGestionTicket extends CommonDBTM {
                      $hasValidParams = false; // Indicateur pour vérifier si des valeurs de params existent
                  
                      while ($row = $DB->fetchAssoc($result)) {
-                         $hasValidParams = true; // Une ligne avec params 0 ou 1 a été trouvée
-                         $folderPath = $row['folder_name']; // Obtenir le chemin du dossier
-                         $params = $row['params']; // Obtenir la valeur de params
-                 
-                         // Exécuter la méthode appropriée en fonction de la valeur de params
-                         if ($params == 0) {
-                             $contents = $sharepoint->listFolderContents($folderPath);
-                         } elseif ($params == 1) {
-                             $contents = $sharepoint->listFolderContentsRecursive($folderPath);
-                         }
-                 
-                         // Filtrer et ajouter les fichiers PDF
-                         foreach ($contents as $item) {
-                             if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
-                                 $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
-                                 $groups[$file_name] = $file_name; // Ajouter le nom du fichier au groupe
-                             }
-                         }
+                        $hasValidParams = true; // Une ligne avec params 0 ou 1 a été trouvée
+                        $folderPath = $row['folder_name']; // Obtenir le chemin du dossier
+                        $params = $row['params']; // Obtenir la valeur de params
+               
+                        // Exécuter la méthode appropriée en fonction de la valeur de params
+                        if ($params == 0) {
+                           $contents = $sharepoint->listFolderContents($folderPath);
+                        } elseif ($params == 1) {
+                           $contents = $sharepoint->listFolderContentsRecursive($folderPath);
+                        }
+                        // Filtrer et ajouter les fichiers PDF
+                        foreach ($contents as $item) {
+                           if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
+                              // Extraire le nom du fichier sans extension
+                              $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
+
+                              // Extraire le chemin relatif
+                              if (isset($item['parentReference']['path'])) {
+                                 // La clé 'parentReference.path' contient le chemin complet
+                                 $fullPath = $item['parentReference']['path'];
+
+                                 // Extraire la partie après "/root:/"
+                                 $relativePath = '';
+                                 if (strpos($fullPath, '/root:/') !== false) {
+                                       $relativePath = substr($fullPath, strpos($fullPath, '/root:/') + 7)."/"; // Retirer "/root:/"
+                                 }
+                              } else {
+                                 $relativePath = ""; // Si aucune information de chemin n'est disponible
+                              }
+
+                              // Ajouter au groupe
+                              $groups[$relativePath.$file_name] = $file_name; // Ajouter le nom du fichier
+                           }
+                        }
                      }
                  
                      // Si aucune ligne valide n'a été trouvée, utiliser le chemin par défaut
@@ -302,19 +322,36 @@ class PluginGestionTicket extends CommonDBTM {
                          $folderPath = ''; // Récupérer le nom par défaut
                          $contents = $sharepoint->listFolderContents($folderPath); // Utiliser listFolderContents
                  
-                         // Filtrer et ajouter les fichiers PDF
-                         foreach ($contents as $item) {
-                             if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
-                                 $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
-                                 $groups[$file_name] = $file_name; // Ajouter le nom du fichier au groupe
-                             }
-                         }
+                        // Filtrer et ajouter les fichiers PDF
+                        foreach ($contents as $item) {
+                           if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
+                              // Extraire le nom du fichier sans extension
+                              $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
+
+                              // Extraire le chemin relatif
+                              if (isset($item['parentReference']['path'])) {
+                                 // La clé 'parentReference.path' contient le chemin complet
+                                 $fullPath = $item['parentReference']['path'];
+
+                                 // Extraire la partie après "/root:/"
+                                 $relativePath = '';
+                                 if (strpos($fullPath, '/root:/') !== false) {
+                                       $relativePath = substr($fullPath, strpos($fullPath, '/root:/') + 7); // Retirer "/root:/"
+                                 }
+                              } else {
+                                 $relativePath = ""; // Si aucune information de chemin n'est disponible
+                              }
+
+                              // Ajouter au groupe
+                              $groups[$relativePath.$file_name] = $file_name; // Ajouter le nom du fichier
+                           }
+                        }
                      }
                   } catch (Exception $e) {
                         
                   }
-               }
-  
+               } 
+
                $selected_values_json = json_encode($selected_ids);
                $csrf_token = Session::getNewCSRFToken();
                
@@ -398,6 +435,7 @@ class PluginGestionTicket extends CommonDBTM {
                      `entities_id` int {$default_key_sign} NOT NULL DEFAULT '0',
                      `users_id` int {$default_key_sign} NULL,
                      `users_ext` VARCHAR(255) NULL,
+                     `UrlBl` VARCHAR(255) NULL,
                      `bl` VARCHAR(255) NULL,
                      `signed` int NOT NULL DEFAULT '0',
                      `date_creation` TIMESTAMP NULL,

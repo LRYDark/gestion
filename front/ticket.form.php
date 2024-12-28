@@ -41,7 +41,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             $file_path = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned/" . $item . ".pdf"; 
         }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
             // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-            $file_path = "BL_NON_SIGNE/" . $item . ".pdf"; // Remplacez par le chemin exact de votre fichier
+            $file_path = $item . ".pdf"; // Remplacez par le chemin exact de votre fichier
             // Étape 4 : Récupérez l'URL du fichier
             $fileUrl = $sharepoint->getFileUrl($file_path);
         }
@@ -84,7 +84,16 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             if ($sharepoint->checkFileExists($file_path)) {
                 $file_name = basename($file_path);
                 $file_path_bdd = $fileUrl;
-    
+
+                // Expression régulière pour extraire les deux parties
+                $pattern = '#^(.*)/(.*)$#';
+
+                // Vérification et extraction
+                if (preg_match($pattern, $item, $matches)) {
+                    $itemUrl = $matches[1]; // xxx/zzzz ou xxx/xxxx/zzzz
+                    $item = $matches[2]; // zzzz
+                } 
+
                 // Préparer les informations pour le document
                 $input = [
                     'name'        => 'PDF : Doc - ' . str_replace("?", "°", $item),
@@ -100,7 +109,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                 $doc = new Document();
                 if ($doc_id = $doc->add($input)) {
                     // Insérer le ticket et l'ID de document dans glpi_plugin_gestion_tickets
-                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_tickets (tickets_id, entities_id, bl, doc_id) VALUES ($ticketId, $entityId, '".$DB->escape($item)."', $doc_id)")) {
+                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_tickets (tickets_id, entities_id, url_bl, bl, doc_id) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', $doc_id)")) {
                         $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                     }
                 } else {
