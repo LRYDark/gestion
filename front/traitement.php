@@ -219,38 +219,37 @@ if ($config->fields['ConfigModes'] == 0){
         $tech_id = Session::getLoginUserID();
         $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
 
-        // Sauvegarder le PDF modifié avec la signature ajoutée
+        // Utilisation
         try {
-            $folderPath = "BL_SIGNE"; // Dossier cible dans SharePoint
-            $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement
+            $folderPath = 'BL_NON_SIGNE';
+            $itemId = $DOC_NAME.".pdf"; // Nom du fichier à rechercher
 
-            // Étape 3 : Téléverser le fichier
-            $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPath);
+            // Étape 3 : Récupérez l'ID du fichier
+            $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
 
-            // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-            $file_path = "BL_SIGNE/" . $DOC_NAME . ".pdf"; // Remplacez par le chemin exact de votre fichier
-            // Étape 4 : Récupérez l'URL du fichier
-            $fileUrl = $sharepoint->getFileUrl($file_path);
+            // Étape 3 : Supprimez le fichier
+            if($sharepoint->deleteFile($fileId)){
+                // Sauvegarder le PDF modifié avec la signature ajoutée
+                try {
+                    $folderPath = "BL_SIGNE"; // Dossier cible dans SharePoint
+                    $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement
+
+                    // Étape 3 : Téléverser le fichier
+                    $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPath);
+
+                    // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+                    $file_path = "BL_SIGNE/" . $DOC_NAME . ".pdf"; // Remplacez par le chemin exact de votre fichier
+                    // Étape 4 : Récupérez l'URL du fichier
+                    $fileUrl = $sharepoint->getFileUrl($file_path);
+                } catch (Exception $e) {
+                    message("Erreur : " . $e->getMessage(), ERROR);
+                }
+            }
         } catch (Exception $e) {
             message("Erreur : " . $e->getMessage(), ERROR);
         }
-
+       
         if ($DB->query("UPDATE glpi_documents SET link = '$fileUrl' WHERE id = $DOC_FILES->id")){
-
-            // Utilisation
-            try {
-                $folderPath = 'BL_NON_SIGNE';
-                $itemId = $DOC_NAME.".pdf"; // Nom du fichier à rechercher
-
-                // Étape 3 : Récupérez l'ID du fichier
-                $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
-
-                // Étape 3 : Supprimez le fichier
-                $sharepoint->deleteFile($fileId);
-            } catch (Exception $e) {
-                message("Erreur : " . $e->getMessage(), ERROR);
-            }
-
             unlink($existingPdfPath);
             unlink($signaturePath);
             unlink($outputPath);

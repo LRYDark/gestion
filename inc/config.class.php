@@ -215,12 +215,12 @@ class PluginGestionConfig extends CommonDBTM
 
                      // Tableau des options pour le champ déroulant
                      $values2 = [
-                           0 => __('Dossier de récupération (Global)', 'gestion'),
-                           1 => __('Dossier de destination (Global)', 'gestion'),
-                           2 => __('Dossier de récupération (Récup Doc ticket uniquement)', 'gestion'),
-                           3 => __('Dossier de destination (Dépot Doc ticket uniquement)', 'gestion'),
-                           4 => __('Dossier de récupération (Récup Doc gestion uniquement)', 'gestion'),
-                           5 => __('Dossier de destination (Dépot Doc gestion uniquement)', 'gestion'),
+                           0 => __('Dossier de récupération (Racine)', 'gestion'),
+                           1 => __('Dossier de récupération (Global - Recursive)', 'gestion'),
+                           //2 => __('Dossier de récupération (Récup Doc ticket uniquement)', 'gestion'),
+                           //3 => __('Dossier de destination (Dépot Doc ticket uniquement)', 'gestion'),
+                           //4 => __('Dossier de récupération (Récup Doc gestion uniquement)', 'gestion'),
+                           //5 => __('Dossier de destination (Dépot Doc gestion uniquement)', 'gestion'),
                            6 => __('Supprimer le dossier', 'gestion'),
                            7 => __('Mettre en pause', 'gestion'),
                            8 => __('__Non attribué__', 'gestion'),

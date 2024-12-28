@@ -262,63 +262,95 @@ class PluginGestionTicket extends CommonDBTM {
                            }
                         }
                   }
-              }elseif ($config->fields['ConfigModes'] == 1){
-                  // Utilisation affiche des dossiers du site
+               }elseif ($config->fields['ConfigModes'] == 1 && !empty($config->fields['Global'])){
                   try {
-                     // Étape 3 : Lister le contenu du dossier "BL"
-                     $folderPath = "BL_NON_SIGNE"; // Chemin relatif dans la bibliothèque
-                     $contents = $sharepoint->listFolderContents($folderPath);
-
-                     // Affichage des résultats
-                     $groups = [];
-                     foreach ($contents as $item) {
-                           $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
-                           $groups[$file_name] = $file_name; // Utiliser le nom du fichier sans extension
+                     // Récupérer les lignes de la table où la colonne params est 0 ou 1
+                     $query = "SELECT folder_name, params FROM glpi_plugin_gestion_configsfolder WHERE params IN (0, 1)";
+                     $result = $DB->query($query); // Utilisation de la classe GLPI pour les requêtes
+                 
+                     if (!$result) {
+                         throw new Exception("Erreur lors de l'exécution de la requête SQL.");
                      }
-                  } catch (Exception $e) {
-                     echo "Erreur : " . $e->getMessage();
+                 
+                     // Initialisation des groupes et vérification des résultats
+                     $groups = [];
+                     $hasValidParams = false; // Indicateur pour vérifier si des valeurs de params existent
+                 
+                     while ($row = $DB->fetchAssoc($result)) {
+                         $hasValidParams = true; // Une ligne avec params 0 ou 1 a été trouvée
+                         $folderPath = $row['folder_name']; // Obtenir le chemin du dossier
+                         $params = $row['params']; // Obtenir la valeur de params
+                 
+                         // Exécuter la méthode appropriée en fonction de la valeur de params
+                         if ($params == 0) {
+                             $contents = $sharepoint->listFolderContents($folderPath);
+                         } elseif ($params == 1) {
+                             $contents = $sharepoint->listFolderContentsRecursive($folderPath);
+                         }
+                 
+                         // Filtrer et ajouter les fichiers PDF
+                         foreach ($contents as $item) {
+                             if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
+                                 $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
+                                 $groups[$file_name] = $file_name; // Ajouter le nom du fichier au groupe
+                             }
+                         }
+                     }
+                 
+                     // Si aucune ligne valide n'a été trouvée, utiliser le chemin par défaut
+                     if (!$hasValidParams) {
+                         $folderPath = ''; // Récupérer le nom par défaut
+                         $contents = $sharepoint->listFolderContents($folderPath); // Utiliser listFolderContents
+                 
+                         // Filtrer et ajouter les fichiers PDF
+                         foreach ($contents as $item) {
+                             if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
+                                 $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
+                                 $groups[$file_name] = $file_name; // Ajouter le nom du fichier au groupe
+                             }
+                         }
+                     }
                   }
-              }
-
+               }
   
-              $selected_values_json = json_encode($selected_ids);
-              $csrf_token = Session::getNewCSRFToken();
-              
-              // Modal HTML
-              echo <<<HTML
-              <div class="modal fade" id="AddGestionModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-                  <div class="modal-dialog">
-                      <div class="modal-content">
-                          <div class="modal-header">
-                              <h5 class="modal-title" id="AddGestionModalLabel">Ajouter un BC / BL</h5>
-                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                          </div>
-                          <div class="modal-body">
-              HTML;
-              
-                  // Fermeture temporaire de HTML pour inclure du PHP
-                  echo '<form method="post" action="' . Toolbox::getItemTypeFormURL('PluginGestionTicket') . '">';
-                  echo '<input type="hidden" name="_glpi_csrf_token" value="' . $csrf_token . '">';
-                  echo '<input type="hidden" name="tickets_id" value="' . $ticketId . '">';
-              
-                  // Affichage du dropdown
-                  Dropdown::showFromArray("groups_id", $groups, [
-                      'multiple' => true,
-                      'width' => 200,
-                      'values' => json_decode($selected_values_json, true)
-                  ]);
-              
-              echo <<<HTML
-                                  <div class="modal-footer">
-                                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                                      <button type="submit" name="save_selection" class="btn btn-primary">Sauvegarder</button>
-                                  </div>
-                              </form>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-              HTML;
+               $selected_values_json = json_encode($selected_ids);
+               $csrf_token = Session::getNewCSRFToken();
+               
+               // Modal HTML
+               echo <<<HTML
+               <div class="modal fade" id="AddGestionModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
+                     <div class="modal-dialog">
+                        <div class="modal-content">
+                           <div class="modal-header">
+                                 <h5 class="modal-title" id="AddGestionModalLabel">Ajouter un BC / BL</h5>
+                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                           </div>
+                           <div class="modal-body">
+               HTML;
+               
+                     // Fermeture temporaire de HTML pour inclure du PHP
+                     echo '<form method="post" action="' . Toolbox::getItemTypeFormURL('PluginGestionTicket') . '">';
+                     echo '<input type="hidden" name="_glpi_csrf_token" value="' . $csrf_token . '">';
+                     echo '<input type="hidden" name="tickets_id" value="' . $ticketId . '">';
+               
+                     // Affichage du dropdown
+                     Dropdown::showFromArray("groups_id", $groups, [
+                        'multiple' => true,
+                        'width' => 200,
+                        'values' => json_decode($selected_values_json, true)
+                     ]);
+               
+               echo <<<HTML
+                                    <div class="modal-footer">
+                                       <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                                       <button type="submit" name="save_selection" class="btn btn-primary">Sauvegarder</button>
+                                    </div>
+                                 </form>
+                           </div>
+                        </div>
+                     </div>
+               </div>
+               HTML;
   
                // Bouton d'ouverture du modal avec style ajusté
                $entitie = "<div class='d-inline-block' style='margin-left: 0px; margin-top: 7px;'><button id='add_gestion' type='button' style='border: 1px solid; padding: 2px 10px;' class='btn-sm btn-outline-secondary' data-bs-toggle='modal' data-bs-target='#AddGestionModal'><i class='fas fa-plus'></i> Lié des documents</button></div>";

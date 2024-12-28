@@ -108,7 +108,14 @@ class PluginGestionSharepoint extends CommonDBTM {
         $accessToken = $this->getAccessToken();
         $driveId = $this->GetDriveId();
 
-        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+        // Construire l'URL en fonction de la valeur de $folderPath
+        if (empty($folderPath)) {
+            // Si $folderPath est vide, utiliser l'URL pour le dossier racine
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children";
+        } else {
+            // Sinon, utiliser l'URL pour le dossier spécifié
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+        }
 
         $headers = [
             "Authorization: Bearer $accessToken",
@@ -131,6 +138,56 @@ class PluginGestionSharepoint extends CommonDBTM {
             echo "<br><br>";
             throw new Exception("Impossible de récupérer le contenu du dossier : " . $response);
         }
+    }
+
+    /**
+     * Fonction récursive pour lister le contenu d'un dossier et de ses sous-dossiers
+     */
+    public function listFolderContentsRecursive($folderPath) {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+
+        // Construire l'URL en fonction de la valeur de $folderPath
+        if (empty($folderPath)) {
+            // Si $folderPath est vide, utiliser l'URL pour le dossier racine
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children";
+        } else {
+            // Sinon, utiliser l'URL pour le dossier spécifié
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+        }
+
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/json"
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        $responseObj = json_decode($response, true);
+
+        if (!isset($responseObj['value'])) {
+            throw new Exception("Impossible de récupérer le contenu du dossier : " . $response);
+        }
+
+        $contents = [];
+        foreach ($responseObj['value'] as $item) {
+            if ($item['folder'] ?? false) {
+                // Si l'élément est un dossier, appeler récursivement la fonction
+                $subFolderPath = $folderPath . '/' . $item['name'];
+                $contents = array_merge($contents, $this->listFolderContentsRecursive($subFolderPath));
+            } else {
+                // Ajouter le fichier à la liste
+                $contents[] = $item;
+            }
+        }
+
+        return $contents;
     }
 
     /**
