@@ -58,6 +58,24 @@ class PluginGestionConfig extends CommonDBTM
       $config->showFormHeader(['colspan' => 4]);
       echo "<tr><th colspan='2'>" . __('Gestion', 'rp') . "</th></tr>";
 
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Affichage du PDF après signature", "rt") . "</td><td>";
+            Dropdown::showYesNo('DisplayPdfEnd', $config->DisplayPdfEnd(), -1);
+         echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Envoie des PDF par mail", "rt") . "</td><td>";
+            Dropdown::showYesNo('MailTo', $config->MailTo(), -1);
+         echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Enregistrement dans ZenDoc par mail", "gestion") . "</td><td>";
+            echo Html::input('ZenDocMail', ['value' => $config->ZenDocMail(), 'size' => 80]);// bouton configuration du bas de page line 1
+         echo "</td>";
+      echo "</tr>";
+
       // Mode de configuration de récupération
          $values = [
             0 => __('Dossier Local','gestion'),
@@ -77,6 +95,12 @@ class PluginGestionConfig extends CommonDBTM
       // -----------------------------------------------------------------------
 
       if($config->fields['ConfigModes'] == 1){
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Prévisualisation du PDF avant signature (cela peut provoquer des ralentissements). Vérifiez également la configuration de SharePoint pour le partage par lien.", "rt") . "</td><td>";
+               Dropdown::showYesNo('SharePointLinkDisplay', $config->SharePointLinkDisplay(), -1);
+            echo "</td>";
+         echo "</tr>";
+
          echo "<tr><th colspan='2'>" . __('Configuration de SharePoint (API Graph)', 'rp') . "</th></tr>";
 
          echo "<tr class='tab_bg_1'>";
@@ -264,6 +288,22 @@ class PluginGestionConfig extends CommonDBTM
    {
       return ($this->fields['Global']);
    }
+   function ZenDocMail()
+   {
+      return ($this->fields['ZenDocMail']);
+   }
+   function SharePointLinkDisplay()
+   {
+      return ($this->fields['SharePointLinkDisplay']);
+   }
+   function DisplayPdfEnd()
+   {
+      return ($this->fields['DisplayPdfEnd']);
+   }
+   function MailTo()
+   {
+      return ($this->fields['MailTo']);
+   }
    function TenantID(){
       return openssl_decrypt(base64_decode($this->fields['TenantID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
    }
@@ -332,6 +372,10 @@ class PluginGestionConfig extends CommonDBTM
                   `Hostname` TEXT NULL,
                   `SitePath` TEXT NULL,
                   `Global` VARCHAR(255) NULL,
+                  `ZenDocMail` VARCHAR(255) NULL,
+                  `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
+                  `MailTo` TINYINT NOT NULL DEFAULT '0',
+                  `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',
                   PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
          $DB->query($query) or die($DB->error());

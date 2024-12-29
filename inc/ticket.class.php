@@ -435,7 +435,7 @@ class PluginGestionTicket extends CommonDBTM {
                      `entities_id` int {$default_key_sign} NOT NULL DEFAULT '0',
                      `users_id` int {$default_key_sign} NULL,
                      `users_ext` VARCHAR(255) NULL,
-                     `UrlBl` VARCHAR(255) NULL,
+                     `url_bl` VARCHAR(255) NULL,
                      `bl` VARCHAR(255) NULL,
                      `signed` int NOT NULL DEFAULT '0',
                      `date_creation` TIMESTAMP NULL,
