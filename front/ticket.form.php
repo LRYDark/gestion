@@ -5,7 +5,7 @@ Session::haveRight("ticket", UPDATE);
 global $DB, $CFG_GLPI;
 $doc = new Document();
 
-require_once '../inc/SharePointGraph.php';
+require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
 $sharepoint = new PluginGestionSharepoint();
 
 // Vérifier que le formulaire a été soumis

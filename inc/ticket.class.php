@@ -230,7 +230,7 @@ class PluginGestionTicket extends CommonDBTM {
    static function postShowItemNewTaskGESTION($params) {
       global $DB, $gestion;
       $config = new PluginGestionConfig();
-      require_once 'SharePointGraph.php';
+      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint();
   
       // Vérifier que la page actuelle est ticket.form.php

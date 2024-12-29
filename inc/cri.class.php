@@ -18,7 +18,7 @@ class PluginGestionCri extends CommonDBTM {
       $config     = PluginGestionConfig::getInstance(); // Récupérer la configuration
       $documents  = new Document(); // Initialiser la classe Document
       $job        = new Ticket(); // Initialiser la classe Ticket
-      require_once 'SharePointGraph.php';
+      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint(); // Initialiser la classe SharePointGraph
       
       $job->getfromDB($ID);

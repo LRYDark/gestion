@@ -52,7 +52,7 @@ class PluginGestionConfig extends CommonDBTM
    {
       $config = new self();
       $config->getFromDB(1);
-      require_once 'SharePointGraph.php';
+      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint();
 
       $config->showFormHeader(['colspan' => 4]);
@@ -64,17 +64,36 @@ class PluginGestionConfig extends CommonDBTM
          echo "</td>";
       echo "</tr>";
 
-      /*echo "<tr class='tab_bg_1'>";
+      echo "<tr class='tab_bg_1'>";
          echo "<td>" . __("Envoie des PDF par mail", "rt") . "</td><td>";
             Dropdown::showYesNo('MailTo', $config->MailTo(), -1);
          echo "</td>";
       echo "</tr>";
 
       echo "<tr class='tab_bg_1'>";
+         echo "<td> Gabarit : Modèle de notifications </td>";
+         echo "<td>";
+
+         //notificationtemplates_id
+         Dropdown::show('NotificationTemplate', [
+            'name' => 'gabarit',
+            'value' => $config->gabarit(),
+            'display_emptychoice' => 1,
+            'specific_tags' => [],
+            'itemtype' => 'NotificationTemplate',
+            'displaywith' => [],
+            'emptylabel' => "-----",
+            'used' => [],
+            'toadd' => [],
+            'entity_restrict' => 0,
+         ]); 
+      echo "</td></tr>";
+
+      echo "<tr class='tab_bg_1'>";
          echo "<td>" . __("Enregistrement dans ZenDoc par mail", "gestion") . "</td><td>";
             echo Html::input('ZenDocMail', ['value' => $config->ZenDocMail(), 'size' => 40]);// bouton configuration du bas de page line 1
          echo "</td>";
-      echo "</tr>";*/
+      echo "</tr>";
 
       // Mode de configuration de récupération
          $values = [
@@ -328,8 +347,7 @@ class PluginGestionConfig extends CommonDBTM
                }
             }
          }
-      }
-      
+      }   
       $config->showFormButtons(['candel' => false]);
       return false;
    }
@@ -369,6 +387,10 @@ class PluginGestionConfig extends CommonDBTM
    function MailTo()
    {
       return ($this->fields['MailTo']);
+   }
+   function gabarit()
+   {
+      return ($this->fields['gabarit']);
    }
    function TenantID(){
       return openssl_decrypt(base64_decode($this->fields['TenantID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
@@ -439,10 +461,11 @@ class PluginGestionConfig extends CommonDBTM
                   `SitePath` TEXT NULL,
                   `Global` VARCHAR(255) NULL,
                   `ZenDocMail` VARCHAR(255) NULL,
-                  `NumberViews` INT(50) NOT NULL DEFAULT '800',
+                  `NumberViews` INT(10) NOT NULL DEFAULT '800',
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',
+                  `gabarit` INT(10) NOT NULL DEFAULT '0',
                   PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
          $DB->query($query) or die($DB->error());
@@ -454,6 +477,43 @@ class PluginGestionConfig extends CommonDBTM
             `params` TINYINT NOT NULL DEFAULT '8',
             PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
+         $DB->query($query) or die($DB->error());
+
+         $result = $DB->query("SELECT id FROM glpi_notificationtemplates WHERE NAME = 'Gestion Mail PDF' AND comment = 'Created by the plugin gestion'");
+
+         while ($ID = $result->fetch_object()) {
+             if (!empty($ID->id)) {
+                 // Suppression de la ligne dans glpi_notificationtemplates
+                 $deleteTemplateQuery = "DELETE FROM glpi_notificationtemplates WHERE id = {$ID->id}";
+                 $DB->query($deleteTemplateQuery);
+         
+                 // Suppression de la ligne correspondante dans glpi_notificationtemplatetranslations
+                 $deleteTranslationQuery = "DELETE FROM glpi_notificationtemplatetranslations WHERE notificationtemplates_id = {$ID->id}";
+                 $DB->query($deleteTranslationQuery);
+             }
+         }
+   
+         require_once PLUGIN_GESTION_DIR.'/front/MailContent.php';
+         $content_html = $ContentHtml;
+
+         // Échapper le contenu HTML
+         $content_html_escaped = Toolbox::addslashes_deep($content_html);
+   
+         // Construire la requête d'insertion
+         $insertQuery1 = "INSERT INTO `glpi_notificationtemplates` (`name`, `itemtype`, `date_mod`, `comment`, `css`, `date_creation`) VALUES ('Gestion Mail PDF', 'Ticket', NULL, 'Created by the plugin gestion', '', NULL);";
+         // Exécuter la requête
+         $DB->query($insertQuery1);
+   
+         // Construire la requête d'insertion
+         $insertQuery2 = "INSERT INTO `glpi_notificationtemplatetranslations` 
+            (`notificationtemplates_id`, `language`, `subject`, `content_text`, `content_html`) 
+            VALUES (LAST_INSERT_ID(), 'fr_FR', '[GLPI] | Document signé', '', '{$content_html_escaped}')";
+         // Exécuter la requête
+         $DB->query($insertQuery2);
+   
+         $ID = $DB->query("SELECT id FROM glpi_notificationtemplates WHERE NAME = 'Gestion Mail PDF' AND comment = 'Created by the plugin gestion'")->fetch_object();
+   
+         $query= "UPDATE glpi_plugin_gestion_configs SET gabarit = $ID->id WHERE id=1;";
          $DB->query($query) or die($DB->error());
       }
    }
