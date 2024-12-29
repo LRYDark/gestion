@@ -64,7 +64,7 @@ class PluginGestionConfig extends CommonDBTM
          echo "</td>";
       echo "</tr>";
 
-      echo "<tr class='tab_bg_1'>";
+      /*echo "<tr class='tab_bg_1'>";
          echo "<td>" . __("Envoie des PDF par mail", "rt") . "</td><td>";
             Dropdown::showYesNo('MailTo', $config->MailTo(), -1);
          echo "</td>";
@@ -74,7 +74,7 @@ class PluginGestionConfig extends CommonDBTM
          echo "<td>" . __("Enregistrement dans ZenDoc par mail", "gestion") . "</td><td>";
             echo Html::input('ZenDocMail', ['value' => $config->ZenDocMail(), 'size' => 40]);// bouton configuration du bas de page line 1
          echo "</td>";
-      echo "</tr>";
+      echo "</tr>";*/
 
       // Mode de configuration de récupération
          $values = [
