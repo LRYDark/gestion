@@ -288,6 +288,10 @@ class PluginGestionConfig extends CommonDBTM
    {
       return ($this->fields['Global']);
    }
+   function NumberViews()
+   {
+      return ($this->fields['NumberViews']);
+   }
    function ZenDocMail()
    {
       return ($this->fields['ZenDocMail']);
@@ -373,6 +377,7 @@ class PluginGestionConfig extends CommonDBTM
                   `SitePath` TEXT NULL,
                   `Global` VARCHAR(255) NULL,
                   `ZenDocMail` VARCHAR(255) NULL,
+                  `NumberViews` INT(50) NOT NULL DEFAULT '200',
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',

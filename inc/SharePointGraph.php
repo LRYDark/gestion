@@ -107,14 +107,15 @@ class PluginGestionSharepoint extends CommonDBTM {
     public function listFolderContents($folderPath) {
         $accessToken = $this->getAccessToken();
         $driveId = $this->GetDriveId();
+        $NumberViews = $this->NumberViews();
 
         // Construire l'URL en fonction de la valeur de $folderPath
         if (empty($folderPath)) {
             // Si $folderPath est vide, utiliser l'URL pour le dossier racine
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children";
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children\$top=$NumberViews";
         } else {
             // Sinon, utiliser l'URL pour le dossier spécifié
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children\$top=$NumberViews";
         }
 
         $headers = [
@@ -146,14 +147,15 @@ class PluginGestionSharepoint extends CommonDBTM {
     public function listFolderContentsRecursive($folderPath) {
         $accessToken = $this->getAccessToken();
         $driveId = $this->GetDriveId();
+        $NumberViews = $this->NumberViews();
 
         // Construire l'URL en fonction de la valeur de $folderPath
         if (empty($folderPath)) {
             // Si $folderPath est vide, utiliser l'URL pour le dossier racine
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children";
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children?\$top=$NumberViews";
         } else {
             // Sinon, utiliser l'URL pour le dossier spécifié
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children?\$top=$NumberViews";
         }
 
         $headers = [
