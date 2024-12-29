@@ -72,7 +72,7 @@ class PluginGestionConfig extends CommonDBTM
 
       echo "<tr class='tab_bg_1'>";
          echo "<td>" . __("Enregistrement dans ZenDoc par mail", "gestion") . "</td><td>";
-            echo Html::input('ZenDocMail', ['value' => $config->ZenDocMail(), 'size' => 80]);// bouton configuration du bas de page line 1
+            echo Html::input('ZenDocMail', ['value' => $config->ZenDocMail(), 'size' => 40]);// bouton configuration du bas de page line 1
          echo "</td>";
       echo "</tr>";
 
@@ -95,13 +95,32 @@ class PluginGestionConfig extends CommonDBTM
       // -----------------------------------------------------------------------
 
       if($config->fields['ConfigModes'] == 1){
+         echo "<tr><th colspan='2'>" . __("Configuration de l'affichage", 'rp') . "</th></tr>";
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Prévisualisation du PDF avant signature (cela peut provoquer des ralentissements). Vérifiez également la configuration de SharePoint pour le partage par lien.", "rt") . "</td><td>";
                Dropdown::showYesNo('SharePointLinkDisplay', $config->SharePointLinkDisplay(), -1);
             echo "</td>";
          echo "</tr>";
 
-         echo "<tr><th colspan='2'>" . __('Configuration de SharePoint (API Graph)', 'rp') . "</th></tr>";
+         // Générer les options du menu déroulant
+         $dropdownValues = [];
+         for ($i = 100; $i <= 20000; $i += 100) {
+            $dropdownValues[$i] = $i; // La clé et la valeur sont identiques dans ce cas
+         }
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Nombre d'éléments maximum à afficher", "gestion") . "</td><td>";
+               // Afficher le menu déroulant avec Dropdown::show()
+               Dropdown::showFromArray(
+                  'NumberViews',  // Nom de l'identifiant du champ
+                  $dropdownValues,    // Tableau des options
+                  [
+                     'value'      => $config->NumberViews(),        // Valeur sélectionnée par défaut (optionnel)
+                  ]
+               );
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr><th colspan='2'>" . __('Connexion de SharePoint (API Graph)', 'rp') . "</th></tr>";
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
@@ -255,12 +274,55 @@ class PluginGestionConfig extends CommonDBTM
                            $folder_name,
                            $values2,
                            [
-                              'value' => $value
+                              'value' => $value,
+                              'class' => 'folder-dropdown', // Ajouter une classe CSS
+                              'data-folder' => $folder_name // Ajouter un attribut unique pour JS
                            ]
                      );
                      echo "</td>";
                      echo "</tr>";
                   }
+
+                  ?><script defer>
+                     const dropdowns = document.querySelectorAll('.folder-dropdown');
+
+                     // Fonction pour désactiver uniquement l'option avec la valeur `2`
+                     function updateDropdowns() {
+                        // Récupérer toutes les valeurs actuellement sélectionnées
+                        const selectedValues = Array.from(dropdowns).map(dropdown => dropdown.value);
+
+                        // Vérifier si la valeur `2` est sélectionnée
+                        const isOption2Selected = selectedValues.includes("2");
+
+                        // Si l'option 2 est sélectionnée, désactiver uniquement celle-ci dans les autres dropdowns
+                        dropdowns.forEach(dropdown => {
+                           const options = dropdown.querySelectorAll('option'); // Cibler les <option>
+                           const currentValue = dropdown.value;
+
+                           options.forEach(option => {
+                                 const value = option.value;
+
+                                 if (value === "2" && isOption2Selected && currentValue !== "2") {
+                                    option.disabled = true;
+                                 } else {
+                                    option.disabled = false; // Réactiver si elle devient disponible
+                                 }
+                           });
+
+                           // Rafraîchir le rendu Select2 après modification des options
+                           $(dropdown).select2();
+                        });
+                     }
+
+                     // Ajouter les événements sur chaque dropdown pour mettre à jour les options dynamiquement
+                     dropdowns.forEach(dropdown => {
+                        $(dropdown).on('select2:select', updateDropdowns); // Lorsqu'une option est sélectionnée
+                        $(dropdown).on('select2:unselect', updateDropdowns); // Si une option est désélectionnée (utile pour multi-sélection)
+                     });
+
+                     // Mise à jour initiale
+                     updateDropdowns();
+                  </script><?php
                } else {
                   echo "<tr><td colspan='2'>Aucun paramètre trouvé ou erreur dans la base de données.</td></tr>";
                }
@@ -377,7 +439,7 @@ class PluginGestionConfig extends CommonDBTM
                   `SitePath` TEXT NULL,
                   `Global` VARCHAR(255) NULL,
                   `ZenDocMail` VARCHAR(255) NULL,
-                  `NumberViews` INT(50) NOT NULL DEFAULT '200',
+                  `NumberViews` INT(50) NOT NULL DEFAULT '800',
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',

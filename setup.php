@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.1.1'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.1.2'); // version du plugin
 
 // Minimal GLPI version,
 define("PLUGIN_GESTION_MIN_GLPI", "10.0.3");

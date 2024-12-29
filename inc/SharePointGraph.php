@@ -107,7 +107,8 @@ class PluginGestionSharepoint extends CommonDBTM {
     public function listFolderContents($folderPath) {
         $accessToken = $this->getAccessToken();
         $driveId = $this->GetDriveId();
-        $NumberViews = $this->NumberViews();
+        $config = new PluginGestionConfig();
+        $NumberViews = $config->NumberViews();
 
         // Construire l'URL en fonction de la valeur de $folderPath
         if (empty($folderPath)) {
@@ -147,7 +148,8 @@ class PluginGestionSharepoint extends CommonDBTM {
     public function listFolderContentsRecursive($folderPath) {
         $accessToken = $this->getAccessToken();
         $driveId = $this->GetDriveId();
-        $NumberViews = $this->NumberViews();
+        $config = new PluginGestionConfig();
+        $NumberViews = $config->NumberViews();
 
         // Construire l'URL en fonction de la valeur de $folderPath
         if (empty($folderPath)) {
