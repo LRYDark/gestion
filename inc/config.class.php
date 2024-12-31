@@ -95,6 +95,62 @@ class PluginGestionConfig extends CommonDBTM
          echo "</td>";
       echo "</tr>";
 
+      echo "<tr class='tab_bg_1'>";
+      echo "<td>" . __("Position de la signature sur le PDF", "gestion") . "</td><td>";
+         echo '<div style="display: flex; align-items: center; gap: 5px;">';
+         echo '<label for="SignatureX">Signature X</label>';
+            echo Html::input('SignatureX', ['value' => $config->SignatureX(), 'size' => 10]);
+         echo '</div>';
+         echo '<div style="display: flex; align-items: center; gap: 5px;">';
+         echo '<label for="SignatureY">Signature Y</label>';
+            echo Html::input('SignatureY', ['value' => $config->SignatureY(), 'size' => 10]);
+         echo '</div>';
+         echo '<div style="display: flex; align-items: center; gap: 5px;">';
+         echo '<label for="SignatureSize">Signature taille</label>';
+            echo Html::input('SignatureSize', ['value' => $config->SignatureSize(), 'size' => 10]);
+         echo '</div>';
+      echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+      echo "<td>" . __("Position nom du signataire ", "gestion") . "</td><td>";
+         echo '<div style="display: flex; align-items: center; gap: 5px;">';
+         echo '<label for="SignataireX">Position X</label>';
+            echo Html::input('SignataireX', ['value' => $config->SignataireX(), 'size' => 10]);
+         echo '</div>';
+         echo '<div style="display: flex; align-items: center; gap: 5px;">';
+         echo '<label for="SignataireY">Position Y</label>';
+            echo Html::input('SignataireY', ['value' => $config->SignataireY(), 'size' => 10]);
+         echo '</div>';
+      echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+      echo "<td>" . __("Position date de signature", "gestion") . "</td><td>";
+         echo '<div style="display: flex; align-items: center; gap: 5px;">';
+         echo '<label for="DateX">Position X</label>';
+            echo Html::input('DateX', ['value' => $config->DateX(), 'size' => 10]);
+         echo '</div>';
+         echo '<div style="display: flex; align-items: center; gap: 5px;">';
+         echo '<label for="DateY">Position Y</label>';
+            echo Html::input('DateY', ['value' => $config->DateY(), 'size' => 10]);
+         echo '</div>';
+      echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+      echo "<td>" . __("Position du nom du technicien", "gestion") . "</td><td>";
+         echo '<div style="display: flex; align-items: center; gap: 5px;">';
+         echo '<label for="TechX">Position X</label>';
+            echo Html::input('TechX', ['value' => $config->TechX(), 'size' => 10]);
+         echo '</div>';
+         echo '<div style="display: flex; align-items: center; gap: 5px;">';
+         echo '<label for="TechY">Position Y</label>';
+            echo Html::input('TechY', ['value' => $config->TechY(), 'size' => 10]);
+         echo '</div>';
+      echo "</td>";
+      echo "</tr>";
+
       // Mode de configuration de récupération
          $values = [
             0 => __('Dossier Local','gestion'),
@@ -368,6 +424,42 @@ class PluginGestionConfig extends CommonDBTM
    {
       return ($this->fields['Global']);
    }
+   function SignatureX()
+   {
+      return ($this->fields['SignatureX']);
+   } 
+   function SignatureY()
+   {
+      return ($this->fields['SignatureY']);
+   } 
+   function SignatureSize()
+   {
+      return ($this->fields['SignatureSize']);
+   } 
+   function SignataireX()
+   {
+      return ($this->fields['SignataireX']);
+   } 
+   function SignataireY()
+   {
+      return ($this->fields['SignataireY']);
+   } 
+   function DateX()
+   {
+      return ($this->fields['DateX']);
+   } 
+   function DateY()
+   {
+      return ($this->fields['DateY']);
+   } 
+   function TechX()
+   {
+      return ($this->fields['TechX']);
+   } 
+   function TechY()
+   {
+      return ($this->fields['TechY']);
+   }
    function NumberViews()
    {
       return ($this->fields['NumberViews']);
@@ -466,6 +558,15 @@ class PluginGestionConfig extends CommonDBTM
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',
                   `gabarit` INT(10) NOT NULL DEFAULT '0',
+                  `SignatureX` FLOAT(10) NOT NULL DEFAULT '36',
+                  `SignatureY` FLOAT(10) NOT NULL DEFAULT '44',
+                  `SignatureSize` FLOAT(10) NOT NULL DEFAULT '50',
+                  `SignataireX` FLOAT(10) NOT NULL DEFAULT '20',
+                  `SignataireY` FLOAT(10) NOT NULL DEFAULT '56.5',
+                  `DateX` FLOAT(10) NOT NULL DEFAULT '20',
+                  `DateY` FLOAT(10) NOT NULL DEFAULT '51.3',
+                  `TechX` FLOAT(10) NOT NULL DEFAULT '150',
+                  `TechY` FLOAT(10) NOT NULL DEFAULT '37',
                   PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
          $DB->query($query) or die($DB->error());

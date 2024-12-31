@@ -102,20 +102,26 @@ try {
         // Si c'est la page cible, ajoutez la signature
         if ($i === $targetPage) {
             // Ajouter la signature en bas à gauche
-            $pdf->Image($signaturePath, 36, $pdf->GetPageHeight() - 44, 50); // Ajustez la position et la taille
+            $pdf->Image($signaturePath, $config->fields['SignatureX'], $pdf->GetPageHeight() - $config->fields['SignatureY'], $config->fields['SignatureSize']); // Ajustez la position et la taille
 
-            // Ajouter le nom et la date
-            $pdf->SetFont('Arial', '', 10);
-            $pdf->SetXY(20, $pdf->GetPageHeight() - 56.5); // Position pour "Nom"
-            $pdf->Cell(40, 10, $NAME);
+            // Ajouter le nom et la date et tech
+            if(!empty($config->fields['SignataireX']) && !empty($config->fields['SignataireY'])){
+                $pdf->SetFont('Arial', '', 10);
+                $pdf->SetXY($config->fields['SignataireX'], $pdf->GetPageHeight() - $config->fields['SignataireY']); // Position pour "Nom"
+                $pdf->Cell(40, 10, $NAME);
+            }
 
-            $pdf->SetXY(20, $pdf->GetPageHeight() - 51.3); // Position pour "Date"
-            $pdf->Cell(40, 10, date('d/m/Y'));
+            if(!empty($config->fields['DateX']) && !empty($config->fields['DateY'])){
+                $pdf->SetXY($config->fields['DateX'], $pdf->GetPageHeight() - $config->fields['DateY']); // Position pour "Date"
+                $pdf->Cell(40, 10, date('d/m/Y'));
+            }
 
-            $tech = getUserName(Session::getLoginUserID());
-            $pdf->SetFont('Arial', '', 12);
-            $pdf->SetXY(150, $pdf->GetPageHeight() - 37); // Position pour "Nom"
-            $pdf->Cell(40, 10, $tech);
+            if(!empty($config->fields['TechX']) && !empty($config->fields['TechX'])){
+                $tech = getUserName(Session::getLoginUserID());
+                $pdf->SetFont('Arial', '', 12);
+                $pdf->SetXY($config->fields['TechX'], $pdf->GetPageHeight() - $config->fields['TechY']); // Position pour "Nom"
+                $pdf->Cell(40, 10, $tech);
+            }
         }
     }
 } catch (Exception $e) {
