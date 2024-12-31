@@ -96,61 +96,7 @@ class PluginGestionConfig extends CommonDBTM
       echo "</tr>";
 
       echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __("Position de la signature sur le PDF", "gestion") . "</td><td>";
-         echo '<div style="display: flex; align-items: center; gap: 5px;">';
-         echo '<label for="SignatureX">Signature X</label>';
-            echo Html::input('SignatureX', ['value' => $config->SignatureX(), 'size' => 10]);
-         echo '</div>';
-         echo '<div style="display: flex; align-items: center; gap: 5px;">';
-         echo '<label for="SignatureY">Signature Y</label>';
-            echo Html::input('SignatureY', ['value' => $config->SignatureY(), 'size' => 10]);
-         echo '</div>';
-         echo '<div style="display: flex; align-items: center; gap: 5px;">';
-         echo '<label for="SignatureSize">Signature taille</label>';
-            echo Html::input('SignatureSize', ['value' => $config->SignatureSize(), 'size' => 10]);
-         echo '</div>';
-      echo "</td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __("Position nom du signataire ", "gestion") . "</td><td>";
-         echo '<div style="display: flex; align-items: center; gap: 5px;">';
-         echo '<label for="SignataireX">Position X</label>';
-            echo Html::input('SignataireX', ['value' => $config->SignataireX(), 'size' => 10]);
-         echo '</div>';
-         echo '<div style="display: flex; align-items: center; gap: 5px;">';
-         echo '<label for="SignataireY">Position Y</label>';
-            echo Html::input('SignataireY', ['value' => $config->SignataireY(), 'size' => 10]);
-         echo '</div>';
-      echo "</td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __("Position date de signature", "gestion") . "</td><td>";
-         echo '<div style="display: flex; align-items: center; gap: 5px;">';
-         echo '<label for="DateX">Position X</label>';
-            echo Html::input('DateX', ['value' => $config->DateX(), 'size' => 10]);
-         echo '</div>';
-         echo '<div style="display: flex; align-items: center; gap: 5px;">';
-         echo '<label for="DateY">Position Y</label>';
-            echo Html::input('DateY', ['value' => $config->DateY(), 'size' => 10]);
-         echo '</div>';
-      echo "</td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __("Position du nom du technicien", "gestion") . "</td><td>";
-         echo '<div style="display: flex; align-items: center; gap: 5px;">';
-         echo '<label for="TechX">Position X</label>';
-            echo Html::input('TechX', ['value' => $config->TechX(), 'size' => 10]);
-         echo '</div>';
-         echo '<div style="display: flex; align-items: center; gap: 5px;">';
-         echo '<label for="TechY">Position Y</label>';
-            echo Html::input('TechY', ['value' => $config->TechY(), 'size' => 10]);
-         echo '</div>';
-      echo "</td>";
-      echo "</tr>";
-
+      
       // Mode de configuration de récupération
          $values = [
             0 => __('Dossier Local','gestion'),
@@ -168,6 +114,63 @@ class PluginGestionConfig extends CommonDBTM
             echo "</td>";
          echo "</tr>";
       // -----------------------------------------------------------------------
+
+      echo "<tr><th colspan='2'>" . __("Positionnement des éléments (0 pour masqué)", 'rp') . "</th></tr>";
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Position de la signature sur le PDF", "gestion") . "</td><td>";
+               echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                  echo '<label for="SignatureX">Signature X</label>';
+                     echo Html::input('SignatureX', ['value' => $config->SignatureX(), 'size' => 10]);
+                  echo '</div>';
+               echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                  echo '<label for="SignatureY">Signature Y</label>';
+                     echo Html::input('SignatureY', ['value' => $config->SignatureY(), 'size' => 10]);
+                  echo '</div>';
+               echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                  echo '<label for="SignatureSize">Signature taille</label>';
+                     echo Html::input('SignatureSize', ['value' => $config->SignatureSize(), 'size' => 10]);
+                  echo '</div>';
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Position nom du signataire ", "gestion") . "</td><td>";
+               echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                  echo '<label for="SignataireX">Position X</label>';
+                     echo Html::input('SignataireX', ['value' => $config->SignataireX(), 'size' => 10]);
+                  echo '</div>';
+               echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                  echo '<label for="SignataireY">Position Y</label>';
+                     echo Html::input('SignataireY', ['value' => $config->SignataireY(), 'size' => 10]);
+                  echo '</div>';
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Position date de signature", "gestion") . "</td><td>";
+               echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                  echo '<label for="DateX">Position X</label>';
+                     echo Html::input('DateX', ['value' => $config->DateX(), 'size' => 10]);
+                  echo '</div>';
+               echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                  echo '<label for="DateY">Position Y</label>';
+                     echo Html::input('DateY', ['value' => $config->DateY(), 'size' => 10]);
+                  echo '</div>';
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Position du nom du technicien", "gestion") . "</td><td>";
+               echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                  echo '<label for="TechX">Position X</label>';
+                     echo Html::input('TechX', ['value' => $config->TechX(), 'size' => 10]);
+                  echo '</div>';
+               echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                  echo '<label for="TechY">Position Y</label>';
+                     echo Html::input('TechY', ['value' => $config->TechY(), 'size' => 10]);
+                  echo '</div>';
+            echo "</td>";
+         echo "</tr>";
 
       if($config->fields['ConfigModes'] == 1){
          echo "<tr><th colspan='2'>" . __("Configuration de l'affichage", 'rp') . "</th></tr>";
