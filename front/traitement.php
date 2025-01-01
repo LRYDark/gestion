@@ -80,6 +80,8 @@ $nombreAleatoire = rand(1, 100000);
 $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_tickets` WHERE bl = '$DOC_NAME'")->fetch_object();
 $DOC_FILES = $DB->query("SELECT * FROM `glpi_documents` WHERE id = $DOC->doc_id")->fetch_object();
 
+ob_start(); // Démarre la mise en tampon de sortie
+
 // Retirer le préfixe de type MIME, s’il est présent
 if (strpos($signatureBase64, 'data:image/png;base64,') === 0) {
     $signatureBase64 = str_replace('data:image/png;base64,', '', $signatureBase64);
@@ -144,6 +146,8 @@ if ($config->fields['ConfigModes'] == 0){
         exit;
     }
 }
+
+ob_end_clean(); // Vide le tampon de sortie
 
 // Créer un nouvel objet FPDI / ajouter signature
 $pdf = new FPDI();
@@ -371,11 +375,12 @@ if ($config->fields['ConfigModes'] == 0){
             unlink($existingPdfPath);
             unlink($signaturePath);
             unlink($outputPathTemp);
+            echo 'test ok';
         }
         message('Documents : '. $DOC_NAME.' signé', INFO);
     }else{
         message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
     }
 }
-Html::back();
+//Html::back();
 ?>
