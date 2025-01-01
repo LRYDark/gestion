@@ -11,6 +11,34 @@ class PluginGestionCri extends CommonDBTM {
       return _n('Rapport / Prise en charge', 'Rapport / Prise en charge', $nb, 'rp');
    }
 
+   function ShareLink($Doc_Name){
+      global $DB;
+      $sharepoint = new PluginGestionSharepoint(); // Initialiser la classe SharePointGraph
+
+      // Requête SQL pour récupérer le folder_name où params = 3
+      $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
+      $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
+
+      if (!$result) {
+         throw new Exception("Erreur lors de l'exécution de la requête SQL.");
+      }
+
+      // Vérifier si une ligne correspondante existe
+      $folderPath = ""; // Par défaut, $folderPath est vide
+      if ($row = $DB->fetchAssoc($result)) {
+         $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
+      }
+
+      if (!empty($folderPath)){
+         $folderPath = $folderPath . "/";
+      }
+      // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+      $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
+
+      // Étape 3 : Obtenez le lien de partage
+      return $sharepoint->createShareLink($itemId);
+   }
+
    function showForm($ID, $options = []) {
       global $DB, $CFG_GLPI;
       
@@ -161,33 +189,6 @@ class PluginGestionCri extends CommonDBTM {
                      echo '<input type="file" id="capture-photo" accept="image/*" capture="environment">';// Bouton de capture photo
                      echo '<br>';
                      echo '<textarea name="photo_base64" id="photo-base64" style="display: none;"></textarea>';// Champ caché pour stocker la photo
-               
-                     ?><script>
-                        // Gestion de la capture de photo
-                        document.getElementById('capture-photo').addEventListener('change', function(event) {
-                           const file = event.target.files[0];
-
-                           if (file) {
-                              // Vérifiez si le fichier est une image
-                              if (!file.type.startsWith('image/')) {
-                                 alert("Le fichier sélectionné n'est pas une image.");
-                                 return;
-                              }
-
-                              // Vérifiez si le fichier est au format PNG ou JPEG
-                              if (file.type !== 'image/png' && file.type !== 'image/jpeg') {
-                                 alert("Le fichier doit être au format PNG ou JPEG.");
-                                 return;
-                              }
-
-                              const reader = new FileReader();
-                              reader.onload = function(e) {
-                                 document.getElementById('photo-base64').value = e.target.result;
-                              };
-                              reader.readAsDataURL(file);
-                           }
-                        });
-                     </script><?php
                   echo "</tr><br>";
                   
                   echo "<tr>";
@@ -340,33 +341,6 @@ class PluginGestionCri extends CommonDBTM {
                         echo '<input type="file" id="capture-photo" accept="image/*" capture="environment">'; // Bouton de capture photo
                         echo '<br>';
                         echo '<textarea name="photo_base64" id="photo-base64" style="display: none;"></textarea>'; // Champ caché pour stocker la photo
-
-                        ?><script>
-                           // Gestion de la capture de photo
-                           document.getElementById('capture-photo').addEventListener('change', function(event) {
-                              const file = event.target.files[0];
-
-                              if (file) {
-                                 // Vérifiez si le fichier est une image
-                                 if (!file.type.startsWith('image/')) {
-                                    alert("Le fichier sélectionné n'est pas une image.");
-                                    return;
-                                 }
-
-                                 // Vérifiez si le fichier est au format PNG ou JPEG
-                                 if (file.type !== 'image/png' && file.type !== 'image/jpeg') {
-                                    alert("Le fichier doit être au format PNG ou JPEG.");
-                                    return;
-                                 }
-
-                                 const reader = new FileReader();
-                                 reader.onload = function(e) {
-                                    document.getElementById('photo-base64').value = e.target.result;
-                                 };
-                                 reader.readAsDataURL(file);
-                              }
-                           });
-                        </script><?php
                      echo "</td>";
                   echo "</tr>";
                
@@ -470,28 +444,8 @@ class PluginGestionCri extends CommonDBTM {
                   if ($config->fields['SharePointLinkDisplay'] == 1){
                      // Utilisation
                      try {
-                        // Requête SQL pour récupérer le folder_name où params = 3
-                        $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
-                        $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
-
-                        if (!$result) {
-                           throw new Exception("Erreur lors de l'exécution de la requête SQL.");
-                        }
-
-                        // Vérifier si une ligne correspondante existe
-                        $folderPath = ""; // Par défaut, $folderPath est vide
-                        if ($row = $DB->fetchAssoc($result)) {
-                           $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
-                        }
-
-                        if (!empty($folderPath)){
-                           $folderPath = $folderPath . "/";
-                        }
-                        // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-                        $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
-
                         // Étape 3 : Obtenez le lien de partage
-                        $shareLink = $sharepoint->createShareLink($itemId);
+                        $shareLink = $this->ShareLink($Doc_Name);
 
                         // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
@@ -561,28 +515,8 @@ class PluginGestionCri extends CommonDBTM {
                   if ($config->fields['SharePointLinkDisplay'] == 1){
                      // Utilisation
                      try {
-                        // Requête SQL pour récupérer le folder_name où params = 3
-                        $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
-                        $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
-
-                        if (!$result) {
-                           throw new Exception("Erreur lors de l'exécution de la requête SQL.");
-                        }
-
-                        // Vérifier si une ligne correspondante existe
-                        $folderPath = ""; // Par défaut, $folderPath est vide
-                        if ($row = $DB->fetchAssoc($result)) {
-                           $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
-                        }
-
-                        if (!empty($folderPath)){
-                           $folderPath = $folderPath . "/";
-                        }
-                        // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-                        $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
-
                         // Étape 3 : Obtenez le lien de partage
-                        $shareLink = $sharepoint->createShareLink($itemId);
+                        $shareLink = $this->ShareLink($Doc_Name);
 
                         // Étape 4 : Affichez le PDF via <embed>
                            echo "<td style='width: 70%;'>"; // Augmente la largeur de la colonne droite pour le PDF
@@ -613,6 +547,30 @@ class PluginGestionCri extends CommonDBTM {
       Html::closeForm();
          ?>
          <script>
+            // //--------------------------------------------------- Gestion de la capture de photo
+            document.getElementById('capture-photo').addEventListener('change', function(event) {
+               const file = event.target.files[0];
+
+               if (file) {
+                  // Vérifiez si le fichier est une image
+                  if (!file.type.startsWith('image/')) {
+                     alert("Le fichier sélectionné n'est pas une image.");
+                     return;
+                  }
+
+                  // Vérifiez si le fichier est au format PNG ou JPEG
+                  if (file.type !== 'image/png' && file.type !== 'image/jpeg') {
+                     alert("Le fichier doit être au format PNG ou JPEG.");
+                     return;
+                  }
+
+                  const reader = new FileReader();
+                  reader.onload = function(e) {
+                     document.getElementById('photo-base64').value = e.target.result;
+                  };
+                  reader.readAsDataURL(file);
+               }
+            });
             //--------------------------------------------------- signature
                window.requestAnimFrame = (function(callback) { // Fonction pour animer le canvas
                   return window.requestAnimationFrame ||    // Demande d'animation pour les navigateurs

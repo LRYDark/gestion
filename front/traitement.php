@@ -20,9 +20,59 @@ function message($msg, $msgtype){
     );
 }
 
+function MailSend($EMAIL, $outputPath, $message){
+    global $DB, $CFG_GLPI;
+    $mmail = new GLPIMailer(); // génération du mail
+    $config = new PluginGestionConfig();
+
+    $notificationtemplates_id = $config->fields['gabarit'];
+    $NotifMailTemplate = $DB->query("SELECT * FROM glpi_notificationtemplatetranslations WHERE notificationtemplates_id=$notificationtemplates_id")->fetch_object();
+        $BodyHtml = html_entity_decode($NotifMailTemplate->content_html, ENT_QUOTES, 'UTF-8');
+        $BodyText = html_entity_decode($NotifMailTemplate->content_text, ENT_QUOTES, 'UTF-8');
+
+    $footer = $DB->query("SELECT value FROM glpi_configs WHERE name = 'mailing_signature'")->fetch_object();
+    if(!empty($footer->value)){$footer = html_entity_decode($footer->value, ENT_QUOTES, 'UTF-8');}else{$footer='';}
+
+    // For exchange
+        $mmail->AddCustomHeader("X-Auto-Response-Suppress: OOF, DR, NDR, RN, NRN");
+
+    if (empty($CFG_GLPI["from_email"])){
+        // si mail expediteur non renseigné    
+        $mmail->SetFrom($CFG_GLPI["admin_email"], $CFG_GLPI["admin_email_name"], false);
+    }else{
+        //si mail expediteur renseigné  
+        $mmail->SetFrom($CFG_GLPI["from_email"], $CFG_GLPI["from_email_name"], false);
+    }
+
+    $mmail->AddAddress($EMAIL);
+    $mmail->addAttachment($outputPath); // Ajouter un attachement (documents)
+    $mmail->isHTML(true);
+
+    // Objet et sujet du mail 
+    $mmail->Subject = $NotifMailTemplate->subject;
+        $mmail->Body = GLPIMailer::normalizeBreaks($BodyHtml).$footer;
+        $mmail->AltBody = GLPIMailer::normalizeBreaks($BodyText).$footer;
+
+        // envoie du mail
+        if(!$mmail->send()) {
+            message("Erreur lors de l'envoi du mail : " . $mmail->ErrorInfo, ERROR);
+        }else{
+            //message("<br>Mail envoyé à " . $EMAIL, INFO);
+            message($message, INFO);
+        }
+        
+    $mmail->ClearAddresses();
+}
+
 $signatureBase64 = $_POST['url'] ?? ''; // Assurez-vous que la variable est définie
 $DOC_NAME = $_POST['DOC'];
 $NAME = $_POST['name'];
+
+if (empty($_POST['email'])) $_POST['email'] = " ";
+$EMAIL = $_POST["email"];
+
+if (empty($_POST['mailtoclient'])) $_POST['mailtoclient'] = 0;
+$MAILTOCLIENT = $_POST["mailtoclient"];
 
 // Générer un nombre entier aléatoire entre 1 et 100
 $nombreAleatoire = rand(1, 100000);
@@ -70,12 +120,20 @@ if ($config->fields['ConfigModes'] == 0){
 
         // Étape 4 : Obtenir l'URL de téléchargement
         $downloadUrl = $sharepoint->getDownloadUrl($filePath);
+    } catch (Exception $e) {
+        message("Erreur : " . $e->getMessage(), ERROR);
+        Html::back();
+        exit;
+    }
 
+    try {
         // Étape 5 : Télécharger le fichier depuis l'URL
         $destinationPath = PLUGIN_GESTION_DIR."/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
         $sharepoint->downloadFileFromUrl($downloadUrl, $destinationPath);
     } catch (Exception $e) {
         message("Erreur : " . $e->getMessage(), ERROR);
+        Html::back();
+        exit;
     }
 
     // Vérifiez que le PDF source existe
@@ -126,6 +184,8 @@ try {
     }
 } catch (Exception $e) {
     message("Erreur lors de l'importation du fichier PDF : " . $e->getMessage(), ERROR);
+    Html::back();
+    exit;
 }
 
 // Récupérer la photo encodée en base64
@@ -202,6 +262,9 @@ if (!empty($photoBase64) && strpos($photoBase64, 'data:image') === 0) {
     unlink($photoPath); // Supprimer l'image temporaire
 }
 
+if($config->fields['DisplayPdfEnd'] == 1){
+    $pdf->Output(); // affichage du PDF
+}
 
 if ($config->fields['ConfigModes'] == 0){
     // Sauvegarder le PDF modifié avec la signature ajoutée
@@ -211,6 +274,15 @@ if ($config->fields['ConfigModes'] == 0){
         $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
         $tech_id = Session::getLoginUserID();
         $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
+
+        if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){   
+            if (!empty($config->fields['ZenDocMail'])){ 
+                $MailZendoc = $config->fields['ZenDocMail'];
+                MailSend($MailZendoc, $outputPath, "Envoyé vers ZenDoc");
+            }       
+            MailSend($EMAIL, $outputPath, "Mail envoyé à ". $EMAIL);
+        }
+
         $savepath = "_plugins/gestion/signed/" . $DOC_NAME . ".pdf";
         if ($DB->query("UPDATE glpi_documents SET filepath = '$savepath' WHERE id = $DOC_FILES->id")){
             unlink($existingPdfPath);
@@ -221,71 +293,84 @@ if ($config->fields['ConfigModes'] == 0){
         message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
     }
 }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
-    
-    $outputPath = PLUGIN_GESTION_DIR . "/FilesTempSharePoint/".$DOC_NAME.".pdf";
+    // Sauvegarder Temporaire due PDF modifié avec la signature ajoutée
+    $outputPathTemp = PLUGIN_GESTION_DIR . "/FilesTempSharePoint/".$DOC_NAME.".pdf";
 
-    if ($pdf->Output('F', $outputPath) === '') {
+    if ($pdf->Output('F', $outputPathTemp) === '') {
         $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
         $tech_id = Session::getLoginUserID();
         $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
-        echo 'point de dep<br>';
-        // Utilisation
+
+        if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){   
+            if (!empty($config->fields['ZenDocMail'])){ 
+                $MailZendoc = $config->fields['ZenDocMail'];
+                MailSend($MailZendoc, $outputPathTemp, "Envoyé vers ZenDoc");
+            }       
+            MailSend($EMAIL, $outputPathTemp, "Mail envoyé à ". $EMAIL);
+        }
+
         try {
             $folderPathFile = ""; // Par défaut, $folderPath est vide
             if (!empty($DOC->url_bl)){
-               $folderPathFile = $DOC->url_bl;
+                $folderPathFile = $DOC->url_bl;
             }
+    
             $folderPath = $folderPathFile;
             $itemId = $DOC_NAME.".pdf"; // Nom du fichier à rechercher
-            
+
             // Étape 3 : Récupérez l'ID du fichier
             $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
-
-            // Étape 3 : Supprimez le fichier
-            $sharepoint->deleteFile($fileId);
-
-            // Sauvegarder le PDF modifié avec la signature ajoutée
-            try {
-                // Requête SQL pour récupérer le folder_name où params = 3
-                $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
-                $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
-
-                if (!$result) {
-                    throw new Exception("Erreur lors de l'exécution de la requête SQL.");
-                }
-
-                // Vérifier si une ligne correspondante existe
-                $folderPath = ""; // Par défaut, $folderPath est vide
-                if ($row = $DB->fetchAssoc($result)) {
-                    $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
-                }
-
-                $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement
-
-                // Étape 3 : Téléverser le fichier
-                $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPath);
-
-                if (!empty($folderPath)){
-                    $folderPath = $folderPath . "/";
-                }
-                // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-                $file_path = $folderPath . $DOC_NAME . ".pdf"; // Remplacez par le chemin exact de votre fichier
-
-                // Étape 4 : Récupérez l'URL du fichier
-                $fileUrl = $sharepoint->getFileUrl($file_path);
-
-            } catch (Exception $e) {
-                message("Erreur : " . $e->getMessage(), ERROR);
-            }
-            
         } catch (Exception $e) {
             message("Erreur : " . $e->getMessage(), ERROR);
         }
-       
+           
+        try {
+            // Étape 3 : Supprimez le fichier
+            $sharepoint->deleteFile($fileId);
+        } catch (Exception $e) {
+            message("Erreur : " . $e->getMessage(), ERROR);
+        }
+
+        try {
+            // Requête SQL pour récupérer le folder_name où params = 3
+            $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
+            $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
+
+            if (!$result) {
+                throw new Exception("Erreur lors de l'exécution de la requête SQL.");
+            }
+
+            // Vérifier si une ligne correspondante existe
+            $folderPath = ""; // Par défaut, $folderPath est vide
+            if ($row = $DB->fetchAssoc($result)) {
+                $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
+            }
+
+            $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement
+
+            // Étape 3 : Téléverser le fichier
+            $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPathTemp);
+        } catch (Exception $e) {
+            message("Erreur : " . $e->getMessage(), ERROR);
+        }
+
+        try {
+            if (!empty($folderPath)){
+                $folderPath = $folderPath . "/";
+            }
+            // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+            $file_path = $folderPath . $DOC_NAME . ".pdf"; // Remplacez par le chemin exact de votre fichier
+
+            // Étape 4 : Récupérez l'URL du fichier
+            $fileUrl = $sharepoint->getFileUrl($file_path);
+        } catch (Exception $e) {
+            message("Erreur : " . $e->getMessage(), ERROR);
+        }
+                       
         if ($DB->query("UPDATE glpi_documents SET link = '$fileUrl' WHERE id = $DOC_FILES->id")){
             unlink($existingPdfPath);
             unlink($signaturePath);
-            unlink($outputPath);
+            unlink($outputPathTemp);
         }
         message('Documents : '. $DOC_NAME.' signé', INFO);
     }else{

@@ -20,8 +20,6 @@ class PluginGestionProfile extends Profile {
       if ($item->getType() == 'Profile') {
          $ID   = $item->getID();
          $prof = new self();
-         //self::addDefaultProfileInfos($ID,['plugin_rp_rappogestion_tech' => ALLSTANDARDRIGHT]);
-         //self::addDefaultProfileInfos($ID,['plugin_rp' => ALLSTANDARDRIGHT]);
          $prof->showForm($ID);
       }
       return true;
@@ -108,13 +106,6 @@ class PluginGestionProfile extends Profile {
       $profile = new self();
       $dbu     = new DbUtils();
 
-   /* --------------- Nettoyage de BDD en fonction de la suppression des tickets à chaque ouvegestionure de session--------------- */
-   /*
-   $DB->query("DELETE FROM glpi_plugin_rp_cridetails WHERE NOT EXISTS(SELECT id FROM glpi_tickets WHERE glpi_tickets.id = glpi_plugin_rp_cridetails.id_ticket);");
-   $DB->query("DELETE FROM glpi_plugin_rp_dataclient WHERE NOT EXISTS(SELECT id FROM glpi_tickets WHERE glpi_tickets.id = glpi_plugin_rp_dataclient.id_ticket);");
-   */
-   /*---------*/
-
       //Add new rights in glpi_profilerights table
       foreach ($profile->getAllRights(true) as $data) {
          if ($dbu->countElementsInTable("glpi_profilerights",
@@ -148,7 +139,7 @@ class PluginGestionProfile extends Profile {
 
    static function createFirstAccess($profiles_id) {
       self::addDefaultProfileInfos($profiles_id,
-                                   ['plugin_gestion_gestion'             => ALLSTANDARDRIGHT,
+                                   ['plugin_gestion_gestion'        => ALLSTANDARDRIGHT,
                                     'plugin_gestion_chrono'         => ALLSTANDARDRIGHT,
                                     'plugin_gestion_affichage'      => ALLSTANDARDRIGHT,
                                     'plugin_gestion_add'            => ALLSTANDARDRIGHT], true);

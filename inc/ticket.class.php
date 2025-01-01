@@ -413,12 +413,6 @@ class PluginGestionTicket extends CommonDBTM {
       }
   }
   
-
-   /*static function processSelection() {
-      global $DB;
-      code de ticket.form.php
-   }*/
-
    static function install(Migration $migration) { // fonction intsllation de la table en BDD
       global $DB;
 
