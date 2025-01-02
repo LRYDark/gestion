@@ -198,7 +198,7 @@ class PluginGestionConfig extends CommonDBTM
             echo "</td>";
          echo "</tr>";
 
-         echo "<tr><th colspan='2'>" . __('Connexion de SharePoint (API Graph)', 'rp') . "</th></tr>";
+         echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph)', 'rp') . "</th></tr>";
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
@@ -406,7 +406,11 @@ class PluginGestionConfig extends CommonDBTM
                }
             }
          }
-      }   
+      }else{
+         echo "<tr><th colspan='2'>" . __("Dossier de récupération et de déstination des PDFs en Local", 'rp') . "</th></tr>";
+         echo "<tr class='tab_bg_1'><td>" . __("Dossier de récupération des PDFs : ".GLPI_PLUGIN_DOC_DIR."/gestion/unsigned/", "gestion") . "</td></tr>";
+         echo "<tr class='tab_bg_1'><td>" . __("Dossier de déstination des PDFs : ".GLPI_PLUGIN_DOC_DIR."/gestion/signed/", "gestion") . "</td></tr>";
+      }
       $config->showFormButtons(['candel' => false]);
       return false;
    }

@@ -397,11 +397,13 @@ class PluginGestionCri extends CommonDBTM {
                echo "</table>"; 
                echo "</div>";
             } // ----------------------------------- FIN ORDINATEUR -----------------------------------
-            echo '<div class="button-container-right" style="text-align: right;">';
-               echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signé" class="submit">'; // Bouton pour signer
-            echo '</div>';
+            if(Session::haveRight("plugin_gestion_sign", CREATE)){
+               echo '<div class="button-container-right" style="text-align: right;">';
+                  echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signé" class="submit">'; // Bouton pour signer
+               echo '</div>';
 
-            echo '<textarea readonly name="url" id="sig-dataUrl" class="form-control" rows="0" cols="150" style="display: none;"></textarea>';  // Champ caché pour stocker la signature
+               echo '<textarea readonly name="url" id="sig-dataUrl" class="form-control" rows="0" cols="150" style="display: none;"></textarea>';  // Champ caché pour stocker la signature
+            }
          }else{ // ----------------------------------- SIGNE -----------------------------------
             echo '<div class="table-responsive">';
             echo "<table class='table'>"; 

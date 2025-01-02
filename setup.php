@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.1.2'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.2.0'); // version du plugin
 
 // Minimal GLPI version,
 define("PLUGIN_GESTION_MIN_GLPI", "10.0.3");
@@ -41,7 +41,7 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
 
 function plugin_version_gestion() { // fonction version du plugin (verification et affichage des infos de la version)
    return [
-      'name'           => _n('Gestion', 'Gestion', 2, 'gestion'),
+      'name'           => _n('Gestion signature PDF', 'Gestion signature PDF', 2, 'gestion'),
       'version'        => PLUGIN_GESTION_VERSION,
       'author'         => 'REINERT Joris',
       'homepage'       => 'https://www.jcd-groupe.fr',

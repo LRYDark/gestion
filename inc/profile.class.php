@@ -54,23 +54,14 @@ class PluginGestionProfile extends Profile {
    static function getAllRights($all = false) {
       $rights = [
          ['itemtype' => 'PluginGestionConfig',
-         'label'    => __('Temps de trajet', 'gestion'),
-         'field'    => 'plugin_gestion_gestion',
-         ],
-         ['itemtype' => 'PluginGestionConfig',
-         'label'    => __('Affichage des infos sur les entitées', 'gestion'),
-         'field'    => 'plugin_gestion_affichage',
-         'rights'   => [READ    => __('Read')]
-         ],
-         ['itemtype' => 'PluginGestionConfig',
-         'label'    => __('Affichage du chronomètre', 'gestion'),
-         'field'    => 'plugin_gestion_chrono',
-         'rights'   => [READ    => __('Read')]
-         ],
-         ['itemtype' => 'PluginGestionConfig',
-         'label'    => __('Ajout de demandeur', 'gestion'),
+         'label'    => __('Ajout de documents à signer', 'gestion'),
          'field'    => 'plugin_gestion_add',
-         'rights'   => [CREATE  => __('Create')]
+         'rights'   => [READ    => __('Read'), UPDATE  => __('Update / Add / Delete')]
+         ],
+         ['itemtype' => 'PluginGestionConfig',
+         'label'    => __('Documents à signer', 'gestion'),
+         'field'    => 'plugin_gestion_sign',
+         'rights'   => [READ    => __('Read'), CREATE  => __('Signer'), PURGE  => __('Purge')]
          ]
       ];
 
@@ -139,11 +130,8 @@ class PluginGestionProfile extends Profile {
 
    static function createFirstAccess($profiles_id) {
       self::addDefaultProfileInfos($profiles_id,
-                                   ['plugin_gestion_gestion'        => ALLSTANDARDRIGHT,
-                                    'plugin_gestion_chrono'         => ALLSTANDARDRIGHT,
-                                    'plugin_gestion_affichage'      => ALLSTANDARDRIGHT,
-                                    'plugin_gestion_add'            => ALLSTANDARDRIGHT], true);
-
+                                   ['plugin_gestion_add'        => ALLSTANDARDRIGHT,
+                                    'plugin_gestion_sign'         => ALLSTANDARDRIGHT], true);
    }
 
    static function removeRightsFromSession() {
