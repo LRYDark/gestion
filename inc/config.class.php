@@ -542,10 +542,10 @@ class PluginGestionConfig extends CommonDBTM
 
       $table = self::getTable();
       $config = new self();
-      if ($DB->tableExists($table)) {
+      /*if ($DB->tableExists($table)) {
          $query = "DROP TABLE $table";
          $DB->query($query) or die($DB->error());
-      }
+      }*/
       if (!$DB->tableExists($table)) {
 
          $migration->displayMessage("Installing $table");
@@ -623,6 +623,8 @@ class PluginGestionConfig extends CommonDBTM
    
          $query= "UPDATE glpi_plugin_gestion_configs SET gabarit = $ID->id WHERE id=1;";
          $DB->query($query) or die($DB->error());
+      }else{
+         
       }
    }
 

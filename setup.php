@@ -36,6 +36,8 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
 
       $PLUGIN_HOOKS['post_show_item']['gestion'] = ['PluginGestionTicket', 'postShowItemNewTicketGESTION']; // initialisation de la class
       $PLUGIN_HOOKS['pre_show_item']['gestion'] = ['PluginGestionTicket', 'postShowItemNewTaskGESTION']; // initialisation de la class
+
+      $PLUGIN_HOOKS["menu_toadd"]['gestion'] = ['admin' => PluginGestionMenu::class];
    }
 }
 

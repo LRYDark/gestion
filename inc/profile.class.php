@@ -62,6 +62,11 @@ class PluginGestionProfile extends Profile {
          'label'    => __('Documents à signer', 'gestion'),
          'field'    => 'plugin_gestion_sign',
          'rights'   => [READ    => __('Read'), CREATE  => __('Signer'), PURGE  => __('Purge')]
+      ],
+         ['itemtype' => 'PluginGestionConfig',
+         'label'    => __('Tous les Documents', 'gestion'),
+         'field'    => 'plugin_gestion',
+         'rights'   => [READ    => __('Read')]
          ]
       ];
 

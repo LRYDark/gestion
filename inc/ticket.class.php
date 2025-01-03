@@ -62,6 +62,45 @@ class PluginGestionTicket extends CommonDBTM {
 
       return $vouchers;
    }
+
+   static function getTableViews(){
+      global $DB;
+      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
+      $sharepoint = new PluginGestionSharepoint();
+
+      // Récupérer les lignes de la table où la colonne params est 0 ou 1
+      $query = "SELECT folder_name, params FROM glpi_plugin_gestion_configsfolder WHERE params IN (0, 1)";
+      $result = $DB->query($query); // Utilisation de la classe GLPI pour les requêtes
+   
+      if (!$result) {
+            throw new Exception("Erreur lors de l'exécution de la requête SQL.");
+      }
+   
+      // Initialisation des groupes et vérification des résultats
+      $groups = [];
+      $hasValidParams = false; // Indicateur pour vérifier si des valeurs de params existent
+   
+      while ($row = $DB->fetchAssoc($result)) {
+         $hasValidParams = true; // Une ligne avec params 0 ou 1 a été trouvée
+         $folderPath = $row['folder_name']; // Obtenir le chemin du dossier
+         $params = $row['params']; // Obtenir la valeur de params
+
+         // Exécuter la méthode appropriée en fonction de la valeur de params
+         if ($params == 0) {
+            $contents = $sharepoint->listFolderContents($folderPath);
+         } elseif ($params == 1) {
+            $contents = $sharepoint->listFolderContentsRecursive($folderPath);
+         }
+      }
+   
+      // Si aucune ligne valide n'a été trouvée, utiliser le chemin par défaut
+      if (!$hasValidParams) {
+            $folderPath = ''; // Récupérer le nom par défaut
+            $contents = $sharepoint->listFolderContents($folderPath); // Utiliser listFolderContents
+      }
+
+      return $contents;
+   }
 //*--------------------------------------------------------------------------------------------- 
 
    static function showForTicket(Ticket $ticket) { // formulaire sur le ticket
@@ -302,23 +341,10 @@ class PluginGestionTicket extends CommonDBTM {
                            if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
                               // Extraire le nom du fichier sans extension
                               $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
-
-                              // Extraire le chemin relatif
-                              if (isset($item['parentReference']['path'])) {
-                                 // La clé 'parentReference.path' contient le chemin complet
-                                 $fullPath = $item['parentReference']['path'];
-
-                                 // Extraire la partie après "/root:/"
-                                 $relativePath = '';
-                                 if (strpos($fullPath, '/root:/') !== false) {
-                                       $relativePath = substr($fullPath, strpos($fullPath, '/root:/') + 7)."/"; // Retirer "/root:/"
-                                 }
-                              } else {
-                                 $relativePath = ""; // Si aucune information de chemin n'est disponible
-                              }
-
+                              // La clé 'parentReference.name' contient le dossier
+                              $fullPath = $item['parentReference']['name'].'/';
                               // Ajouter au groupe
-                              $groups[$relativePath.$file_name] = $file_name; // Ajouter le nom du fichier
+                              $groups[$fullPath.$file_name] = $file_name; // Ajouter le nom du fichier
                            }
                         }
                      }
@@ -333,23 +359,10 @@ class PluginGestionTicket extends CommonDBTM {
                            if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
                               // Extraire le nom du fichier sans extension
                               $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
-
-                              // Extraire le chemin relatif
-                              if (isset($item['parentReference']['path'])) {
-                                 // La clé 'parentReference.path' contient le chemin complet
-                                 $fullPath = $item['parentReference']['path'];
-
-                                 // Extraire la partie après "/root:/"
-                                 $relativePath = '';
-                                 if (strpos($fullPath, '/root:/') !== false) {
-                                       $relativePath = substr($fullPath, strpos($fullPath, '/root:/') + 7); // Retirer "/root:/"
-                                 }
-                              } else {
-                                 $relativePath = ""; // Si aucune information de chemin n'est disponible
-                              }
-
+                              // La clé 'parentReference.name' contient le dossier
+                              $fullPath = $item['parentReference']['name'].'/';
                               // Ajouter au groupe
-                              $groups[$relativePath.$file_name] = $file_name; // Ajouter le nom du fichier
+                              $groups[$fullPath.$file_name] = $file_name; // Ajouter le nom du fichier
                            }
                         }
                      }
@@ -357,6 +370,11 @@ class PluginGestionTicket extends CommonDBTM {
                         
                   }
                } 
+               echo 'test';
+
+               echo '<pre>';
+               //print_r(self::getTableViews());
+               echo '</pre>';
 
                $selected_values_json = json_encode($selected_ids);
                $csrf_token = Session::getNewCSRFToken();

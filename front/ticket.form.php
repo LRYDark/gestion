@@ -104,17 +104,23 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                     'tickets_id'  => $ticketId,
                     'is_recursive'=> 1
                 ];
-    
-                // Ajouter le document dans GLPI
-                $doc = new Document();
-                if ($doc_id = $doc->add($input)) {
-                    // Insérer le ticket et l'ID de document dans glpi_plugin_gestion_tickets
-                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_tickets (tickets_id, entities_id, url_bl, bl, doc_id) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', $doc_id)")) {
-                        $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
+
+                $existedoc = $DB->query("SELECT tickets_id FROM `glpi_plugin_gestion_tickets` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
+                if(empty($existedoc->tickets_id)){
+                    // Ajouter le document dans GLPI
+                    $doc = new Document();
+                    if ($doc_id = $doc->add($input)) {
+                        // Insérer le ticket et l'ID de document dans glpi_plugin_gestion_tickets
+                        if (!$DB->query("INSERT INTO glpi_plugin_gestion_tickets (tickets_id, entities_id, url_bl, bl, doc_id) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', $doc_id)")) {
+                            $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
+                        }
+                    } else {
+                        // Gérer le cas d'erreur lors de l'ajout du document
+                        Session::addMessageAfterRedirect(__("Erreur lors de l'ajout du document pour $item.", 'gestion'), false, ERROR);
+                        $success = false;
                     }
-                } else {
-                    // Gérer le cas d'erreur lors de l'ajout du document
-                    Session::addMessageAfterRedirect(__("Erreur lors de l'ajout du document pour $item.", 'gestion'), false, ERROR);
+                }else{
+                    Session::addMessageAfterRedirect(__("Document ".$DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
                     $success = false;
                 }
             } else {
