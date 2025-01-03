@@ -1,22 +1,22 @@
 <?php
 
-/*if (isset($_POST['save_selection'])) {
-   PluginGestionTicket::processSelection();  
-}*/
-
 function plugin_gestion_install() { // fonction installation du plugin
    
-   $rep_files_rp = GLPI_PLUGIN_DOC_DIR . "/gestion";
-   if (!is_dir($rep_files_rp))
-      mkdir($rep_files_rp);
+   $rep_files_gestion = GLPI_PLUGIN_DOC_DIR . "/gestion";
+   if (!is_dir($rep_files_gestion))
+      mkdir($rep_files_gestion);
 
-   $rep_files_rp = GLPI_PLUGIN_DOC_DIR . "/gestion/signed";
-   if (!is_dir($rep_files_rp))
-      mkdir($rep_files_rp);
+   $rep_files_gestion = GLPI_PLUGIN_DOC_DIR . "/gestion/signed";
+   if (!is_dir($rep_files_gestion))
+      mkdir($rep_files_gestion);
 
-   $rep_files_rp = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned";
-   if (!is_dir($rep_files_rp))
-      mkdir($rep_files_rp);
+   $rep_files_gestion = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned";
+   if (!is_dir($rep_files_gestion))
+      mkdir($rep_files_gestion);
+
+   $rep_files_gestion = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint";
+   if (!is_dir($rep_files_gestion))
+      mkdir($rep_files_gestion);
 
    $migration = new Migration(PLUGIN_GESTION_VERSION);
 

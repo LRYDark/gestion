@@ -94,7 +94,7 @@ if ($signatureData === false) {
 }
 
 // Sauvegarder l'image décodée
-$signaturePath = PLUGIN_GESTION_DIR.'/FilesTempSharePoint/signature'.$nombreAleatoire.'.png';
+$signaturePath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/signature'.$nombreAleatoire.'.png';
 if (file_put_contents($signaturePath, $signatureData) === false) {
     message("Échec de la sauvegarde de l'image de signature.", ERROR);
 }
@@ -130,7 +130,7 @@ if ($config->fields['ConfigModes'] == 0){
 
     try {
         // Étape 5 : Télécharger le fichier depuis l'URL
-        $destinationPath = PLUGIN_GESTION_DIR."/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
+        $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
         $sharepoint->downloadFileFromUrl($downloadUrl, $destinationPath);
     } catch (Exception $e) {
         message("Erreur : " . $e->getMessage(), ERROR);
@@ -139,7 +139,7 @@ if ($config->fields['ConfigModes'] == 0){
     }
 
     // Vérifiez que le PDF source existe
-    $existingPdfPath = PLUGIN_GESTION_DIR."/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";;
+    $existingPdfPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";;
     if (!file_exists($existingPdfPath)) {
         message("Le fichier PDF source n'existe pas.", ERROR);
         Html::back();
@@ -205,7 +205,7 @@ if (!empty($photoBase64) && strpos($photoBase64, 'data:image') === 0) {
     }
 
     // Enregistrer temporairement l'image décodée sous forme brute
-    $tempPath = PLUGIN_GESTION_DIR.'/FilesTempSharePoint/temp_photo'.$nombreAleatoire.'';
+    $tempPath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/temp_photo'.$nombreAleatoire.'';
     if (file_put_contents($tempPath, $photoData) === false) {
         message("Erreur lors de la sauvegarde de l'image de la photo.", ERROR);
     }
@@ -217,7 +217,7 @@ if (!empty($photoBase64) && strpos($photoBase64, 'data:image') === 0) {
         message("Le fichier image n'est pas valide.", ERROR);
     }
 
-    $photoPath = PLUGIN_GESTION_DIR.'/FilesTempSharePoint/photo_capture'.$nombreAleatoire.'.png'; // Le chemin final de l'image en PNG
+    $photoPath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/photo_capture'.$nombreAleatoire.'.png'; // Le chemin final de l'image en PNG
 
     // Si l'image est au format JPEG, la convertir en PNG et corriger l'orientation
     if ($imageInfo['mime'] === 'image/jpeg') {
@@ -298,7 +298,7 @@ if ($config->fields['ConfigModes'] == 0){
     }
 }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
     // Sauvegarder Temporaire due PDF modifié avec la signature ajoutée
-    $outputPathTemp = PLUGIN_GESTION_DIR . "/FilesTempSharePoint/".$DOC_NAME.".pdf";
+    $outputPathTemp = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/".$DOC_NAME.".pdf";
 
     if ($pdf->Output('F', $outputPathTemp) === '') {
         $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
@@ -375,12 +375,11 @@ if ($config->fields['ConfigModes'] == 0){
             unlink($existingPdfPath);
             unlink($signaturePath);
             unlink($outputPathTemp);
-            echo 'test ok';
         }
         message('Documents : '. $DOC_NAME.' signé', INFO);
     }else{
         message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
     }
 }
-//Html::back();
+Html::back();
 ?>
