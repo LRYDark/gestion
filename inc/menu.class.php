@@ -32,13 +32,13 @@
  */
 class PluginGestionMenu extends CommonGLPI
 {
-   static $rightname = 'gestion';
+   static $rightname = 'plugin_gestion_survey';
 
    /**
     * @return translated
     */
    static function getMenuName() {
-      return __('Documents', 'gestion');
+      return __('Signature des documents', 'gestion');
    }
 
    /**
@@ -48,14 +48,13 @@ class PluginGestionMenu extends CommonGLPI
 
       $menu = [];
 
-      if (Session::haveRight('plugin_gestion', READ)) {
+      if (Session::haveRight('plugin_gestion_survey', READ)) {
          $menu['title']           = self::getMenuName();
          $menu['page']            = PLUGIN_GESTION_NOTFULL_WEBDIR."/front/survey.php";
-         //$menu['links']['search'] = PluginGestionSurvey::getSearchURL(false);
-         if (PluginGestionSurvey::canCreate()) {
-            //$menu['links']['add'] = PluginGestionSurvey::getFormURL(false);
-            $menu['links']['add'] = 'test';
-         }
+         $menu['links']['search'] = PluginGestionSurvey::getSearchURL(false);
+         /*if (PluginGestionSurvey::canCreate()) {
+            $menu['links']['add'] = PluginGestionSurvey::getFormURL(false);
+         }*/
       }
 
       $menu['icon'] = self::getIcon();

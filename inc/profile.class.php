@@ -40,8 +40,7 @@ class PluginGestionProfile extends Profile {
       $profile->displayRightsChoiceMatrix($rights, ['canedit'       => $canedit,
                                                     'default_class' => 'tab_bg_2',
                                                     'title'         => __('General')]);
-      if ($canedit
-          && $closeform) {
+      if ($canedit && $closeform) {
          echo "<div class='center'>";
          echo Html::hidden('id', ['value' => $profiles_id]);
          echo Html::submit(_sx('button', 'Save'), ['name' => 'update', 'class' => 'btn btn-primary']);
@@ -62,10 +61,15 @@ class PluginGestionProfile extends Profile {
          'label'    => __('Documents à signer', 'gestion'),
          'field'    => 'plugin_gestion_sign',
          'rights'   => [READ    => __('Read'), CREATE  => __('Signer'), PURGE  => __('Purge')]
-      ],
+         ],
          ['itemtype' => 'PluginGestionConfig',
          'label'    => __('Tous les Documents', 'gestion'),
          'field'    => 'plugin_gestion',
+         'rights'   => [READ    => __('Read')]
+         ],
+         ['itemtype' => 'PluginGestionSurvey',
+         'label'    => PluginRpautoSurvey::getTypeName(2),
+         'field'    => 'plugin_gestion_survey',
          'rights'   => [READ    => __('Read')]
          ]
       ];
@@ -135,8 +139,10 @@ class PluginGestionProfile extends Profile {
 
    static function createFirstAccess($profiles_id) {
       self::addDefaultProfileInfos($profiles_id,
-                                   ['plugin_gestion_add'        => ALLSTANDARDRIGHT,
-                                    'plugin_gestion_sign'         => ALLSTANDARDRIGHT], true);
+                                   ['plugin_gestion_add'          => ALLSTANDARDRIGHT,
+                                    'plugin_gestion_sign'         => ALLSTANDARDRIGHT,
+                                    'plugin_gestion'              => ALLSTANDARDRIGHT,
+                                    'plugin_gestion_survey'         => ALLSTANDARDRIGHT], true);
    }
 
    static function removeRightsFromSession() {

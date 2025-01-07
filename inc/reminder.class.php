@@ -39,7 +39,7 @@ if (!defined('GLPI_ROOT')) {
  */
 class PluginGestionReminder extends CommonDBTM {
 
-   static $rightname = "plugin_gestion";
+   static $rightname = "plugin_gestion_survey";
    public $dohistory = true;
 
    public static $itemtype = TicketGestion::class;
@@ -113,7 +113,7 @@ class PluginGestionReminder extends CommonDBTM {
 
                // Vérifier si le dossier existe déjà
                $query = "SELECT COUNT(*) AS count
-               FROM `glpi_plugin_gestion_surveys`
+               FROM `glpi_plugin_gestion_survey_surveys`
                WHERE `bl` = '$fileName';";
 
                $result = $DB->query($query);
@@ -121,7 +121,7 @@ class PluginGestionReminder extends CommonDBTM {
 
                if ($row['count'] == 0) {
                   // Ajouter le fichier en base s'il n'existe pas
-                  $DB->query("INSERT INTO glpi_plugin_gestion_surveys (bl, doc_url, doc_date) VALUES ('$fileName', '".$DB->escape($webUrl)."', '$createdDateTime')");                  
+                  $DB->query("INSERT INTO glpi_plugin_gestion_survey_surveys (bl, doc_url, doc_date) VALUES ('$fileName', '".$DB->escape($webUrl)."', '$createdDateTime')");                  
                   $addedFiles[] = $fileName;
                }
             }

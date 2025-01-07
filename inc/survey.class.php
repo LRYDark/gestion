@@ -37,13 +37,10 @@ if (!defined('GLPI_ROOT')) {
  */
 class PluginGestionSurvey extends CommonDBTM {
 
-   static $rightname = "plugin_gestion";
-  /* public $dohistory = true;
-
-   public $can_be_translated = true;*/
+   static $rightname = "plugin_gestion_survey";
 
    static function getTypeName($nb = 0) {
-      return _n('Gestion survey', 'Gestion surveys', $nb, 'gestion');
+      return _n('Gestion', 'Gestion', $nb, 'gestion');
    }
 
    function defineTabs($options = []) {
@@ -62,45 +59,6 @@ class PluginGestionSurvey extends CommonDBTM {
       return true;
    }
 
-   static function getTableViews(){
-      global $DB;
-      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
-      $sharepoint = new PluginGestionSharepoint();
-
-      // Récupérer les lignes de la table où la colonne params est 0 ou 1
-      $query = "SELECT folder_name, params FROM glpi_plugin_gestion_configsfolder WHERE params IN (0, 1)";
-      $result = $DB->query($query); // Utilisation de la classe GLPI pour les requêtes
-   
-      if (!$result) {
-            throw new Exception("Erreur lors de l'exécution de la requête SQL.");
-      }
-   
-      // Initialisation des groupes et vérification des résultats
-      $groups = [];
-      $hasValidParams = false; // Indicateur pour vérifier si des valeurs de params existent
-   
-      while ($row = $DB->fetchAssoc($result)) {
-         $hasValidParams = true; // Une ligne avec params 0 ou 1 a été trouvée
-         $folderPath = $row['folder_name']; // Obtenir le chemin du dossier
-         $params = $row['params']; // Obtenir la valeur de params
-
-         // Exécuter la méthode appropriée en fonction de la valeur de params
-         if ($params == 0) {
-            $contents = $sharepoint->listFolderContents($folderPath);
-         } elseif ($params == 1) {
-            $contents = $sharepoint->listFolderContentsRecursive($folderPath);
-         }
-      }
-   
-      // Si aucune ligne valide n'a été trouvée, utiliser le chemin par défaut
-      if (!$hasValidParams) {
-            $folderPath = ''; // Récupérer le nom par défaut
-            $contents = $sharepoint->listFolderContents($folderPath); // Utiliser listFolderContents
-      }
-
-      return $contents;
-   }
-
    /**
     * @return array
     */
@@ -114,10 +72,10 @@ class PluginGestionSurvey extends CommonDBTM {
          'name'               => self::getTypeName(2)
       ];
 
-      /*$tab[] = [
+      $tab[] = [
          'id'                 => '1',
          'table'              => $this->getTable(),
-         'field'              => 'name',
+         'field'              => 'bl',
          'name'               => __('Name'),
          'datatype'           => 'itemlink',
          'itemlink_type'      => $this->getType(),
@@ -126,39 +84,14 @@ class PluginGestionSurvey extends CommonDBTM {
 
       $tab[] = [
          'id'                 => '2',
-         'table'              => $this->getTable(),
-         'field'              => 'is_active',
-         'name'               => __('Active'),
-         'datatype'           => 'bool'
+         'table'              => 'glpi_tickets',
+         'field'              => 'id',
+         'name'               => __('Tickets'),
+         'datatype'           => 'dropdown'
       ];
 
       $tab[] = [
          'id'                 => '3',
-         'table'              => $this->getTable(),
-         'field'              => 'comment',
-         'name'               => __('Comments'),
-         'datatype'           => 'text'
-      ];
-
-      $tab[] = [
-         'id'                 => '4',
-         'table'              => $this->getTable(),
-         'field'              => 'date_mod',
-         'name'               => __('Last update'),
-         'massiveaction'      => false,
-         'datatype'           => 'datetime'
-      ];
-
-      $tab[] = [
-         'id'                 => '5',
-         'table'              => $this->getTable(),
-         'field'              => 'date_creation',
-         'name'               => __('Creation date'),
-         'datatype'           => 'date'
-      ];
-
-      $tab[] = [
-         'id'                 => '6',
          'table'              => 'glpi_entities',
          'field'              => 'completename',
          'name'               => __('Entity'),
@@ -166,12 +99,53 @@ class PluginGestionSurvey extends CommonDBTM {
       ];
 
       $tab[] = [
-         'id'                 => '11',
+         'id'                 => '4',
          'table'              => $this->getTable(),
-         'field'              => 'is_recursive',
-         'name'               => __('Child entities'),
+         'field'              => 'doc_url',
+         'name'               => __('Url du document'),
+         'massiveaction'      => false,
+         'datatype'           => 'text'
+      ];
+
+      $tab[] = [
+         'id'                 => '5',
+         'table'              => $this->getTable(),
+         'field'              => 'signed',
+         'name'               => __('Signé'),
          'datatype'           => 'bool'
-      ];*/
+      ];
+
+      $tab[] = [
+         'id'                 => '6',
+         'table'              => $this->getTable(),
+         'field'              => 'doc_date',
+         'name'               => __('Date de création'),
+         'datatype'           => 'datetime'
+      ];
+
+      $tab[] = [
+         'id'                 => '7',
+         'table'              => $this->getTable(),
+         'field'              => 'date_creation',
+         'name'               => __('Date de signature'),
+         'datatype'           => 'datetime'
+      ];
+
+      $tab[] = [
+         'id'                 => '8',
+         'table'              => $this->getTable(),
+         'field'              => 'users_ext',
+         'name'               => __('Signataire'),
+         'datatype'           => 'text'
+      ];
+
+      $tab[] = [
+         'id'                 => '9',
+         'table'              => 'glpi_users',
+         'field'              => 'name',
+         'name'               => __('Users'),
+         'datatype'           => 'dropdown'
+      ];
 
       return $tab;
    }
@@ -195,119 +169,7 @@ class PluginGestionSurvey extends CommonDBTM {
       $this->initForm($ID, $options);
       $this->showFormHeader($options);
 
-     /* echo "<tr class='tab_bg_1'>";
-
-
-      echo "<td>" . __('Name') . "<span class='required'>*</span></td>";
-      echo "<td>";
-      echo '<input type="text" name="name" required="" size="40" placeholder="Nom" value="'.$this->fields['name'].'">';
-      echo "</td>";  
-
-      echo "<td>" . __('Comments') . "</td>";
-      echo "<td>";
-      echo Html::textarea([
-                             'name'    => 'comment',
-                             'value'    => $this->fields["comment"],
-                             'cols'    => '60',
-                             'rows'    => '6',
-                             'display' => false,
-                          ]);
-      echo "</td></tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __('Entity') . "</td>";
-      echo "<td>";
-      Dropdown::show('Entity', [
-         'name' => 'entities_id',
-         'value' => $this->fields["entities_id"],
-         'display_emptychoice' => 1,
-         'specific_tags' => [],
-         'itemtype' => 'Entity',
-         'displaywith' => [],
-         'emptylabel' => "-----",
-         'used' => [],
-         'toadd' => [],
-         'entity_restrict' => 0,
-      ]); 
-      echo "</td><td colspan='2'></td></tr>";
-
-
-      $ID_notificationtemplates = $DB->query("SELECT id FROM glpi_notificationtemplates WHERE NAME = 'Rapport automatique PDF'")->fetch_object();
-      if(empty($this->fields["gabarit"])){
-         $this->fields["gabarit"] = $ID_notificationtemplates->id;
-      }
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __('Model de notification') . "</td>";
-      echo "<td>";
-      //notificationtemplates_id
-      Dropdown::show('NotificationTemplate', [
-         'name' => 'gabarit',
-         'value' => $this->fields["gabarit"],
-         'display_emptychoice' => 1,
-         'specific_tags' => [],
-         'itemtype' => 'NotificationTemplate',
-         'displaywith' => [],
-         'emptylabel' => "-----",
-         'used' => [],
-         'toadd' => [],
-         'entity_restrict' => 0,
-      ]); 
-      echo "</td><td colspan='2'></td></tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __('Active') . "</td>";
-      echo "<td>";
-      Dropdown::showYesNo("is_active", $this->fields["is_active"]);
-      echo "</td><td colspan='2'></td></tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __('Affichage des tâches privés') . "</td>";
-      echo "<td>";
-      Dropdown::showYesNo("tasks_private", $this->fields["tasks_private"]);
-      echo "</td>";
-      echo "<td>" . __('Affichager les images des tâches') . "</td>";
-      echo "<td>";
-      Dropdown::showYesNo("tasks_img", $this->fields["tasks_img"]);
-      echo "</td>";
-      echo "<td colspan='2'></td></tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __('Affichage des suivis privés') . "</td>";
-      echo "<td>";
-      Dropdown::showYesNo("suivis_private", $this->fields["suivis_private"]);
-      echo "</td>";
-      echo "<td>" . __('Affichager les images des suivis') . "</td>";
-      echo "<td>";
-      Dropdown::showYesNo("suivis_img", $this->fields["suivis_img"]);
-      echo "</td>";
-      echo "<td colspan='2'></td></tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __('Affichage de la déscription du ticket') . "</td>";
-      echo "<td>";
-      Dropdown::showYesNo("ticket_desc", $this->fields["ticket_desc"]);
-      echo "</td>";
-      if (Plugin::isPluginActive('rt')) {
-         echo "<td>" . __('Affichager du temps de trajet') . "</td>";
-         echo "<td>";
-         Dropdown::showYesNo("route_time", $this->fields["route_time"]);
-         echo "</td>";
-      }
-      echo "<td colspan='2'></td></tr>";*/
-
-      /*echo "<td>" . __('Email') . "</td>";
-      echo "<td>";
-      $mail = $DB->query("SELECT alternative_email FROM glpi_plugin_gestion_surveysuser WHERE survey_id = $ID")->fetch_object();
-      if(empty($mail->alternative_email)){$mail = '';}else{$mail = $mail->alternative_email;}
-      echo Html::input('mail', ['value' => $mail, 'size' => 40,'required']);
-      echo "</td>"; */ 
-
-     /* echo "<td>" . __('Email') . "<span class='required'>*</span></td>";
-      echo "<td>";
-      $mail = $DB->query("SELECT alternative_email FROM glpi_plugin_gestion_surveysuser WHERE survey_id = $ID")->fetch_object();
-      if(empty($mail->alternative_email)){$mail = '';}else{$mail = $mail->alternative_email;}
-      echo '<input type="mail" name="mail" required="" size="40" placeholder="email" value="'.$mail.'">';
-      echo "</td>";  */
+      echo 'test';
 
       $this->showFormButtons($options);
       Html::closeForm();
