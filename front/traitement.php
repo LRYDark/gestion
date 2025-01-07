@@ -67,6 +67,7 @@ function MailSend($EMAIL, $outputPath, $message){
 $signatureBase64 = $_POST['url'] ?? ''; // Assurez-vous que la variable est définie
 $DOC_NAME = $_POST['DOC'];
 $NAME = $_POST['name'];
+$id_document = $_POST['id_document'];
 
 if (empty($_POST['email'])) $_POST['email'] = " ";
 $EMAIL = $_POST["email"];
@@ -77,8 +78,7 @@ $MAILTOCLIENT = $_POST["mailtoclient"];
 // Générer un nombre entier aléatoire entre 1 et 100
 $nombreAleatoire = rand(1, 100000);
 
-$DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_tickets` WHERE bl = '$DOC_NAME'")->fetch_object();
-$DOC_FILES = $DB->query("SELECT * FROM `glpi_documents` WHERE id = $DOC->doc_id")->fetch_object();
+$DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$id_document'")->fetch_object();
 
 ob_start(); // Démarre la mise en tampon de sortie
 
@@ -100,6 +100,7 @@ if (file_put_contents($signaturePath, $signatureData) === false) {
 }
 
 if ($config->fields['ConfigModes'] == 0){
+    $DOC_FILES = $DB->query("SELECT * FROM `glpi_documents` WHERE id = $DOC->doc_id")->fetch_object();
     $originalPath = $DOC_FILES->filepath;
     $modifiedPath = str_replace('_plugins', '', $originalPath);
 
@@ -277,7 +278,7 @@ if ($config->fields['ConfigModes'] == 0){
     if ($pdf->Output('F', $outputPath) === '') {
         $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
         $tech_id = Session::getLoginUserID();
-        $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
+        $DB->query("UPDATE glpi_plugin_gestion_surveys SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
 
         if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){   
             if (!empty($config->fields['ZenDocMail'])){ 
@@ -303,7 +304,7 @@ if ($config->fields['ConfigModes'] == 0){
     if ($pdf->Output('F', $outputPathTemp) === '') {
         $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
         $tech_id = Session::getLoginUserID();
-        $DB->query("UPDATE glpi_plugin_gestion_tickets SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
+        $DB->query("UPDATE glpi_plugin_gestion_surveys SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
 
         if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){   
             if (!empty($config->fields['ZenDocMail'])){ 
@@ -370,11 +371,19 @@ if ($config->fields['ConfigModes'] == 0){
         } catch (Exception $e) {
             message("Erreur : " . $e->getMessage(), ERROR);
         }
-                       
-        if ($DB->query("UPDATE glpi_documents SET link = '$fileUrl' WHERE id = $DOC_FILES->id")){
-            unlink($existingPdfPath);
-            unlink($signaturePath);
-            unlink($outputPathTemp);
+                 
+        if ($config->fields['ConfigModes'] == 0){  
+            if ($DB->query("UPDATE glpi_documents SET link = '$fileUrl' WHERE id = $DOC_FILES->id")){
+                unlink($existingPdfPath);
+                unlink($signaturePath);
+                unlink($outputPathTemp);
+            }
+        }elseif ($config->fields['ConfigModes'] == 1){
+            if ($DB->query("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl' WHERE id = $id_document")){
+                unlink($existingPdfPath);
+                unlink($signaturePath);
+                unlink($outputPathTemp);
+            }
         }
         message('Documents : '. $DOC_NAME.' signé', INFO);
     }else{

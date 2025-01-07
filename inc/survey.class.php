@@ -46,7 +46,6 @@ class PluginGestionSurvey extends CommonDBTM {
       return _n('Gestion survey', 'Gestion surveys', $nb, 'gestion');
    }
 
-
    function defineTabs($options = []) {
 
       $ong = [];
@@ -115,7 +114,7 @@ class PluginGestionSurvey extends CommonDBTM {
          'name'               => self::getTypeName(2)
       ];
 
-      $tab[] = [
+      /*$tab[] = [
          'id'                 => '1',
          'table'              => $this->getTable(),
          'field'              => 'name',
@@ -172,7 +171,7 @@ class PluginGestionSurvey extends CommonDBTM {
          'field'              => 'is_recursive',
          'name'               => __('Child entities'),
          'datatype'           => 'bool'
-      ];
+      ];*/
 
       return $tab;
    }
@@ -196,11 +195,8 @@ class PluginGestionSurvey extends CommonDBTM {
       $this->initForm($ID, $options);
       $this->showFormHeader($options);
 
-      echo "<tr class='tab_bg_1'>";
-      /*echo "<td>" . __('Name') . "</td>";
-      echo "<td>";
-      echo Html::input('name', ['value' => $this->fields['name'], 'size' => 40, ]);
-      echo "</td>";*/
+     /* echo "<tr class='tab_bg_1'>";
+
 
       echo "<td>" . __('Name') . "<span class='required'>*</span></td>";
       echo "<td>";
@@ -297,7 +293,7 @@ class PluginGestionSurvey extends CommonDBTM {
          Dropdown::showYesNo("route_time", $this->fields["route_time"]);
          echo "</td>";
       }
-      echo "<td colspan='2'></td></tr>";
+      echo "<td colspan='2'></td></tr>";*/
 
       /*echo "<td>" . __('Email') . "</td>";
       echo "<td>";
@@ -306,12 +302,12 @@ class PluginGestionSurvey extends CommonDBTM {
       echo Html::input('mail', ['value' => $mail, 'size' => 40,'required']);
       echo "</td>"; */ 
 
-      echo "<td>" . __('Email') . "<span class='required'>*</span></td>";
+     /* echo "<td>" . __('Email') . "<span class='required'>*</span></td>";
       echo "<td>";
       $mail = $DB->query("SELECT alternative_email FROM glpi_plugin_gestion_surveysuser WHERE survey_id = $ID")->fetch_object();
       if(empty($mail->alternative_email)){$mail = '';}else{$mail = $mail->alternative_email;}
       echo '<input type="mail" name="mail" required="" size="40" placeholder="email" value="'.$mail.'">';
-      echo "</td>";  
+      echo "</td>";  */
 
       $this->showFormButtons($options);
       Html::closeForm();

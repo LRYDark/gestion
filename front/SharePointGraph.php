@@ -574,4 +574,72 @@ class PluginGestionSharepoint extends CommonDBTM {
             return $driveId;
         }
     }
+
+    /**
+     * Fonction récursive pour récupérer les fichiers récents dans un dossier SharePoint (incluant les sous-dossiers)
+     */
+    public function getRecentFilesRecursive($folderPath, $days = 3) {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+
+        // Construire l'URL en fonction de la valeur de $folderPath
+        if (empty($folderPath)) {
+            // Si $folderPath est vide, utiliser l'URL pour le dossier racine
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children";
+        } else {
+            // Sinon, utiliser l'URL pour le dossier spécifié
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+        }
+
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/json"
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        $files = json_decode($response, true)['value'];
+        if (!$files) {
+            return [];
+        }
+
+        $recentFiles = [];
+        $cutoffDate = new DateTime("-$days days");
+
+        foreach ($files as $file) {
+            if (isset($file['folder'])) {
+                // Si l'élément est un dossier, appeler la fonction récursive
+                $subfolderPath = $folderPath . '/' . $file['name'];
+                $recentFiles = array_merge($recentFiles, $this->getRecentFilesRecursive($subfolderPath, $days));
+            } elseif (isset($file['file']) && $file['file']['mimeType'] === 'application/pdf') {
+                // Si l'élément est un fichier PDF, vérifier la date de modification
+                $lastModified = new DateTime($file['lastModifiedDateTime']);
+                if ($lastModified >= $cutoffDate) {
+                    $recentFiles[] = $file;
+                }
+            }
+        }
+
+        return $recentFiles;
+    }
+
+    /**
+     * Convertir une date ISO 8601 (avec T et Z) en format standard
+     */
+    public function convertFromISO8601($isoDate) {
+        // Vérifier si le format correspond à une date ISO 8601 avec T et Z
+        if (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $isoDate)) {
+            // Remplacer le 'T' par un espace et supprimer le 'Z'
+            return str_replace(['T', 'Z'], [' ', ''], $isoDate);
+        }
+
+        // Retourner l'entrée si ce n'est pas une date ISO 8601 valide
+        return $isoDate;
+    }
 }

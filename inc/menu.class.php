@@ -51,9 +51,10 @@ class PluginGestionMenu extends CommonGLPI
       if (Session::haveRight('plugin_gestion', READ)) {
          $menu['title']           = self::getMenuName();
          $menu['page']            = PLUGIN_GESTION_NOTFULL_WEBDIR."/front/survey.php";
-         $menu['links']['search'] = PluginGestionSurvey::getSearchURL(false);
+         //$menu['links']['search'] = PluginGestionSurvey::getSearchURL(false);
          if (PluginGestionSurvey::canCreate()) {
-            $menu['links']['add'] = PluginGestionSurvey::getFormURL(false);
+            //$menu['links']['add'] = PluginGestionSurvey::getFormURL(false);
+            $menu['links']['add'] = 'test';
          }
       }
 

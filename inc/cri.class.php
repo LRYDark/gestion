@@ -42,18 +42,20 @@ class PluginGestionCri extends CommonDBTM {
    function showForm($ID, $options = []) {
       global $DB, $CFG_GLPI;
       
-      $Doc_Name = $_POST["modal"];
+      $id = $_POST["modal"];
       $config     = PluginGestionConfig::getInstance(); // Récupérer la configuration
       $documents  = new Document(); // Initialiser la classe Document
       $job        = new Ticket(); // Initialiser la classe Ticket
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint(); // Initialiser la classe SharePointGraph
-      
+
       $job->getfromDB($ID);
       $email = '';
-      $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_tickets` WHERE bl = '$Doc_Name'")->fetch_object(); // Récupérer les informations du document
-      $doc_id = $DOC->doc_id;
 
+      $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$id'")->fetch_object(); // Récupérer les informations du document   
+      $Doc_Name = $DOC->bl;
+      $doc_id  = $DOC->doc_id;
+   
       $email = $DB->query("SELECT u.email FROM glpi_useremails u JOIN glpi_users us ON u.users_id = us.id JOIN glpi_tickets t ON us.entities_id = t.entities_id WHERE t.id = $ID LIMIT 1;")->fetch_object(); // Récupérer les informations du document
       if(!empty($email->email)){
          $email = $email->email;
@@ -108,11 +110,12 @@ class PluginGestionCri extends CommonDBTM {
       </style><?php
          function isMobile() {
             return preg_match('/(android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)/i', $_SERVER['HTTP_USER_AGENT']); // Vérifie si l'utilisateur est sur un appareil mobile
-        }
+         }
         
          echo "<form action=\"" . PLUGIN_GESTION_WEBDIR . "/front/traitement.php\" method=\"post\" name=\"formReport\">"; // Formulaire pour envoyer les données
          echo Html::hidden('REPORT_ID', ['value' => $ID]);
          echo Html::hidden('DOC', ['value' => $Doc_Name]);
+         echo Html::hidden('id_document', ['value' => $id]);
 
          if($DOC->signed == 0){ // ----------------------------------- NON SIGNE -----------------------------------
             // tableau bootstrap -> glpi | Mobile ou Ordinateur
@@ -140,8 +143,7 @@ class PluginGestionCri extends CommonDBTM {
                   echo "</tr><br><br>";
                   //----------------------------------- FIN LOCAL -----------------------------------
                }elseif ($config->fields['ConfigModes'] == 1){ //----------------------------------- SHAREPOINT -----------------------------------
-                  $documents ->getFromDB($doc_id);
-                  $DocUrlSharePoint = $documents->fields['link'];
+                  $DocUrlSharePoint  = $DOC->doc_url;
 
                   function AffichageNoSigneMobile($DocUrlSharePoint){
                      // Bouton pour voir le PDF en plein écran
@@ -254,9 +256,7 @@ class PluginGestionCri extends CommonDBTM {
                      echo "</tr>";
                      //----------------------------------- FIN LOCAL -----------------------------------
                   }elseif ($config->fields['ConfigModes'] == 1){ // ----------------------------------- SHAREPOINT -----------------------------------
-
-                     $documents ->getFromDB($doc_id);
-                     $DocUrlSharePoint = $documents->fields['link'];
+                     $DocUrlSharePoint  = $DOC->doc_url;
 
                      function AffichageNoSigneNoMobile($Doc_Name, $DocUrlSharePoint){
                         echo "<tr>";
@@ -433,8 +433,7 @@ class PluginGestionCri extends CommonDBTM {
                   echo "</tr><br><br>";
                            // ----------------------------------- FIN LOCAL -----------------------------------
                }elseif ($config->fields['ConfigModes'] == 1){ // ----------------------------------- SHAREPOINT ----------------------------------- 
-                  $documents ->getFromDB($doc_id);
-                  $DocUrlSharePoint = $documents->fields['link'];
+                  $DocUrlSharePoint  = $DOC->doc_url;
 
                   function AffichageSigneMobile($DocUrlSharePoint){
                      // Bouton pour voir le PDF en plein écran
@@ -502,9 +501,7 @@ class PluginGestionCri extends CommonDBTM {
                   echo "</tr>";
                                        // ----------------------------------- FIN LOCAL -----------------------------------
                }elseif ($config->fields['ConfigModes'] == 1){ // ----------------------------------- SHAREPOINT -----------------------------------
-
-                  $documents ->getFromDB($doc_id);
-                  $DocUrlSharePoint = $documents->fields['link'];
+                  $DocUrlSharePoint  = $DOC->doc_url;
 
                   function AffichageSigneNoMobile($DocUrlSharePoint){
                            echo "<td style='width: 70%;'>"; // Augmente la largeur de la colonne droite pour le PDF

@@ -34,6 +34,12 @@ function plugin_gestion_install() { // fonction installation du plugin
    }
    $migration->executeMigration();
    return true;
+
+   PluginGestionProfile::initProfile();
+   PluginGestionProfile::createFirstAccess($_SESSION['glpiactiveprofile']['id']);
+
+   CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
+   return true;
 }
 
 function plugin_gestion_uninstall() { // fonction desintallation du plugin
@@ -57,6 +63,17 @@ function plugin_gestion_uninstall() { // fonction desintallation du plugin
    }
 
    $migration->executeMigration();
+
+      //Delete rights associated with the plugin
+      $profileRight = new ProfileRight();
+      foreach (PluginGestionProfile::getAllRights() as $right) {
+         $profileRight->deleteByCriteria(['name' => $right['field']]);
+      }
+      PluginGestionProfile::removeRightsFromSession();
+      PluginGestionMenu::removeRightsFromSession();
+   
+      CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
+
    return true;
 }
 

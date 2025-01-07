@@ -39,7 +39,7 @@ class PluginGestionTicket extends CommonDBTM {
 
    public static function countForItem(CommonDBTM $item) { 
       if(Session::haveRight("plugin_gestion_sign", READ)){
-         return countElementsInTable(self::getTable(), ['tickets_id' => $item->getID()]);
+         return countElementsInTable('glpi_plugin_gestion_surveys', ['tickets_id' => $item->getID()]);
       }
    }
 
@@ -48,7 +48,7 @@ class PluginGestionTicket extends CommonDBTM {
 
       $request = [
          'SELECT' => '*',
-         'FROM'   => self::getTable(),
+         'FROM'   => 'glpi_plugin_gestion_surveys',
          'WHERE'  => [
             'tickets_id' => $ID,
          ],
@@ -233,7 +233,7 @@ class PluginGestionTicket extends CommonDBTM {
                }else{
                   $BlName = substr($data['bl'], 0, 10).'...'; // Récupère le numéro de BL depuis la base
                }
-               $blId = $data['bl']; // Récupère le numéro de BL depuis la base
+               $blId = $data['id']; // Récupère le numéro de BL depuis la base
                $status = $data["signed"]; // Définit le statut signé true = signé / flase non signé
                
                if ($data["signed"] == 1) {
@@ -285,7 +285,7 @@ class PluginGestionTicket extends CommonDBTM {
                $gestion = 1;
 
                // Récupérer toutes les valeurs 'bl' pour le ticket spécifié
-               $result = $DB->query("SELECT * FROM glpi_plugin_gestion_tickets WHERE tickets_id = $ticketId AND signed = 0");
+               $result = $DB->query("SELECT * FROM glpi_plugin_gestion_surveys WHERE tickets_id = $ticketId AND signed = 0");
 
                $groups = [];
                $selected_ids = [];
@@ -370,11 +370,6 @@ class PluginGestionTicket extends CommonDBTM {
                         
                   }
                } 
-               echo 'test';
-
-               echo '<pre>';
-               //print_r(self::getTableViews());
-               echo '</pre>';
 
                $selected_values_json = json_encode($selected_ids);
                $csrf_token = Session::getNewCSRFToken();
@@ -452,7 +447,7 @@ class PluginGestionTicket extends CommonDBTM {
       $default_collation = DBConnection::getDefaultCollation();
       $default_key_sign = DBConnection::getDefaultPrimaryKeySignOption();
 
-      $table = self::getTable();
+      $table = 'glpi_plugin_gestion_surveys';
 
       if (!$DB->tableExists($table)) {
          $query = "CREATE TABLE IF NOT EXISTS `$table` (
@@ -466,6 +461,8 @@ class PluginGestionTicket extends CommonDBTM {
                      `signed` int NOT NULL DEFAULT '0',
                      `date_creation` TIMESTAMP NULL,
                      `doc_id` int {$default_key_sign} NULL,
+                     `doc_url` TEXT NULL,
+                     `doc_date` TIMESTAMP NULL,
                      PRIMARY KEY (`id`),
                      KEY `tickets_id` (`tickets_id`),
                      KEY `entities_id` (`entities_id`)
@@ -482,7 +479,7 @@ class PluginGestionTicket extends CommonDBTM {
 
    static function uninstall(Migration $migration) {
 
-      $table = self::getTable();
+      $table = 'glpi_plugin_gestion_surveys';
       $migration->dropTable($table);
    }
 }
