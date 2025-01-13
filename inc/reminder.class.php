@@ -93,36 +93,92 @@ class PluginGestionReminder extends CommonDBTM {
     */
    static function cronGestionPdf($task = NULL) {
       global $DB, $CFG_GLPI;
-      
+      $config = new PluginGestionConfig();
+  
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint();
-
+  
       try {
-         // Étape 1 : Récupérer les fichiers récents
+         // Étape 1 : Déterminer les dates pour la récupération
+         $startDate = $config->fields['LastCronTask'] ? $config->fields['LastCronTask'] : null; // Si dernière exécution connue, l'utiliser comme date de début
+
+         Session::addMessageAfterRedirect(__('test : '.$startDate, 'gestion'), false, ERROR);
+
+         /*$datetime = new DateTime($startDate); 
+         $startDate = $datetime->format('Y-m-d\TH:i:s\Z');
+   
+                  Session::addMessageAfterRedirect(__('test2 : '.$startDate, 'gestion'), false, ERROR);*/
+
+         $endDate = (new DateTime())->format('Y-m-d\TH:i:s\Z');
+
+         // Étape 2 : Récupérer les fichiers récents
          $folderPath = '';
-         $recentFiles = $sharepoint->getRecentFilesRecursive($folderPath, 3);
+         $recentFiles = $sharepoint->getRecentFilesRecursive($folderPath, $startDate, $endDate);
+
          $addedFiles = [];
 
+         $requet2 = $DB->query("SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1")->fetch_object();
+         $fileDestination = $requet2->folder_name ?? null;
+
+                  Session::addMessageAfterRedirect(__($fileDestination, 'gestion'), false, ERROR);
+
          foreach ($recentFiles as $file) {
+            $lastModified = $sharepoint->convertFromISO8601($file['lastModifiedDateTime']);
+
+            // Vérifier l'extension du fichier
             if (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) === 'pdf') {
-               // Extraire le nom du fichier sans extension
+               // Extraire les informations nécessaires
                $fileName = pathinfo($file['name'], PATHINFO_FILENAME);
                $createdDateTime = $sharepoint->convertFromISO8601($file['createdDateTime']);
                $webUrl = $file['webUrl'];
-               $FileNameBdd = $file['name'];
 
-               // Vérifier si le dossier existe déjà
-               $query = "SELECT COUNT(*) AS count
-               FROM `glpi_plugin_gestion_survey_surveys`
-               WHERE `bl` = '$fileName';";
+               Session::addMessageAfterRedirect(__($webUrl, 'gestion'), false, ERROR);
 
+               // Vérifier si le fichier est dans le dossier spécifique ou ses sous-dossiers
+               $isSigned = 0;
+               if ($fileDestination) {
+                  Session::addMessageAfterRedirect(__('signer 1 : '.$isSigned, 'gestion'), false, ERROR);
+                     $filePath = $file['parentReference']['path'] ?? '';
+                     Session::addMessageAfterRedirect(__('file : '.$filePath, 'gestion'), false, ERROR); 
+                     if (strpos($filePath, $fileDestination) !== false) {
+                        $isSigned = 1;
+                        Session::addMessageAfterRedirect(__('signer 2 : '.$isSigned, 'gestion'), false, ERROR); 
+                     }
+               }
+
+               Session::addMessageAfterRedirect(__('signer 3 : '.$isSigned, 'gestion'), false, ERROR); 
+
+               // Vérifier si le fichier existe déjà en base
+               $query = "SELECT COUNT(*) AS count FROM `glpi_plugin_gestion_survey_surveys` WHERE `bl` = '$fileName';";
+               Session::addMessageAfterRedirect(__('TEST 1', 'gestion'), false, ERROR); 
                $result = $DB->query($query);
-               $row = $DB->fetchassoc($result);
+               Session::addMessageAfterRedirect(__('TEST 2', 'gestion'), false, ERROR); 
+
+               try{
+                  $row = $DB->fetchassoc($result);
+               }catch (Exception $e) {
+                  Session::addMessageAfterRedirect(__($e->getMessage(), 'gestion'), false, ERROR);
+                  echo "Erreur : " . $e->getMessage() . "\n";
+              }
+               
+
+
+
+               Session::addMessageAfterRedirect(__('TEST 3', 'gestion'), false, ERROR); 
+               Session::addMessageAfterRedirect(__('count : '.$row['count'], 'gestion'), false, ERROR);
 
                if ($row['count'] == 0) {
-                  // Ajouter le fichier en base s'il n'existe pas
-                  $DB->query("INSERT INTO glpi_plugin_gestion_survey_surveys (bl, doc_url, doc_date) VALUES ('$fileName', '".$DB->escape($webUrl)."', '$createdDateTime')");                  
-                  $addedFiles[] = $fileName;
+                  Session::addMessageAfterRedirect(__('TEST 4', 'gestion'), false, ERROR); 
+
+                     // Ajouter le fichier en base
+                     $sql = $isSigned
+                        ? "INSERT INTO glpi_plugin_gestion_surveys (bl, doc_url, doc_date, signed) VALUES ('$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned)"
+                        : "INSERT INTO glpi_plugin_gestion_surveys (bl, doc_url, doc_date) VALUES ('$fileName', '".$DB->escape($webUrl)."', '$createdDateTime')";
+
+                        Session::addMessageAfterRedirect(__('SQL : '.$sql, 'gestion'), false, ERROR); 
+                     $DB->query($sql);
+                     $addedFiles[] = $fileName;
+                     Session::addMessageAfterRedirect(__('filename : '.$fileName, 'gestion'), false, ERROR); 
                }
             }
          }
@@ -130,12 +186,13 @@ class PluginGestionReminder extends CommonDBTM {
          // Résultat de la synchronisation
          if (!empty($addedFiles)) {
             echo "Fichiers ajoutés en base : " . implode(", ", $addedFiles) . "\n";
+            //$DB->query("UPDATE glpi_plugin_gestion_configs SET LastCronTask = $endDate WHERE id = 1");
          } else {
             echo "Aucun nouveau fichier à ajouter.\n";
          }
       } catch (Exception $e) {
-         Session::addMessageAfterRedirect(__($e->getMessage(), 'gestion'), false, ERROR);
-            echo "Erreur : " . $e->getMessage() . "\n";
+          Session::addMessageAfterRedirect(__($e->getMessage(), 'gestion'), false, ERROR);
+          echo "Erreur : " . $e->getMessage() . "\n";
       }
-   }
+   }     
 }

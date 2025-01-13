@@ -578,16 +578,14 @@ class PluginGestionSharepoint extends CommonDBTM {
     /**
      * Fonction récursive pour récupérer les fichiers récents dans un dossier SharePoint (incluant les sous-dossiers)
      */
-    public function getRecentFilesRecursive($folderPath, $days = 3) {
+    public function getRecentFilesRecursive($folderPath, $startDate = null, $endDate = null) {
         $accessToken = $this->getAccessToken();
         $driveId = $this->GetDriveId();
 
         // Construire l'URL en fonction de la valeur de $folderPath
         if (empty($folderPath)) {
-            // Si $folderPath est vide, utiliser l'URL pour le dossier racine
             $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children";
         } else {
-            // Sinon, utiliser l'URL pour le dossier spécifié
             $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
         }
 
@@ -610,17 +608,33 @@ class PluginGestionSharepoint extends CommonDBTM {
         }
 
         $recentFiles = [];
-        $cutoffDate = new DateTime("-$days days");
 
         foreach ($files as $file) {
             if (isset($file['folder'])) {
                 // Si l'élément est un dossier, appeler la fonction récursive
                 $subfolderPath = $folderPath . '/' . $file['name'];
-                $recentFiles = array_merge($recentFiles, $this->getRecentFilesRecursive($subfolderPath, $days));
+                $recentFiles = array_merge($recentFiles, $this->getRecentFilesRecursive($subfolderPath, $startDate, $endDate));
             } elseif (isset($file['file']) && $file['file']['mimeType'] === 'application/pdf') {
-                // Si l'élément est un fichier PDF, vérifier la date de modification
+                // Vérifier la date de modification
                 $lastModified = new DateTime($file['lastModifiedDateTime']);
-                if ($lastModified >= $cutoffDate) {
+                $includeFile = true;
+
+                if ($startDate) {
+                    $start = new DateTime($startDate);
+                    if ($lastModified < $start) {
+                        $includeFile = false;
+                    }
+                }
+
+                if ($endDate) {
+                    $end = new DateTime($endDate);
+                    if ($lastModified > $end) {
+                        $includeFile = false;
+                    }
+                }
+
+                // Ajouter le fichier si les critères de date sont respectés
+                if ($includeFile) {
                     $recentFiles[] = $file;
                 }
             }

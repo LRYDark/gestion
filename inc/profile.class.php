@@ -68,7 +68,7 @@ class PluginGestionProfile extends Profile {
          'rights'   => [READ    => __('Read')]
          ],
          ['itemtype' => 'PluginGestionSurvey',
-         'label'    => PluginRpautoSurvey::getTypeName(2),
+         'label'    => PluginGestionSurvey::getTypeName(2),
          'field'    => 'plugin_gestion_survey',
          'rights'   => [READ    => __('Read')]
          ]

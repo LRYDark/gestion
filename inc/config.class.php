@@ -411,6 +411,14 @@ class PluginGestionConfig extends CommonDBTM
          echo "<tr class='tab_bg_1'><td>" . __("Dossier de récupération des PDFs : ".GLPI_PLUGIN_DOC_DIR."/gestion/unsigned/", "gestion") . "</td></tr>";
          echo "<tr class='tab_bg_1'><td>" . __("Dossier de déstination des PDFs : ".GLPI_PLUGIN_DOC_DIR."/gestion/signed/", "gestion") . "</td></tr>";
       }
+
+      echo "<tr><th colspan='2'>" . __("Dérnière synchronisation : ".$config->LastCronTask(), 'rp') . "</th></tr>";
+
+      echo 'test ';
+      $filePath = 'https://globalinfo763.sharepoint.com/sites/GLPI-BL/Documents%20partages/BL_NON_SIGNE/BL123456789_TESTJORIS.pdf';
+      $fileDestination = '/drives/b!HhaCvvwDvUiFVihE9wOc4p2C-XsAqJlFmDwulVa6XzmWhDjy_c1mRbzLqiqfq3qU/root:/BL_NON_SIGNE';
+      echo strpos($filePath, $fileDestination);
+
       $config->showFormButtons(['candel' => false]);
       return false;
    }
@@ -430,6 +438,10 @@ class PluginGestionConfig extends CommonDBTM
    function Global()
    {
       return ($this->fields['Global']);
+   }
+   function LastCronTask()
+   {
+      return ($this->fields['LastCronTask']);
    }
    function SignatureX()
    {
@@ -574,6 +586,7 @@ class PluginGestionConfig extends CommonDBTM
                   `DateY` FLOAT NOT NULL DEFAULT '51.3',
                   `TechX` FLOAT NOT NULL DEFAULT '150',
                   `TechY` FLOAT NOT NULL DEFAULT '37',
+                  `LastCronTask` TIMESTAMP DEFAULT NULL,
                   PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
          $DB->query($query) or die($DB->error());
