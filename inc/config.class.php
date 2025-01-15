@@ -434,6 +434,10 @@ class PluginGestionConfig extends CommonDBTM
    {
       return ($this->fields['Global']);
    }
+   function ConfigModes()
+   {
+      return ($this->fields['ConfigModes']);
+   }
    function LastCronTask()
    {
       return ($this->fields['LastCronTask']);

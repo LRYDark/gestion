@@ -30,7 +30,7 @@
 
 include('../../../inc/includes.php');
 
-Html::header(PluginGestionSurvey::getTypeName(2), '', "admin", "plugingestionmenu");
+Html::header(PluginGestionSurvey::getTypeName(2), '', "management", "plugingestionmenu");
 
 $gestion = new PluginGestionSurvey();
 $gestion->checkGlobal(READ);

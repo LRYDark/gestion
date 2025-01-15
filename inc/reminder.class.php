@@ -42,9 +42,6 @@ class PluginGestionReminder extends CommonDBTM {
    static $rightname = "plugin_gestion_survey";
    public $dohistory = true;
 
-   public static $itemtype = TicketGestion::class;
-   public static $items_id = 'ticketgestions_id';
-
    const CRON_TASK_NAME = 'GestionPdf';
 
 
@@ -162,8 +159,8 @@ class PluginGestionReminder extends CommonDBTM {
             }
          }
 
-         /*$lastdate = date('Y-m-d H:i:s');
-         $DB->query("UPDATE glpi_plugin_gestion_configs SET LastCronTask = '$lastdate' WHERE id = 1");  */ 
+         $lastdate = date('Y-m-d H:i:s');
+         $DB->query("UPDATE glpi_plugin_gestion_configs SET LastCronTask = '$lastdate' WHERE id = 1");
 
       } catch (Exception $e) {
          Session::addMessageAfterRedirect(__($e->getMessage(), 'gestion'), false, ERROR);

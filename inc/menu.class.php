@@ -52,9 +52,6 @@ class PluginGestionMenu extends CommonGLPI
          $menu['title']           = self::getMenuName();
          $menu['page']            = PLUGIN_GESTION_NOTFULL_WEBDIR."/front/survey.php";
          $menu['links']['search'] = PluginGestionSurvey::getSearchURL(false);
-         /*if (PluginGestionSurvey::canCreate()) {
-            $menu['links']['add'] = PluginGestionSurvey::getFormURL(false);
-         }*/
       }
 
       $menu['icon'] = self::getIcon();
@@ -63,15 +60,15 @@ class PluginGestionMenu extends CommonGLPI
    }
 
    static function getIcon() {
-      return "fa-fw ti ti-report";
+      return "fa-solid fa-file-signature";
    }
 
    static function removeRightsFromSession() {
-      if (isset($_SESSION['glpimenu']['admin']['types']['PluginGestionMenu'])) {
-         unset($_SESSION['glpimenu']['admin']['types']['PluginGestionMenu']);
+      if (isset($_SESSION['glpimenu']['management']['types']['PluginGestionMenu'])) {
+         unset($_SESSION['glpimenu']['management']['types']['PluginGestionMenu']);
       }
-      if (isset($_SESSION['glpimenu']['admin']['content']['plugingestionmenu'])) {
-         unset($_SESSION['glpimenu']['admin']['content']['plugingestionmenu']);
+      if (isset($_SESSION['glpimenu']['management']['content']['plugingestionmenu'])) {
+         unset($_SESSION['glpimenu']['management']['content']['plugingestionmenu']);
       }
    }
 }

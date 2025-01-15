@@ -69,7 +69,7 @@ class PluginGestionSurvey extends CommonDBTM {
 
       $tab[] = [
          'id'                 => 'common',
-         'name'               => self::getTypeName(2)
+         'name'               => self::getTypeName()
       ];
 
       $tab[] = [
@@ -103,7 +103,6 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => $this->getTable(),
          'field'              => 'doc_url',
          'name'               => __('Url du document'),
-         'massiveaction'      => false,
          'datatype'           => 'text'
       ];
 
@@ -128,7 +127,8 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => $this->getTable(),
          'field'              => 'date_creation',
          'name'               => __('Date de signature'),
-         'datatype'           => 'datetime'
+         'datatype'           => 'datetime',
+         'massiveaction'      => false
       ];
 
       $tab[] = [
@@ -136,7 +136,8 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => $this->getTable(),
          'field'              => 'users_ext',
          'name'               => __('Signataire'),
-         'datatype'           => 'text'
+         'datatype'           => 'text',
+         'massiveaction'      => false
       ];
 
       $tab[] = [
@@ -144,7 +145,8 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => 'glpi_users',
          'field'              => 'name',
          'name'               => __('Users'),
-         'datatype'           => 'dropdown'
+         'datatype'           => 'dropdown',
+         'massiveaction'      => false
       ];
 
       return $tab;
@@ -173,6 +175,13 @@ class PluginGestionSurvey extends CommonDBTM {
       $this->initForm($ID, $options);
       $this->showFormHeader($options);
 
+      if($config->fields['ConfigModes'] == 0){
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __('Non du document : ') . "</td>";
+            echo "<td>";
+            echo $this->fields['bl'].'.pdf';
+         echo "</td></tr>";
+      }elseif($config->fields['ConfigModes'] == 1){// CONFIG SHAREPOINT 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __('Non du document : ') . "</td>";
             echo "<td>";
@@ -181,6 +190,7 @@ class PluginGestionSurvey extends CommonDBTM {
             echo "<td>";
             echo '<a href="' . $this->fields['doc_url'] . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
          echo "</td></tr>";
+      }
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __('Entity') . "</td>";
@@ -225,7 +235,7 @@ class PluginGestionSurvey extends CommonDBTM {
       $signed = '';
       if ($this->fields['signed'] == 1){
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __('Informations sur le document :') ."</td>";
+            echo "<td>" . __('Informations sur le document <strong>Signé</strong> :') ."</td>";
             echo "<td>";
                echo Html::submit($this->fields['bl'], [
                   'name'    => 'showCriForm',
@@ -235,7 +245,7 @@ class PluginGestionSurvey extends CommonDBTM {
          echo "</td></tr>";
       }else{
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __('Informations sur le document :')."</td>";
+            echo "<td>" . __('Informations sur le document <strong>Non signé</strong> ')."</td>";
             echo "<td>";
                echo Html::submit($this->fields['bl'], [
                   'name'    => 'showCriForm',
@@ -244,59 +254,12 @@ class PluginGestionSurvey extends CommonDBTM {
                ]);
          echo "</td></tr>";
       }
-                 
-      $this->showFormButtons($options);
+   
+      if (Session::haveRight('plugin_gestion_survey', UPDATE)) {
+         $this->showFormButtons($options);
+      }
       Html::closeForm();
 
       return true;
-   }
-
-   /**
-    * Prepare input datas for adding the item
-    **/
-   function prepareInputForAdd($input) {
-
-      if ($input['is_active'] == 1) {
-         $dbu = new DbUtils();
-         //we must store only one survey by entity
-         $condition  = ['is_active' => 1]
-                        + $dbu->getEntitiesRestrictCriteria($this->getTable(), 'entities_id', $input['entities_id'], true);
-         $found = $this->find($condition);
-         if (count($found) > 0) {
-            Session::addMessageAfterRedirect(__('Error : only one survey is allowed by entity', 'gestion'), false, ERROR);
-            return false;
-         }
-      }
-
-      return $input;
-   }
-
-   /**
-    * Prepare input datas for updating the item
-    **/
-   function prepareInputForUpdate($input){
-      global $DB;
-
-      $id = $input['id'];
-      $mail = $input['mail'];      
-      $query= "UPDATE glpi_plugin_gestion_surveysuser SET alternative_email = '$mail' WHERE survey_id = $id";
-      $DB->query($query);
-
-      //active external survey for entity
-      if ($input['is_active'] == 1) {
-         $dbu = new DbUtils();
-         //we must store only one survey by entity (other this one)
-         $condition  = ['is_active' => 1,
-                        ['NOT' => ['id' => $this->getID()]]]
-                       + $dbu->getEntitiesRestrictCriteria($this->getTable(), 'entities_id', $input['entities_id'], true);
-         $found = $this->find($condition);
-         if (count($found) > 0) {
-            Session::addMessageAfterRedirect(__('Error : only one survey is allowed by entity',
-                                                'gestion'), false, ERROR);
-            return false;
-         }
-      }
-
-      return $input;
    }
 }

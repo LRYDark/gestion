@@ -38,17 +38,7 @@ if (!isset($_GET["id"])) {
 
 $survey = new PluginGestionSurvey();
 
-if (isset($_POST["add"])) {
-   $survey->check(-1, CREATE, $_POST);
-   $id = $survey->add($_POST);
-
-   $mail = $_POST["mail"];
-   $query= "INSERT INTO `glpi_plugin_gestion_surveyssign` (`survey_id`, `users_id`, `type`, `use_notification`, `alternative_email`) VALUES ($id, 0, 1, 0, '$mail');";
-   $survey_id = $DB->query($query);
-
-   Html::back();
-
-} else if (isset($_POST["purge"])) {
+if (isset($_POST["purge"])) {
    $survey->check($_POST['id'], PURGE);
    $survey->delete($_POST);
    $survey->redirectToList();
@@ -62,9 +52,10 @@ if (isset($_POST["add"])) {
 
    $survey->checkGlobal(READ);
 
-   Html::header(PluginGestionSurvey::getTypeName(2), '', "admin", "plugingestionmenu", "gestion");
+   Html::header(PluginGestionSurvey::getTypeName(2), '', "management", "plugingestionmenu", "gestion");
 
    $survey->display(['id' => $_GET['id']]);
 
    Html::footer();
 }
+

@@ -20,6 +20,8 @@ class PluginGestionProfile extends Profile {
       if ($item->getType() == 'Profile') {
          $ID   = $item->getID();
          $prof = new self();
+
+         self::addDefaultProfileInfos($ID, ['plugin_gestion_survey' => 0]);
          $prof->showForm($ID);
       }
       return true;
@@ -53,25 +55,25 @@ class PluginGestionProfile extends Profile {
    static function getAllRights($all = false) {
       $rights = [
          ['itemtype' => 'PluginGestionConfig',
-         'label'    => __('Ajout de documents à signer', 'gestion'),
-         'field'    => 'plugin_gestion_add',
-         'rights'   => [READ    => __('Read'), UPDATE  => __('Update / Add / Delete')]
+            'label'    => __('Ajout de documents à signer', 'gestion'),
+            'field'    => 'plugin_gestion_add',
+            'rights'   => [READ    => __('Read'), UPDATE  => __('Update / Add / Delete')]
          ],
          ['itemtype' => 'PluginGestionConfig',
-         'label'    => __('Documents à signer', 'gestion'),
-         'field'    => 'plugin_gestion_sign',
-         'rights'   => [READ    => __('Read'), CREATE  => __('Signer'), PURGE  => __('Purge')]
+            'label'    => __('Documents à signer', 'gestion'),
+            'field'    => 'plugin_gestion_sign',
+            'rights'   => [READ    => __('Read'), CREATE  => __('Signer'), PURGE  => __('Purge')]
          ],
          ['itemtype' => 'PluginGestionConfig',
-         'label'    => __('Tous les Documents', 'gestion'),
-         'field'    => 'plugin_gestion',
-         'rights'   => [READ    => __('Read')]
+            'label'    => __('Tous les Documents', 'gestion'),
+            'field'    => 'plugin_gestion',
+            'rights'   => [READ    => __('Read')]
          ],
          ['itemtype' => 'PluginGestionSurvey',
-         'label'    => PluginGestionSurvey::getTypeName(2),
-         'field'    => 'plugin_gestion_survey',
-         'rights'   => [READ    => __('Read')]
-         ]
+            'label'    => PluginGestionSurvey::getTypeName(2),
+            'field'    => 'plugin_gestion_survey',
+            'rights'   => [READ    => __('Read'), UPDATE  => __('Update'), PURGE  => __('Purge')]
+         ],
       ];
 
       return $rights;
@@ -142,7 +144,7 @@ class PluginGestionProfile extends Profile {
                                    ['plugin_gestion_add'          => ALLSTANDARDRIGHT,
                                     'plugin_gestion_sign'         => ALLSTANDARDRIGHT,
                                     'plugin_gestion'              => ALLSTANDARDRIGHT,
-                                    'plugin_gestion_survey'         => ALLSTANDARDRIGHT], true);
+                                    'plugin_gestion_survey'       => ALLSTANDARDRIGHT], true);
    }
 
    static function removeRightsFromSession() {

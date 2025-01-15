@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.2.0'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.2.1'); // version du plugin
 
 // Minimal GLPI version,
 define("PLUGIN_GESTION_MIN_GLPI", "10.0.3");
@@ -15,20 +15,24 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
    global $PLUGIN_HOOKS, $CFG_GLPI;
 
    $PLUGIN_HOOKS['csrf_compliant']['gestion'] = true;
-   $PLUGIN_HOOKS['change_profile']['gestion'] = ['PluginGestionProfile', 'initProfile'];
+   $PLUGIN_HOOKS['change_profile']['gestion'] = [PluginGestionProfile::class, 'initProfile'];
 
    $plugin = new Plugin();
-
-   if (Session::getLoginUserID()) {
-      Plugin::registerClass('PluginGestionProfile', ['addtabon' => 'Profile']);
-   }
-
-   if (isset($_SESSION['glpiactiveprofile']['interface'])
-      && $_SESSION['glpiactiveprofile']['interface'] == 'central') {
-      $PLUGIN_HOOKS['add_javascript']['gestion'] = ['scripts/scripts-gestion.js'];
-   }
-
    if ($plugin->isActivated('gestion')){ // verification si le plugin gestion est installé et activé
+
+      if (Session::getLoginUserID()) {
+         Plugin::registerClass('PluginGestionProfile', ['addtabon' => 'Profile']);
+      }
+
+      if (Session::haveRight('plugin_gestion_survey', READ)) {
+         $PLUGIN_HOOKS["menu_toadd"]['gestion'] = ['management' => PluginGestionMenu::class];
+      }
+
+      if (isset($_SESSION['glpiactiveprofile']['interface'])
+         && $_SESSION['glpiactiveprofile']['interface'] == 'central') {
+         $PLUGIN_HOOKS['add_javascript']['gestion'] = ['scripts/scripts-gestion.js'];
+      }
+
       Plugin::registerClass('PluginGestionTicket', ['addtabon' => 'Ticket']);
 
       $PLUGIN_HOOKS['config_page']['gestion'] = 'front/config.form.php'; // initialisation de la page config
@@ -36,8 +40,6 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
 
       $PLUGIN_HOOKS['post_show_item']['gestion'] = ['PluginGestionTicket', 'postShowItemNewTicketGESTION']; // initialisation de la class
       $PLUGIN_HOOKS['pre_show_item']['gestion'] = ['PluginGestionTicket', 'postShowItemNewTaskGESTION']; // initialisation de la class
-
-      $PLUGIN_HOOKS["menu_toadd"]['gestion'] = ['admin' => PluginGestionMenu::class];
    }
 }
 
