@@ -161,6 +161,10 @@ class PluginGestionSurvey extends CommonDBTM {
     */
    function showForm($ID, $options = []) {
       global $DB;
+      $config = new PluginGestionConfig();
+
+      $params = ['job'        => $ID,
+      'root_doc'   => PLUGIN_GESTION_WEBDIR];
       
       if (!$this->canView()) {
          return false;
@@ -169,8 +173,78 @@ class PluginGestionSurvey extends CommonDBTM {
       $this->initForm($ID, $options);
       $this->showFormHeader($options);
 
-      echo 'test';
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __('Non du document : ') . "</td>";
+            echo "<td>";
+            echo $this->fields['bl'].'.pdf';
+            echo "</td>";  
+            echo "<td>";
+            echo '<a href="' . $this->fields['doc_url'] . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
+         echo "</td></tr>";
 
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __('Entity') . "</td>";
+            echo "<td>";
+            Dropdown::show('Entity', [
+               'name' => 'entities_id',
+               'value' => $this->fields["entities_id"],
+               'display_emptychoice' => 1,
+               'specific_tags' => [],
+               'itemtype' => 'Entity',
+               'displaywith' => [],
+               'emptylabel' => "-----",
+               'used' => [],
+               'toadd' => [],
+               'entity_restrict' => 0,
+            ]); 
+         echo "</td><td colspan='2'></td></tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __('Ticket') . "</td>";
+            echo "<td>";
+            Dropdown::show('Ticket', [
+               'name' => 'tickets_id', // Le nom du champ
+               'value' => $this->fields["tickets_id"], // La valeur sélectionnée par défaut
+               'display_emptychoice' => 1, // Afficher un choix vide
+               'specific_tags' => [], // Éventuels attributs HTML supplémentaires
+               'itemtype' => 'Ticket', // Type d'objet à afficher
+               'displaywith' => ['id'], // Champs à afficher pour les tickets
+               'emptylabel' => "-----", // Étiquette pour l'option vide
+               'used' => [], // Filtrage des tickets déjà utilisés
+               'toadd' => [], // Liste personnalisée d'objets à ajouter
+               'entity_restrict' => 0, // Autoriser les tickets de toutes les entités
+            ]);
+         echo "</td><td colspan='2'></td></tr>";
+
+         echo "<tr class='tab_bg_1'><td></td></tr>";
+         echo "<tr class='tab_bg_1'><td></td></tr>";
+         echo "<tr class='tab_bg_1'><td></td></tr>";
+         echo "<tr class='tab_bg_1'><td></td></tr>";
+         echo "<tr class='tab_bg_1'><td></td></tr>";
+
+      $signed = '';
+      if ($this->fields['signed'] == 1){
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __('Informations sur le document :') ."</td>";
+            echo "<td>";
+               echo Html::submit($this->fields['bl'], [
+                  'name'    => 'showCriForm',
+                  'class'   => 'btn btn-secondary',
+                  'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
+              ]);
+         echo "</td></tr>";
+      }else{
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __('Informations sur le document :')."</td>";
+            echo "<td>";
+               echo Html::submit($this->fields['bl'], [
+                  'name'    => 'showCriForm',
+                  'class'   => 'btn btn-primary',
+                  'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
+               ]);
+         echo "</td></tr>";
+      }
+                 
       $this->showFormButtons($options);
       Html::closeForm();
 

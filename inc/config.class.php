@@ -414,11 +414,6 @@ class PluginGestionConfig extends CommonDBTM
 
       echo "<tr><th colspan='2'>" . __("Dérnière synchronisation : ".$config->LastCronTask(), 'rp') . "</th></tr>";
 
-      echo 'test ';
-      $filePath = 'https://globalinfo763.sharepoint.com/sites/GLPI-BL/Documents%20partages/BL_NON_SIGNE/BL123456789_TESTJORIS.pdf';
-      $fileDestination = '/drives/b!HhaCvvwDvUiFVihE9wOc4p2C-XsAqJlFmDwulVa6XzmWhDjy_c1mRbzLqiqfq3qU/root:/BL_NON_SIGNE';
-      echo strpos($filePath, $fileDestination);
-
       $config->showFormButtons(['candel' => false]);
       return false;
    }
