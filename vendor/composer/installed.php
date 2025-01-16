@@ -3,7 +3,7 @@
         'name' => '__root__',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '5d712a04ae38e9e70435cf1511942b9169b40e58',
+        'reference' => '839329e6dd32495653e4e55ce6e3d83023fac9e3',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -13,7 +13,7 @@
         '__root__' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '5d712a04ae38e9e70435cf1511942b9169b40e58',
+            'reference' => '839329e6dd32495653e4e55ce6e3d83023fac9e3',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
@@ -70,6 +70,15 @@
             'aliases' => array(),
             'dev_requirement' => false,
         ),
+        'smalot/pdfparser' => array(
+            'pretty_version' => 'v2.11.0',
+            'version' => '2.11.0.0',
+            'reference' => 'ac8e6678b0940e4b2ccd5caadd3fb18e68093be6',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../smalot/pdfparser',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
         'symfony/console' => array(
             'pretty_version' => 'v5.4.45',
             'version' => '5.4.45.0',
@@ -122,7 +131,7 @@
             'type' => 'library',
             'install_path' => __DIR__ . '/../symfony/polyfill-mbstring',
             'aliases' => array(),
-            'dev_requirement' => true,
+            'dev_requirement' => false,
         ),
         'symfony/polyfill-php73' => array(
             'pretty_version' => 'v1.31.0',

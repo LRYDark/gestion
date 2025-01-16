@@ -313,7 +313,6 @@ class PluginGestionTicket extends CommonDBTM {
                   }
                }elseif ($config->fields['ConfigModes'] == 1 && !empty($config->fields['Global'])){
 
-                  echo 'test';
                   try {
                      // Récupérer les lignes de la table où la colonne params est 0 ou 1
                      $query = "SELECT folder_name, params FROM glpi_plugin_gestion_configsfolder WHERE params IN (0, 1)";

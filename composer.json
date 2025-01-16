@@ -3,7 +3,8 @@
         "php": ">=7.4",
         "setasign/fpdf": "^1.8",
         "setasign/fpdi": "^2.6",
-        "setasign/fpdi_pdf-parser": "^2.1"
+        "setasign/fpdi_pdf-parser": "^2.1",
+        "smalot/pdfparser": "^2.11"
     },
     "require-dev": {
         "glpi-project/tools": "^0.5"
@@ -15,10 +16,14 @@
         },
         "sort-packages": true
     },
-    "repositories": [
-        {
+    "repositories": {
+        "setasign": {
+            "type": "composer",
+            "url": "https://www.setasign.com/downloads/"
+        },
+        "0": {
             "type": "composer",
             "url": "https://www.setasign.com/downloads/"
         }
-    ]
+    }
 }

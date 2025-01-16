@@ -1,6 +1,8 @@
 <?php
 include ('../../../inc/includes.php');
 
+use Glpi\Event;
+
 Session::haveRight("ticket", UPDATE);
 global $DB, $CFG_GLPI;
 $doc = new Document();
@@ -152,14 +154,22 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
 
         // Exécution de la requête préparée
         $stmt = $DB->prepare($sql);
-        if (!$stmt->execute([NULL, NULL, NULL, $item])){
-            echo 'erreur de supression';
+        if (!$stmt->execute([0, 0, NULL, $item])){
+            Session::addMessageAfterRedirect(__("Erreur de suppression des éléments", 'gestion'), true, ERROR);
         }
     }
 
     // Message de confirmation si tout s'est bien passé
     if ($success) {
         Session::addMessageAfterRedirect(__("Les éléments ont été mis à jour avec succès.", 'gestion'), true, INFO);
+        Event::log(
+            $ticketId,
+            "ticket",
+            4,
+            "tracking",
+            //TRANS: %s is the user login
+            sprintf(__('%s updates an item'), $_SESSION["glpiname"])
+        );
     }
 }
 
