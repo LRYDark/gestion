@@ -675,7 +675,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         $config         = new PluginGestionConfig();
         $extracteur     = $config->extract();
 
-        if (!empty($extracteur) && $config->NotYesExtract() == 1) {
+        if (!empty($extracteur) && $config->ExtractYesNo() == 1) {
             try {  
                 // Étape 4 : Obtenir l'URL de téléchargement
                 $downloadUrl = $this->getDownloadUrl($filePath);

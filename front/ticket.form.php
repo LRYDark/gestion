@@ -133,7 +133,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             }
 
             if ($success) {
-                if($config->NotYesExtract() == 1 && $config->fields['ConfigModes'] == 1){
+                if($config->ExtractYesNo() == 1 && $config->fields['ConfigModes'] == 1){
                     $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
                     if (!empty($tracker)){
                         Session::addMessageAfterRedirect(__("$item - <strong>Tracker : $tracker</strong>", 'gestion'), false, INFO);

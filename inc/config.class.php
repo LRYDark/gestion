@@ -59,13 +59,13 @@ class PluginGestionConfig extends CommonDBTM
       echo "<tr><th colspan='2'>" . __('Gestion', 'rp') . "</th></tr>";
 
       echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Affichage du PDF après signature", "rt") . "</td><td>";
+         echo "<td>" . __("Affichage du PDF après signature", "gestion") . "</td><td>";
             Dropdown::showYesNo('DisplayPdfEnd', $config->DisplayPdfEnd(), -1);
          echo "</td>";
       echo "</tr>";
 
       echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Envoie des PDF par mail", "rt") . "</td><td>";
+         echo "<td>" . __("Envoie des PDF par mail", "gestion") . "</td><td>";
             Dropdown::showYesNo('MailTo', $config->MailTo(), -1);
          echo "</td>";
       echo "</tr>";
@@ -173,9 +173,9 @@ class PluginGestionConfig extends CommonDBTM
          echo "</tr>";
 
       if($config->fields['ConfigModes'] == 1){
-         echo "<tr><th colspan='2'>" . __("Configuration de l'affichage", 'rp') . "</th></tr>";
+         echo "<tr><th colspan='2'>" . __("Configuration de l'affichage et Tâche cron", 'rp') . "</th></tr>";
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Prévisualisation du PDF avant signature (cela peut provoquer des ralentissements). Vérifiez également la configuration de SharePoint pour le partage par lien.", "rt") . "</td><td>";
+            echo "<td>" . __("Prévisualisation du PDF avant signature (cela peut provoquer des ralentissements). Vérifiez également la configuration de SharePoint pour le partage par lien.", "gestion") . "</td><td>";
                Dropdown::showYesNo('SharePointLinkDisplay', $config->SharePointLinkDisplay(), -1);
             echo "</td>";
          echo "</tr>";
@@ -197,27 +197,62 @@ class PluginGestionConfig extends CommonDBTM
                );
             echo "</td>";
          echo "</tr>";
-
+         //--------------------------------------------
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Extraction d'un tracker dans le PDF", "rt") . "</td><td>";
-               Dropdown::showYesNo('NotYesExtract', $config->NotYesExtract(), -1);
+            echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
+         echo "</tr>";
+         
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Extraction d'un tracker dans le PDF", "gestion") . "</td><td>";
+               Dropdown::showYesNo('ExtractYesNo', $config->ExtractYesNo(), -1);
             echo "</td>";
          echo "</tr>";
 
-         if($config->NotYesExtract() == 1){
+         if($config->ExtractYesNo() == 1){
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
                   echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
                echo "</td>";
             echo "</tr>";
          }
-
+         //--------------------------------------------
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Attribuer l'entité en fonction du nom du dossie (Tâche Cron)", "rt") . "</td><td>";
-               Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
-            echo "</td>";
+            echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
          echo "</tr>";
 
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Envoyé un mail si le contenu d'un tracker est détécté (Tâche Cron)", "gestion") . "</td><td>";
+               Dropdown::showYesNo('MailTrackerYesNo', $config->MailTrackerYesNo(), -1);
+            echo "</td>";
+         echo "</tr>";
+         
+         if($config->MailTrackerYesNo() == 1){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Mail", "gestion") . "</td><td>";
+                  echo Html::input('MailTracker', ['value' => $config->MailTracker(), 'size' => 60]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+         }
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td> Gabarit : Modèle de notifications pour la Tâche Cron (Tracker) </td>";
+            echo "<td>";
+
+            //notificationtemplates_id
+            Dropdown::show('NotificationTemplate', [
+               'name' => 'gabarit_tracker',
+               'value' => $config->gabarit_tracker(),
+               'display_emptychoice' => 1,
+               'specific_tags' => [],
+               'itemtype' => 'NotificationTemplate',
+               'displaywith' => [],
+               'emptylabel' => "-----",
+               'used' => [],
+               'toadd' => [],
+               'entity_restrict' => 0,
+            ]); 
+         echo "</td></tr>";
+         //--------------------------------------------
          echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph)', 'rp') . "</th></tr>";
 
          echo "<tr class='tab_bg_1'>";
@@ -359,8 +394,8 @@ class PluginGestionConfig extends CommonDBTM
                            0 => __('Dossier de récupération (Racine)', 'gestion'),
                            1 => __('Dossier de récupération (Global - Recursive)', 'gestion'),
                            2 => __('Dossier de destination (Dépot Global)', 'gestion'),
+                           5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
                            6 => __('Supprimer le dossier', 'gestion'),
-                           7 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
                            8 => __('__Non attribué__', 'gestion'),
                      ];
 
@@ -471,13 +506,21 @@ class PluginGestionConfig extends CommonDBTM
    {
       return ($this->fields['SignatureSize']);
    } 
-   function NotYesExtract()
+   function ExtractYesNo()
    {
-      return ($this->fields['NotYesExtract']);
+      return ($this->fields['ExtractYesNo']);
    } 
    function extract()
    {
       return ($this->fields['extract']);
+   } 
+   function MailTrackerYesNo()
+   {
+      return ($this->fields['MailTrackerYesNo']);
+   } 
+   function MailTracker()
+   {
+      return ($this->fields['MailTracker']);
    } 
    function EntitiesExtract()
    {
@@ -530,6 +573,10 @@ class PluginGestionConfig extends CommonDBTM
    function gabarit()
    {
       return ($this->fields['gabarit']);
+   }
+   function gabarit_tracker()
+   {
+      return ($this->fields['gabarit_tracker']);
    }
    function TenantID(){
       return openssl_decrypt(base64_decode($this->fields['TenantID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
@@ -598,13 +645,16 @@ class PluginGestionConfig extends CommonDBTM
                   `Global` VARCHAR(255) NULL,
                   `ZenDocMail` VARCHAR(255) NULL,
                   `extract` VARCHAR(255) NULL,
-                  `NotYesExtract` TINYINT NOT NULL DEFAULT '0',
+                  `ExtractYesNo` TINYINT NOT NULL DEFAULT '0',
+                  `MailTracker` VARCHAR(255) NULL,
+                  `MailTrackerYesNo` TINYINT NOT NULL DEFAULT '0',
                   `EntitiesExtract` TINYINT NOT NULL DEFAULT '0',
                   `NumberViews` INT(10) NOT NULL DEFAULT '800',
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',
                   `gabarit` INT(10) NOT NULL DEFAULT '0',
+                  `gabarit_tracker` INT(10) NOT NULL DEFAULT '0',
                   `SignatureX` FLOAT NOT NULL DEFAULT '36',
                   `SignatureY` FLOAT NOT NULL DEFAULT '44',
                   `SignatureSize` FLOAT NOT NULL DEFAULT '50',
@@ -663,6 +713,31 @@ class PluginGestionConfig extends CommonDBTM
          $ID = $DB->query("SELECT id FROM glpi_notificationtemplates WHERE NAME = 'Gestion Mail PDF' AND comment = 'Created by the plugin gestion'")->fetch_object();
    
          $query= "UPDATE glpi_plugin_gestion_configs SET gabarit = $ID->id WHERE id=1;";
+         $DB->query($query) or die($DB->error());
+
+         //------------------------------------------------------------------------------------------------------------------------
+
+         require_once PLUGIN_GESTION_DIR.'/front/MailContent2.php';
+         $content_html2 = $ContentHtml2;
+
+         // Échapper le contenu HTML
+         $content_html2_escaped = Toolbox::addslashes_deep($content_html2);
+   
+         // Construire la requête d'insertion
+         $insertQuery1 = "INSERT INTO `glpi_notificationtemplates` (`name`, `itemtype`, `date_mod`, `comment`, `css`, `date_creation`) VALUES ('Gestion Mail PDF (Tracker)', 'Ticket', NULL, 'Created by the plugin gestion (Tracker)', '', NULL);";
+         // Exécuter la requête
+         $DB->query($insertQuery1);
+   
+         // Construire la requête d'insertion
+         $insertQuery2 = "INSERT INTO `glpi_notificationtemplatetranslations` 
+            (`notificationtemplates_id`, `language`, `subject`, `content_text`, `content_html`) 
+            VALUES (LAST_INSERT_ID(), 'fr_FR', '[GLPI] | Document signé', '', '{$content_html2_escaped}')";
+         // Exécuter la requête
+         $DB->query($insertQuery2);
+   
+         $ID = $DB->query("SELECT id FROM glpi_notificationtemplates WHERE NAME = 'Gestion Mail PDF (Tracker)' AND comment = 'Created by the plugin gestion (Tracker)'")->fetch_object();
+   
+         $query= "UPDATE glpi_plugin_gestion_configs SET gabarit_tracker = $ID->id WHERE id=1;";
          $DB->query($query) or die($DB->error());
       }else{
          
