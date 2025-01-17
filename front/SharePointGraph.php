@@ -3,8 +3,12 @@ if (!defined('GLPI_ROOT')) {
     die("Sorry. You can't access directly to this file");
 }
 
+require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
+
+use Smalot\PdfParser\Parser;
+
 class PluginGestionSharepoint extends CommonDBTM {
-        
+
     /**
      * Fonction pour obtenir un token d'accès à partir d'Azure AD
      */
@@ -656,4 +660,85 @@ class PluginGestionSharepoint extends CommonDBTM {
         // Retourner l'entrée si ce n'est pas une date ISO 8601 valide
         return $isoDate;
     }
+
+    /**
+     * Récupération du tracker sur le PDF
+     */
+    public function GetTrackerPdfDownload($filePath) {
+
+        $log = GLPI_PLUGIN_DOC_DIR . "/gestion/log.txt";
+        $autoloadPath = __DIR__ . '/../vendor/autoload.php';
+
+        // Générer un nombre entier aléatoire entre 1 et 100
+        $nombreAleatoire = rand(1, 100000);
+        $tracker = '';
+
+        try {  
+            // Étape 4 : Obtenir l'URL de téléchargement
+            $downloadUrl = $this->getDownloadUrl($filePath);
+        } catch (Exception $e) {
+            throw new Exception("Erreur : " . $e->getMessage());
+        }
+    
+        try {
+            // Étape 5 : Télécharger le fichier depuis l'URL
+            $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
+            $this->downloadFileFromUrl($downloadUrl, $destinationPath);
+        } catch (Exception $e) {
+            throw new Exception("Erreur : " . $e->getMessage());
+        }
+        
+        try {
+            if (file_exists($autoloadPath)) {
+                require_once($autoloadPath);
+            } else {
+                file_put_contents($log, "autoload introuvable : $autoloadPath\n", FILE_APPEND);
+                $tracker = NULL;
+            }
+            
+            if (class_exists('Smalot\PdfParser\Parser')) {
+                try {
+                    $parser = new Parser();
+                } catch (Exception $e) {
+                    file_put_contents($log, "Erreur lors de l'initialisation du Parser : " . $e->getMessage() . "\n", FILE_APPEND);
+                }
+
+                try {
+                    $pdf = $parser->parseFile($destinationPath);
+                    // Extraire le texte brut
+                    $text = $pdf->getText();
+              
+                    if (empty($text)) {
+                        file_put_contents($log, "Impossible d'extraire le texte. Le PDF pourrait contenir uniquement des images.", FILE_APPEND);
+                    }
+                } catch (Exception $e) {
+                    file_put_contents($log, "Erreur lors de l'extraction du text brut : " . $e->getMessage() . "\n", FILE_APPEND);
+                }
+
+                try {
+                    // Nettoyer le texte extrait
+                    $cleanText = trim($text);
+                    
+                    // Rechercher le texte dynamique entre "Instruction de livraison" et "Tracker"
+                    if (preg_match('/Instruction\s*de\s*livraison\s+(.+?)Tracker/', $cleanText, $matches)) {
+                        $tracker = trim($matches[1]);
+                    }
+                } catch (Exception $e) {
+                    file_put_contents($log, "Erreur lors de l'extraction du tracker depuis le text brut : " . $e->getMessage() . "\n", FILE_APPEND);
+                }
+
+            } else {
+                file_put_contents($log, "Classe Parser NON disponible\n", FILE_APPEND);
+                $tracker = NULL;
+            }
+          
+        } catch (Exception $e) {
+            file_put_contents($log, "Erreur général de récupération du tracker  : " . $e->getMessage() . "\n", FILE_APPEND);
+            $tracker = NULL;
+        }
+
+        unlink($destinationPath);
+        return $tracker;
+    }
 }
+

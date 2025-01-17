@@ -97,12 +97,20 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                 if (preg_match($pattern, $item, $matches)) {
                     $itemUrl = $matches[1]; // xxx/zzzz ou xxx/xxxx/zzzz
                     $item = $matches[2]; // zzzz
-                }                
+                }    
+                
+                $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
+                if (!empty($tracker)){
+                    Session::addMessageAfterRedirect(__("$item - <strong>Tracker : $tracker</strong>", 'gestion'), false, INFO);
+                }else{
+                    $tracker = NULL;
+                    Session::addMessageAfterRedirect(__("Aucun tracker défini ou trouver", 'gestion'), false, WARNING);
+                }
 
                 $existedoc = $DB->query("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
                 if(empty($existedoc->bl)){
                     // Insérer le ticket et l'ID de document dans glpi_plugin_gestion_surveys
-                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl')")) {
+                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker')")) {
                         Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
                         $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                     }
@@ -116,12 +124,13 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                         $sql = "UPDATE glpi_plugin_gestion_surveys 
                                 SET tickets_id = ?, 
                                     entities_id = ?, 
-                                    url_bl = ?
+                                    url_bl = ?,
+                                    tracker = ?
                                 WHERE bl = ?";
 
                         // Exécution de la requête préparée
                         $stmt = $DB->prepare($sql);
-                        $stmt->execute([$ticketId, $entityId, $itemUrl, $item]);
+                        $stmt->execute([$ticketId, $entityId, $itemUrl, $tracker, $item]);
                     }elseif($existedoc->tickets_id != $ticketId){
                         Session::addMessageAfterRedirect(__("Document ".$DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
                         $success = false;
@@ -148,13 +157,12 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
         // Préparer la requête SQL
         $sql = "UPDATE glpi_plugin_gestion_surveys 
                 SET tickets_id = ?, 
-                    entities_id = ?, 
-                    url_bl = ?
+                    entities_id = ?
                 WHERE bl = ?";
 
         // Exécution de la requête préparée
         $stmt = $DB->prepare($sql);
-        if (!$stmt->execute([0, 0, NULL, $item])){
+        if (!$stmt->execute([0, 0, $item])){
             Session::addMessageAfterRedirect(__("Erreur de suppression des éléments", 'gestion'), true, ERROR);
         }
     }
@@ -162,14 +170,14 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     // Message de confirmation si tout s'est bien passé
     if ($success) {
         Session::addMessageAfterRedirect(__("Les éléments ont été mis à jour avec succès.", 'gestion'), true, INFO);
-        Event::log(
+        /*Event::log(
             $ticketId,
             "ticket",
             4,
             "tracking",
             //TRANS: %s is the user login
             sprintf(__('%s updates an item'), $_SESSION["glpiname"])
-        );
+        );*/
     }
 }
 

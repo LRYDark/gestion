@@ -151,34 +151,6 @@ if ($config->fields['ConfigModes'] == 0){
 
 ob_end_clean(); // Vide le tampon de sortie
 
-
-
-$tracker = '';
-try {
-    $parser = new Parser();
-    $pdf = $parser->parseFile($existingPdfPath);
-
-    // Extraire le texte brut
-    $text = $pdf->getText();
-
-    if (empty($text)) {
-        throw new Exception("Impossible d'extraire le texte. Le PDF pourrait contenir uniquement des images.");
-    }
-
-    // Nettoyer le texte extrait
-    $cleanText = trim($text);
-    
-    // Rechercher le texte dynamique entre "Instruction de livraison" et "Tracker"
-    if (preg_match('/Instruction\s*de\s*livraison\s+(.+?)Tracker/', $cleanText, $matches)) {
-        $tracker = trim($matches[1]);
-        message("Tracker : " . $tracker, INFO);
-    }
-} catch (Exception $e) {
-    message("Erreur lors de la récupération du tracker : " . $e->getMessage(), ERROR);
-}
-
-
-
 // Créer un nouvel objet FPDI / ajouter signature
 $pdf = new FPDI();
 try {
@@ -418,6 +390,6 @@ if ($config->fields['ConfigModes'] == 0){
     }else{
         message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
     }
-}*/
-//Html::back();
+}
+Html::back();
 ?>

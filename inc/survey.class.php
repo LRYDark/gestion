@@ -149,6 +149,15 @@ class PluginGestionSurvey extends CommonDBTM {
          'massiveaction'      => false
       ];
 
+      $tab[] = [
+         'id'                 => '10',
+         'table'              => $this->getTable(),
+         'field'              => 'tracker',
+         'name'               => __('Tracker'),
+         'datatype'           => 'text',
+         'massiveaction'      => false
+      ];
+
       return $tab;
    }
 

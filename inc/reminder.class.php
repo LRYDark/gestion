@@ -141,20 +141,25 @@ class PluginGestionReminder extends CommonDBTM {
                      $isSigned = 1;
                   }
                }
+               
+               $tracker = $sharepoint->GetTrackerPdfDownload($valueAfterRoot.'/'.$fileName.'.pdf');
+               if (empty($tracker)){
+                  $tracker = NULL;
+               }
 
                // Vérifier si le fichier existe déjà en base
                $query = "SELECT COUNT(*) AS count FROM `glpi_plugin_gestion_surveys` WHERE `bl` = '$fileName';";
                $result = $DB->query($query);
                $row = $DB->fetchassoc($result);
 
-               if ($row['count'] == 0) {
-                     // Ajouter le fichier en base
-                     $sql = $isSigned
-                        ? "INSERT INTO glpi_plugin_gestion_surveys (url_bl, bl, doc_url, doc_date, signed) VALUES ('$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned)"
-                        : "INSERT INTO glpi_plugin_gestion_surveys (url_bl, bl, doc_url, doc_date) VALUES ('$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime')";
+               if ($row['count'] == 0) {                  
+                  // Ajouter le fichier en base
+                  $sql = $isSigned
+                     ? "INSERT INTO glpi_plugin_gestion_surveys (url_bl, bl, doc_url, doc_date, signed, tracker) VALUES ('$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned, '$tracker')"
+                     : "INSERT INTO glpi_plugin_gestion_surveys (url_bl, bl, doc_url, doc_date, tracker) VALUES ('$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', '$tracker')";
 
-                     $DB->query($sql);
-                     $addedFiles[] = $fileName;
+                  $DB->query($sql);
+                  $addedFiles[] = $fileName;
                }
             }
          }
