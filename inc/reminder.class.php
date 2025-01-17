@@ -171,8 +171,14 @@ class PluginGestionReminder extends CommonDBTM {
                         ? "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, signed, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned, '$tracker')"
                         : "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', '$tracker')";
 
-                     $DB->query($sql);
+                     if($DB->query($sql)){
+                        $id_survey = $DB->insert_id();
+                     }
                      $addedFiles[] = $fileName;
+                  }
+
+                  if($config->MailTrackerYesNo() == 1 && !empty($config->MailTracker())){
+                     mailSend($id_survey, $tracker, $webUrl);
                   }
                }
             }
@@ -186,12 +192,12 @@ class PluginGestionReminder extends CommonDBTM {
       }
    }     
 
-   function MailSend($id, $tracker, $url){
+   function MailSend($id_survey, $tracker, $url){
       global $DB, $CFG_GLPI;
 
       //BALISES
       $Balises = array(
-         array('Balise' => '##gestion.id##'             , 'Value' => sprintf("%07d", $id)),
+         array('Balise' => '##gestion.id##'             , 'Value' => sprintf("%07d", $id_survey)),
          array('Balise' => '##gestion.tracker##'        , 'Value' => sprintf("%07d", $tracker)),
          array('Balise' => '##gestion.url##'            , 'Value' => sprintf("%07d", $url)),
       );
