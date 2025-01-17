@@ -731,7 +731,7 @@ class PluginGestionConfig extends CommonDBTM
          // Construire la requête d'insertion
          $insertQuery2 = "INSERT INTO `glpi_notificationtemplatetranslations` 
             (`notificationtemplates_id`, `language`, `subject`, `content_text`, `content_html`) 
-            VALUES (LAST_INSERT_ID(), 'fr_FR', '[GLPI] | Document signé', '', '{$content_html2_escaped}')";
+            VALUES (LAST_INSERT_ID(), 'fr_FR', '[GLPI] | Document ##gestion.tracker## généré', '', '{$content_html2_escaped}')";
          // Exécuter la requête
          $DB->query($insertQuery2);
    
