@@ -198,6 +198,26 @@ class PluginGestionConfig extends CommonDBTM
             echo "</td>";
          echo "</tr>";
 
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Extraction d'un tracker dans le PDF", "rt") . "</td><td>";
+               Dropdown::showYesNo('NotYesExtract', $config->NotYesExtract(), -1);
+            echo "</td>";
+         echo "</tr>";
+
+         if($config->NotYesExtract() == 1){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
+                  echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+         }
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Attribuer l'entité en fonction du nom du dossie (Tâche Cron)", "rt") . "</td><td>";
+               Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
+            echo "</td>";
+         echo "</tr>";
+
          echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph)', 'rp') . "</th></tr>";
 
          echo "<tr class='tab_bg_1'>";
@@ -339,11 +359,8 @@ class PluginGestionConfig extends CommonDBTM
                            0 => __('Dossier de récupération (Racine)', 'gestion'),
                            1 => __('Dossier de récupération (Global - Recursive)', 'gestion'),
                            2 => __('Dossier de destination (Dépot Global)', 'gestion'),
-                           //3 => __('Dossier de récupération (Récup Doc ticket uniquement)', 'gestion'),
-                           //4 => __('Dossier de récupération (Récup Doc gestion uniquement)', 'gestion'),
-                           //5 => __('Dossier de destination (Dépot Doc gestion uniquement)', 'gestion'),
                            6 => __('Supprimer le dossier', 'gestion'),
-                           7 => __('Mettre en pause', 'gestion'),
+                           7 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
                            8 => __('__Non attribué__', 'gestion'),
                      ];
 
@@ -454,6 +471,18 @@ class PluginGestionConfig extends CommonDBTM
    {
       return ($this->fields['SignatureSize']);
    } 
+   function NotYesExtract()
+   {
+      return ($this->fields['NotYesExtract']);
+   } 
+   function extract()
+   {
+      return ($this->fields['extract']);
+   } 
+   function EntitiesExtract()
+   {
+      return ($this->fields['EntitiesExtract']);
+   } 
    function SignataireX()
    {
       return ($this->fields['SignataireX']);
@@ -553,10 +582,7 @@ class PluginGestionConfig extends CommonDBTM
 
       $table = self::getTable();
       $config = new self();
-      /*if ($DB->tableExists($table)) {
-         $query = "DROP TABLE $table";
-         $DB->query($query) or die($DB->error());
-      }*/
+
       if (!$DB->tableExists($table)) {
 
          $migration->displayMessage("Installing $table");
@@ -571,6 +597,9 @@ class PluginGestionConfig extends CommonDBTM
                   `SitePath` TEXT NULL,
                   `Global` VARCHAR(255) NULL,
                   `ZenDocMail` VARCHAR(255) NULL,
+                  `extract` VARCHAR(255) NULL,
+                  `NotYesExtract` TINYINT NOT NULL DEFAULT '0',
+                  `EntitiesExtract` TINYINT NOT NULL DEFAULT '0',
                   `NumberViews` INT(10) NOT NULL DEFAULT '800',
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',

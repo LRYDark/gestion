@@ -9,6 +9,7 @@ $doc = new Document();
 
 require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
 $sharepoint = new PluginGestionSharepoint();
+$config = new PluginGestionConfig();
 
 // Vérifier que le formulaire a été soumis
 if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
@@ -36,8 +37,6 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
 
     // Ajouter les nouveaux éléments
     foreach ($items_to_add as $item) {
-        $config = new PluginGestionConfig();
-
         if ($config->fields['ConfigModes'] == 0){
             // Chemin du fichier PDF
             $file_path = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned/" . $item . ".pdf"; 
@@ -80,7 +79,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                         $success = false;
                     }
                 }else{
-                    Session::addMessageAfterRedirect(__("Document ".$DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
+                    Session::addMessageAfterRedirect(__($DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
                     $success = false;
                 }
             } else {
@@ -99,14 +98,6 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                     $item = $matches[2]; // zzzz
                 }    
                 
-                $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
-                if (!empty($tracker)){
-                    Session::addMessageAfterRedirect(__("$item - <strong>Tracker : $tracker</strong>", 'gestion'), false, INFO);
-                }else{
-                    $tracker = NULL;
-                    Session::addMessageAfterRedirect(__("Aucun tracker défini ou trouver", 'gestion'), false, WARNING);
-                }
-
                 $existedoc = $DB->query("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
                 if(empty($existedoc->bl)){
                     // Insérer le ticket et l'ID de document dans glpi_plugin_gestion_surveys
@@ -118,21 +109,19 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                     if($existedoc->tickets_id == NULL){
                         // Validation des entrées numériques
                         $ticketId = intval($ticketId);
-                        $entityId = intval($entityId);
 
                         // Préparer la requête SQL
                         $sql = "UPDATE glpi_plugin_gestion_surveys 
                                 SET tickets_id = ?, 
-                                    entities_id = ?, 
                                     url_bl = ?,
                                     tracker = ?
                                 WHERE bl = ?";
 
                         // Exécution de la requête préparée
                         $stmt = $DB->prepare($sql);
-                        $stmt->execute([$ticketId, $entityId, $itemUrl, $tracker, $item]);
+                        $stmt->execute([$ticketId, $itemUrl, $tracker, $item]);
                     }elseif($existedoc->tickets_id != $ticketId){
-                        Session::addMessageAfterRedirect(__("Document ".$DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
+                        Session::addMessageAfterRedirect(__($DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
                         $success = false;
                     }
                 }
@@ -141,6 +130,18 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                 // Gérer le cas où le fichier n'existe pas
                 Session::addMessageAfterRedirect(__("Le fichier $file_path n'existe pas.", 'gestion'), false, ERROR);
                 $success = false;
+            }
+
+            if ($success) {
+                if($config->NotYesExtract() == 1 && $config->fields['ConfigModes'] == 1){
+                    $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
+                    if (!empty($tracker)){
+                        Session::addMessageAfterRedirect(__("$item - <strong>Tracker : $tracker</strong>", 'gestion'), false, INFO);
+                    }else{
+                        $tracker = NULL;
+                        Session::addMessageAfterRedirect(__("$item - Aucun tracker", 'gestion'), false, WARNING);
+                    }
+                }        
             }
         }
     }
@@ -152,17 +153,15 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     
         // Validation des entrées numériques
         $ticketId = intval($ticketId);
-        $entityId = intval($entityId);
 
         // Préparer la requête SQL
         $sql = "UPDATE glpi_plugin_gestion_surveys 
-                SET tickets_id = ?, 
-                    entities_id = ?
+                SET tickets_id = ?
                 WHERE bl = ?";
 
         // Exécution de la requête préparée
         $stmt = $DB->prepare($sql);
-        if (!$stmt->execute([0, 0, $item])){
+        if (!$stmt->execute([0, $item])){
             Session::addMessageAfterRedirect(__("Erreur de suppression des éléments", 'gestion'), true, ERROR);
         }
     }
@@ -170,14 +169,6 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     // Message de confirmation si tout s'est bien passé
     if ($success) {
         Session::addMessageAfterRedirect(__("Les éléments ont été mis à jour avec succès.", 'gestion'), true, INFO);
-        /*Event::log(
-            $ticketId,
-            "ticket",
-            4,
-            "tracking",
-            //TRANS: %s is the user login
-            sprintf(__('%s updates an item'), $_SESSION["glpiname"])
-        );*/
     }
 }
 

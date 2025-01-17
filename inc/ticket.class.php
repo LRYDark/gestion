@@ -200,15 +200,9 @@ class PluginGestionTicket extends CommonDBTM {
                   }
                }
 
-               $id_entities = $data['entities_id'];
-               $gestion_entity = $DB->query("SELECT completename FROM `glpi_entities` WHERE id= $id_entities")->fetch_object();
-
                $out .= "<td class='center'>";
                $out .= $data['id'];
                $out .= "</td>";
-               //$out .= "<td width='40%' class='center'>";
-               //$out .= $gestion_entity->completename;
-               //$out .= "</td>";
                $out .= "<td class='center'>"; 
                $out .= Html::convDate($data["date_creation"]);
                $out .= "</td>";
@@ -372,6 +366,10 @@ class PluginGestionTicket extends CommonDBTM {
                   }
                } 
 
+               /*echo '<pre>';
+               print_r($contents);
+               echo '</pre>';*/
+
                $selected_values_json = json_encode($selected_ids);
                $csrf_token = Session::getNewCSRFToken();
 
@@ -457,6 +455,7 @@ class PluginGestionTicket extends CommonDBTM {
                      `entities_id` int {$default_key_sign} NOT NULL DEFAULT '0',
                      `users_id` int {$default_key_sign} NULL,
                      `users_ext` VARCHAR(255) NULL,
+                     `tracker` VARCHAR(255) NULL,
                      `url_bl` VARCHAR(255) NULL,
                      `bl` VARCHAR(255) NULL,
                      `signed` int NOT NULL DEFAULT '0',
