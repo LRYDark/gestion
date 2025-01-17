@@ -232,26 +232,26 @@ class PluginGestionConfig extends CommonDBTM
                   echo Html::input('MailTracker', ['value' => $config->MailTracker(), 'size' => 60]);// bouton configuration du bas de page line 1
                echo "</td>";
             echo "</tr>";
+
+            echo "<tr class='tab_bg_1'>";
+               echo "<td> Gabarit : Modèle de notifications pour la Tâche Cron (Tracker) </td>";
+               echo "<td>";
+
+               //notificationtemplates_id
+               Dropdown::show('NotificationTemplate', [
+                  'name' => 'gabarit_tracker',
+                  'value' => $config->gabarit_tracker(),
+                  'display_emptychoice' => 1,
+                  'specific_tags' => [],
+                  'itemtype' => 'NotificationTemplate',
+                  'displaywith' => [],
+                  'emptylabel' => "-----",
+                  'used' => [],
+                  'toadd' => [],
+                  'entity_restrict' => 0,
+               ]); 
+            echo "</td></tr>";
          }
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td> Gabarit : Modèle de notifications pour la Tâche Cron (Tracker) </td>";
-            echo "<td>";
-
-            //notificationtemplates_id
-            Dropdown::show('NotificationTemplate', [
-               'name' => 'gabarit_tracker',
-               'value' => $config->gabarit_tracker(),
-               'display_emptychoice' => 1,
-               'specific_tags' => [],
-               'itemtype' => 'NotificationTemplate',
-               'displaywith' => [],
-               'emptylabel' => "-----",
-               'used' => [],
-               'toadd' => [],
-               'entity_restrict' => 0,
-            ]); 
-         echo "</td></tr>";
          //--------------------------------------------
          echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph)', 'rp') . "</th></tr>";
 
