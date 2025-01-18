@@ -197,12 +197,6 @@ class PluginGestionConfig extends CommonDBTM
                );
             echo "</td>";
          echo "</tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Extraire l'entité du dossier parent du PDF", "gestion") . "</td><td>";
-               Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
-            echo "</td>";
-         echo "</tr>";
          //--------------------------------------------
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
@@ -715,7 +709,7 @@ class PluginGestionConfig extends CommonDBTM
          $DB->query($query) or die($DB->error());
       }else{
          if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.2.0'){
-            include(PLUGIN_GESTION_DIR . "/install/update_120_130.php");
+            include(PLUGIN_RP_DIR . "/install/update_120_130.php");
             update120to130(); 
          }
       }

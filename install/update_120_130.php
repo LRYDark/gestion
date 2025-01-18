@@ -1,5 +1,5 @@
 <?php
-//include ('../../../inc/includes.php');
+include ('../../../inc/includes.php');
 /*
  * @version $Id: HEADER 15930 2011-10-30 15:47:55Z tsmr $
  -------------------------------------------------------------------------
@@ -44,10 +44,10 @@ function update120to130() {
             ADD COLUMN `EntitiesExtract` TINYINT NOT NULL DEFAULT '0',
             ADD COLUMN `gabarit_tracker` INT(10) NOT NULL DEFAULT '0',
             ADD COLUMN `LastCronTask` TIMESTAMP DEFAULT NULL;";
-   $DB->query($query) or die($DB->error());
+   $DB->query($query) or die($DB->error());   
 
-   $query = "RENAME TABLE glpi_plugin_gestion_tickets TO glpi_plugin_gestion_surveys;";
-   $DB->query($query) or die($DB->error());
+   $query= "RENAME DATABASE glpi_plugin_gestion_ticket TO glpi_plugin_gestion_surveys;";
+   $DB->query($query) or die($DB->error()); 
 
    $query= "ALTER TABLE glpi_plugin_gestion_surveys
             ADD COLUMN `tracker` VARCHAR(255) NULL,
