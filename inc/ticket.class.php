@@ -464,13 +464,7 @@ class PluginGestionTicket extends CommonDBTM {
                      KEY `entities_id` (`entities_id`)
                   ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
          $DB->query($query) or die($DB->error());
-      } /*else {
-         // Fix #1 in 1.0.1 : change tinyint to int for tickets_id
-         $migration->changeField($table, 'tickets_id', 'tickets_id', "int {$default_key_sign} NOT NULL DEFAULT 0");
-
-         //execute the whole migration
-         $migration->executeMigration();
-      }*/
+      }
    }
 
    static function uninstall(Migration $migration) {
