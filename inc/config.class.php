@@ -197,6 +197,12 @@ class PluginGestionConfig extends CommonDBTM
                );
             echo "</td>";
          echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Extraire l'entité du dossier parent du PDF", "gestion") . "</td><td>";
+               Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
+            echo "</td>";
+         echo "</tr>";
          //--------------------------------------------
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
@@ -644,17 +650,11 @@ class PluginGestionConfig extends CommonDBTM
                   `SitePath` TEXT NULL,
                   `Global` VARCHAR(255) NULL,
                   `ZenDocMail` VARCHAR(255) NULL,
-                  `extract` VARCHAR(255) NULL,
-                  `ExtractYesNo` TINYINT NOT NULL DEFAULT '0',
-                  `MailTracker` VARCHAR(255) NULL,
-                  `MailTrackerYesNo` TINYINT NOT NULL DEFAULT '0',
-                  `EntitiesExtract` TINYINT NOT NULL DEFAULT '0',
                   `NumberViews` INT(10) NOT NULL DEFAULT '800',
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',
                   `gabarit` INT(10) NOT NULL DEFAULT '0',
-                  `gabarit_tracker` INT(10) NOT NULL DEFAULT '0',
                   `SignatureX` FLOAT NOT NULL DEFAULT '36',
                   `SignatureY` FLOAT NOT NULL DEFAULT '44',
                   `SignatureSize` FLOAT NOT NULL DEFAULT '50',
@@ -664,7 +664,6 @@ class PluginGestionConfig extends CommonDBTM
                   `DateY` FLOAT NOT NULL DEFAULT '51.3',
                   `TechX` FLOAT NOT NULL DEFAULT '150',
                   `TechY` FLOAT NOT NULL DEFAULT '37',
-                  `LastCronTask` TIMESTAMP DEFAULT NULL,
                   PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
          $DB->query($query) or die($DB->error());
@@ -714,33 +713,11 @@ class PluginGestionConfig extends CommonDBTM
    
          $query= "UPDATE glpi_plugin_gestion_configs SET gabarit = $ID->id WHERE id=1;";
          $DB->query($query) or die($DB->error());
-
-         //------------------------------------------------------------------------------------------------------------------------
-
-         require_once PLUGIN_GESTION_DIR.'/front/MailContent2.php';
-         $content_html2 = $ContentHtml2;
-
-         // Échapper le contenu HTML
-         $content_html2_escaped = Toolbox::addslashes_deep($content_html2);
-   
-         // Construire la requête d'insertion
-         $insertQuery1 = "INSERT INTO `glpi_notificationtemplates` (`name`, `itemtype`, `date_mod`, `comment`, `css`, `date_creation`) VALUES ('Gestion Mail PDF (Tracker)', 'Ticket', NULL, 'Created by the plugin gestion (Tracker)', '', NULL);";
-         // Exécuter la requête
-         $DB->query($insertQuery1);
-   
-         // Construire la requête d'insertion
-         $insertQuery2 = "INSERT INTO `glpi_notificationtemplatetranslations` 
-            (`notificationtemplates_id`, `language`, `subject`, `content_text`, `content_html`) 
-            VALUES (LAST_INSERT_ID(), 'fr_FR', '[GLPI] | Document ##gestion.tracker## généré', '', '{$content_html2_escaped}')";
-         // Exécuter la requête
-         $DB->query($insertQuery2);
-   
-         $ID = $DB->query("SELECT id FROM glpi_notificationtemplates WHERE NAME = 'Gestion Mail PDF (Tracker)' AND comment = 'Created by the plugin gestion (Tracker)'")->fetch_object();
-   
-         $query= "UPDATE glpi_plugin_gestion_configs SET gabarit_tracker = $ID->id WHERE id=1;";
-         $DB->query($query) or die($DB->error());
       }else{
-         
+         if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.2.0'){
+            include(PLUGIN_GESTION_DIR . "/install/update_120_130.php");
+            update120to130(); 
+         }
       }
    }
 
