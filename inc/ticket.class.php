@@ -366,10 +366,6 @@ class PluginGestionTicket extends CommonDBTM {
                   }
                } 
 
-               /*echo '<pre>';
-               print_r($contents);
-               echo '</pre>';*/
-
                $selected_values_json = json_encode($selected_ids);
                $csrf_token = Session::getNewCSRFToken();
 

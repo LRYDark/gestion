@@ -21,50 +21,6 @@ function message($msg, $msgtype){
     );
 }
 
-function MailSend($EMAIL, $outputPath, $message){
-    global $DB, $CFG_GLPI;
-    $mmail = new GLPIMailer(); // génération du mail
-    $config = new PluginGestionConfig();
-
-    $notificationtemplates_id = $config->fields['gabarit'];
-    $NotifMailTemplate = $DB->query("SELECT * FROM glpi_notificationtemplatetranslations WHERE notificationtemplates_id=$notificationtemplates_id")->fetch_object();
-        $BodyHtml = html_entity_decode($NotifMailTemplate->content_html, ENT_QUOTES, 'UTF-8');
-        $BodyText = html_entity_decode($NotifMailTemplate->content_text, ENT_QUOTES, 'UTF-8');
-
-    $footer = $DB->query("SELECT value FROM glpi_configs WHERE name = 'mailing_signature'")->fetch_object();
-    if(!empty($footer->value)){$footer = html_entity_decode($footer->value, ENT_QUOTES, 'UTF-8');}else{$footer='';}
-
-    // For exchange
-        $mmail->AddCustomHeader("X-Auto-Response-Suppress: OOF, DR, NDR, RN, NRN");
-
-    if (empty($CFG_GLPI["from_email"])){
-        // si mail expediteur non renseigné    
-        $mmail->SetFrom($CFG_GLPI["admin_email"], $CFG_GLPI["admin_email_name"], false);
-    }else{
-        //si mail expediteur renseigné  
-        $mmail->SetFrom($CFG_GLPI["from_email"], $CFG_GLPI["from_email_name"], false);
-    }
-
-    $mmail->AddAddress($EMAIL);
-    $mmail->addAttachment($outputPath); // Ajouter un attachement (documents)
-    $mmail->isHTML(true);
-
-    // Objet et sujet du mail 
-    $mmail->Subject = $NotifMailTemplate->subject;
-        $mmail->Body = GLPIMailer::normalizeBreaks($BodyHtml).$footer;
-        $mmail->AltBody = GLPIMailer::normalizeBreaks($BodyText).$footer;
-
-        // envoie du mail
-        if(!$mmail->send()) {
-            message("Erreur lors de l'envoi du mail : " . $mmail->ErrorInfo, ERROR);
-        }else{
-            //message("<br>Mail envoyé à " . $EMAIL, INFO);
-            message($message, INFO);
-        }
-        
-    $mmail->ClearAddresses();
-}
-
 $signatureBase64 = $_POST['url'] ?? ''; // Assurez-vous que la variable est définie
 $DOC_NAME = $_POST['DOC'];
 $NAME = $_POST['name'];
@@ -283,10 +239,9 @@ if ($config->fields['ConfigModes'] == 0){
 
         if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){   
             if (!empty($config->fields['ZenDocMail'])){ 
-                $MailZendoc = $config->fields['ZenDocMail'];
-                MailSend($MailZendoc, $outputPath, "Envoyé vers ZenDoc");
+                $sharepoint->MailSend($config->fields['ZenDocMail'], $config->fields['gabarit'], $outputPath, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL);
             }       
-            MailSend($EMAIL, $outputPath, "Mail envoyé à ". $EMAIL);
+            $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPath, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL);
         }
 
         $savepath = "_plugins/gestion/signed/" . $DOC_NAME . ".pdf";
@@ -309,10 +264,9 @@ if ($config->fields['ConfigModes'] == 0){
 
         if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){   
             if (!empty($config->fields['ZenDocMail'])){ 
-                $MailZendoc = $config->fields['ZenDocMail'];
-                MailSend($MailZendoc, $outputPathTemp, "Envoyé vers ZenDoc");
+                $sharepoint->MailSend($config->fields['ZenDocMail'], $config->fields['gabarit'], $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL);
             }       
-            MailSend($EMAIL, $outputPathTemp, "Mail envoyé à ". $EMAIL);
+            $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL);
         }
 
         try {

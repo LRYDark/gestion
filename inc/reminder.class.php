@@ -164,21 +164,41 @@ class PluginGestionReminder extends CommonDBTM {
                   $query = "SELECT COUNT(*) AS count FROM `glpi_plugin_gestion_surveys` WHERE `bl` = '$fileName';";
                   $result = $DB->query($query);
                   $row = $DB->fetchassoc($result);
+                  $id_survey = 0;
 
                   if ($row['count'] == 0) {                  
                      // Ajouter le fichier en base
                      $sql = $isSigned
                         ? "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, signed, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned, '$tracker')"
                         : "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', '$tracker')";
-
-                     if($DB->query($sql)){
-                        $id_survey = $DB->insert_id();
+                        
+                     if ($DB->query($sql)) {
+                        // Récupérer l'ID de la dernière ligne insérée avec LAST_INSERT_ID()
+                        $result = $DB->query("SELECT LAST_INSERT_ID() AS id");
+                        if ($result) {
+                           $row = $result->fetch_assoc();
+                           $id_survey = $row['id'];
+                        } 
+                        $addedFiles[] = $fileName;
+                     } else {
+                        Session::addMessageAfterRedirect(__('Insertion failed for file: ' . $fileName . '. Error: ' . $DB->error(), 'gestion'), false, ERROR);
                      }
-                     $addedFiles[] = $fileName;
                   }
 
                   if($config->MailTrackerYesNo() == 1 && !empty($config->MailTracker())){
-                     mailSend($id_survey, $tracker, $webUrl);
+                     // Requête pour récupérer les enregistrements ayant params = 5
+                     $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 5";
+                     $result = $DB->query($query);
+
+                     if ($result || $DB->numrows($result) != 0) {
+                        // Vérification des correspondances
+                        while ($data = $DB->fetchAssoc($result)) {
+                           $folder_name = $data['folder_name'];
+                           if (strpos($tracker, $folder_name) !== false) { 
+                              $sharepoint->MailSend($config->fields['MailTracker'], $config->fields['gabarit_tracker'], $outputPath = NULL, $message = NULL, $id_survey, $tracker, $webUrl);
+                           } 
+                        }
+                     }
                   }
                }
             }
@@ -191,60 +211,4 @@ class PluginGestionReminder extends CommonDBTM {
          }
       }
    }     
-
-   function MailSend($id_survey, $tracker, $url){
-      global $DB, $CFG_GLPI;
-
-      //BALISES
-      $Balises = array(
-         array('Balise' => '##gestion.id##'             , 'Value' => sprintf("%07d", $id_survey)),
-         array('Balise' => '##gestion.tracker##'        , 'Value' => sprintf("%07d", $tracker)),
-         array('Balise' => '##gestion.url##'            , 'Value' => sprintf("%07d", $url)),
-      );
-
-      function balise($corps){
-         global $Balises;
-         foreach($Balises as $balise) {
-               $corps = str_replace($balise['Balise'], $balise['Value'], $corps);
-         }
-         return $corps;
-      }
-
-      $mmail = new GLPIMailer(); // génération du mail
-      $config = new PluginGestionConfig();
-  
-      $notificationtemplates_id = $config->fields['gabarit_tracker'];
-      $NotifMailTemplate = $DB->query("SELECT * FROM glpi_notificationtemplatetranslations WHERE notificationtemplates_id=$notificationtemplates_id")->fetch_object();
-          $BodyHtml = html_entity_decode($NotifMailTemplate->content_html, ENT_QUOTES, 'UTF-8');
-          $BodyText = html_entity_decode($NotifMailTemplate->content_text, ENT_QUOTES, 'UTF-8');
-  
-      $footer = $DB->query("SELECT value FROM glpi_configs WHERE name = 'mailing_signature'")->fetch_object();
-      if(!empty($footer->value)){$footer = html_entity_decode($footer->value, ENT_QUOTES, 'UTF-8');}else{$footer='';}
-  
-      // For exchange
-          $mmail->AddCustomHeader("X-Auto-Response-Suppress: OOF, DR, NDR, RN, NRN");
-  
-      if (empty($CFG_GLPI["from_email"])){
-          // si mail expediteur non renseigné    
-          $mmail->SetFrom($CFG_GLPI["admin_email"], $CFG_GLPI["admin_email_name"], false);
-      }else{
-          //si mail expediteur renseigné  
-          $mmail->SetFrom($CFG_GLPI["from_email"], $CFG_GLPI["from_email_name"], false);
-      }
-  
-      $mmail->AddAddress($config->fields['MailTracker']);
-      $mmail->isHTML(true);
-  
-      // Objet et sujet du mail 
-      $mmail->Subject = balise($NotifMailTemplate->subject);
-         $mmail->Body = GLPIMailer::normalizeBreaks(balise($BodyHtml)).$footer;
-         $mmail->AltBody = GLPIMailer::normalizeBreaks(balise($BodyText)).$footer;
-  
-          // envoie du mail
-          if(!$mmail->send()) {
-              Session::addMessageAfterRedirect(__("Erreur lors de l'envoi du mail : " . $mmail->ErrorInfo, 'gestion'), false, ERROR);
-          }
-          
-      $mmail->ClearAddresses();
-  }
 }

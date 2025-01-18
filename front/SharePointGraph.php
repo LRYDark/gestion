@@ -744,5 +744,75 @@ class PluginGestionSharepoint extends CommonDBTM {
         }
         return $tracker;
     }
+
+    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL){
+        global $DB, $CFG_GLPI;
+
+        // Validation de l'email
+        if (!filter_var($EMAIL, FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException("L'adresse email est invalide : $EMAIL");
+        }
+
+        //BALISES
+        $Balises = array(
+            array('Balise' => '##gestion.id##'             , 'Value' => sprintf("%07d", $id_survey)),
+            array('Balise' => '##gestion.tracker##'        , 'Value' => sprintf("%07d", $tracker)),
+            array('Balise' => '##gestion.url##'            , 'Value' => sprintf("%07d", $url)),
+        );
+
+        // Fonction pour remplacer les balises
+        $remplacerBalises = function($corps) use ($Balises) {
+            foreach ($Balises as $balise) {
+                $corps = str_replace($balise['Balise'], $balise['Value'], $corps);
+            }
+            return $corps;
+        };
+
+        $mmail = new GLPIMailer(); // génération du mail
+        $config = new PluginGestionConfig();
+    
+        $NotifMailTemplate = $DB->query("SELECT * FROM glpi_notificationtemplatetranslations WHERE notificationtemplates_id=$gabarit_id")->fetch_object();
+        if (!$NotifMailTemplate) {
+            throw new RuntimeException("Aucun template trouvé pour l'ID : $gabarit_id");
+        }    
+            $BodyHtml = html_entity_decode($NotifMailTemplate->content_html, ENT_QUOTES, 'UTF-8');
+            $BodyText = html_entity_decode($NotifMailTemplate->content_text, ENT_QUOTES, 'UTF-8');
+    
+        $footer = $DB->query("SELECT value FROM glpi_configs WHERE name = 'mailing_signature'")->fetch_object();
+        if(!empty($footer->value)){$footer = html_entity_decode($footer->value, ENT_QUOTES, 'UTF-8');}else{$footer='';}
+    
+        // For exchange
+            $mmail->AddCustomHeader("X-Auto-Response-Suppress: OOF, DR, NDR, RN, NRN");
+    
+        if (empty($CFG_GLPI["from_email"])){
+            // si mail expediteur non renseigné    
+            $mmail->SetFrom($CFG_GLPI["admin_email"], $CFG_GLPI["admin_email_name"], false);
+        }else{
+            //si mail expediteur renseigné  
+            $mmail->SetFrom($CFG_GLPI["from_email"], $CFG_GLPI["from_email_name"], false);
+        }
+    
+        $mmail->AddAddress($EMAIL);
+        
+        if($outputPath != NULL){
+            $mmail->addAttachment($outputPath); // Ajouter un attachement (documents)
+        }
+
+        $mmail->isHTML(true);
+        $mmail->Subject = $remplacerBalises($NotifMailTemplate->subject);
+        $mmail->Body = GLPIMailer::normalizeBreaks($remplacerBalises($NotifMailTemplate->content_html)) . $footer;
+        $mmail->AltBody = GLPIMailer::normalizeBreaks($remplacerBalises($NotifMailTemplate->content_text)) . $footer;
+    
+            // envoie du mail
+            if(!$mmail->send()) {
+                Session::addMessageAfterRedirect(__("Erreur lors de l'envoi du mail : " . $mmail->ErrorInfo, 'gestion'), true, ERROR);
+            }else{
+                if($gabarit_id == $config->fields['gabarit'] && $message != NULL){
+                    Session::addMessageAfterRedirect(__($message, 'gestion'), true, INFO);
+                }
+            }
+            
+        $mmail->ClearAddresses();
+    }
 }
 
