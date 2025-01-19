@@ -43,6 +43,7 @@ function update120to130() {
             ADD COLUMN `MailTrackerYesNo` TINYINT NOT NULL DEFAULT '0',
             ADD COLUMN `EntitiesExtract` TINYINT NOT NULL DEFAULT '0',
             ADD COLUMN `gabarit_tracker` INT(10) NOT NULL DEFAULT '0',
+            ADD COLUMN `formulaire` INT(10) NOT NULL DEFAULT '0',
             ADD COLUMN `LastCronTask` TIMESTAMP DEFAULT NULL;";
    $DB->query($query) or die($DB->error());
 

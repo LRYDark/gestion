@@ -203,7 +203,34 @@ class PluginGestionConfig extends CommonDBTM
                Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
             echo "</td>";
          echo "</tr>";
-         //--------------------------------------------
+
+         if (Plugin::isPluginActive('formcreator')) {
+            echo "<tr class='tab_bg_1'>";
+               echo "<td> Affichage du formulaire dans un modal (Vide pour désactivé) </td>";
+               echo "<td>";
+               
+               // Récupérer les données depuis la table glpi_plugin_formcreator_forms
+               $formcreator_forms = [];
+               global $DB;
+               $query = "SELECT `id`, `name` FROM `glpi_plugin_formcreator_forms`";
+               $result = $DB->query($query);
+               
+               if ($result) {
+                  while ($data = $DB->fetchAssoc($result)) {
+                     $formcreator_forms[$data['id']] = $data['name'];
+                  }
+               }
+               
+               // Afficher le dropdown
+               Dropdown::showFromArray('formulaire', $formcreator_forms, [
+                  'value' => $config->formulaire(), // ID par défaut sélectionné
+                  'display_emptychoice' => 1,
+                  'emptylabel' => "-----"
+               ]);
+            echo "</td></tr>";
+         }
+         
+            //--------------------------------------------
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
          echo "</tr>";
@@ -484,6 +511,10 @@ class PluginGestionConfig extends CommonDBTM
    }
 
    // return fonction (retourn les values enregistrées en bdd)
+   function formulaire()
+   {
+      return ($this->fields['formulaire']);
+   }
    function AddFileSite()
    {
       if (isset($this->fields['AddFileSite'])) return ($this->fields['AddFileSite']);

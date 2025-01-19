@@ -202,72 +202,67 @@ class PluginGestionSurvey extends CommonDBTM {
       }
 
       //----------------------------------------------------------------------------------------------------------------
-      if(empty($this->fields["tickets_id"])){
-         $formId = 1; // Exemple d'ID dynamique
+      if (Plugin::isPluginActive('formcreator')) {
+         if(empty($this->fields["tickets_id"]) && $config->fields['formulaire'] != 0){
+            $formId = $config->fields['formulaire']; // Exemple d'ID dynamique
 
-         echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Création d'un formulaire")."</td>";
-         echo "<td>";
+            echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Création d'un formulaire")."</td>";
+            echo "<td>";
 
-            ?>
-            <!-- Bouton pour ouvrir le modal -->
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#myModal">
-               <?php echo __('Générer un formulaire'); ?>
-            </button>
+               ?>
+               <!-- Bouton pour ouvrir le modal -->
+               <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#myModal">
+                  <?php echo __('Générer un formulaire'); ?>
+               </button>
 
-            <!-- Modal Bootstrap -->
-            <div class="modal fade" id="myModal" tabindex="-1" aria-labelledby="myModalLabel" aria-hidden="true">
-               <div class="modal-dialog modal-xl" style="max-width: 50%;">
-                  <div class="modal-content" style="height: 90vh;">
-                        <div class="modal-header">
-                           <h5 class="modal-title" id="myModalLabel"><?php echo __('Formulaire'); ?></h5>
-                           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body p-0" style="height: calc(100% - 56px); overflow: auto;">
-                           <!-- Iframe -->
-                           <iframe id="iframe-content" 
-                                    src="../../formcreator/front/formdisplay.php?id=<?php echo $formId; ?>" 
-                                    style="width: 100%; height: 99%; border: none;"></iframe>
-                        </div>
+               <!-- Modal Bootstrap -->
+               <div class="modal fade" id="myModal" tabindex="-1" aria-labelledby="myModalLabel" aria-hidden="true">
+                  <div class="modal-dialog modal-xl" style="max-width: 50%;">
+                     <div class="modal-content" style="height: 90vh;">
+                           <div class="modal-header">
+                              <h5 class="modal-title" id="myModalLabel"><?php echo __('Formulaire'); ?></h5>
+                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                           </div>
+                           <div class="modal-body p-0" style="height: calc(100% - 56px); overflow: auto;">
+                              <!-- Iframe -->
+                              <iframe id="iframe-content" 
+                                       src="../../formcreator/front/formdisplay.php?id=<?php echo $formId; ?>" 
+                                       style="width: 100%; height: 99%; border: none;"></iframe>
+                           </div>
+                     </div>
                   </div>
                </div>
-            </div>
 
-            <script>
-               function removeNavbarFromIframe(iframeId) {
-                  const iframe = document.getElementById(iframeId);
-                  if (iframe) {
-                     iframe.onload = function () {
-                        console.log('Iframe loaded (onload)');
-                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                        if (iframeDoc) {
+               <script>
+                  function removeNavbarFromIframe(iframeId) {
+                     const iframe = document.getElementById(iframeId);
+                     if (iframe) {
+                        iframe.onload = function () {
+                           const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                           if (iframeDoc) {
                               // Supprimer la barre de navigation (aside)
                               const navbar = iframeDoc.querySelector('aside.navbar.navbar-vertical.navbar-expand-lg.sticky-lg-top.sidebar');
                               if (navbar) {
-                                 console.log('Navbar found and removed');
                                  navbar.remove();
                               } else {
-                                 console.log('Navbar not found');
                               }
 
                               // Supprimer l'en-tête (header)
                               const header = iframeDoc.querySelector('header.navbar.d-print-none.sticky-lg-top.shadow-sm.navbar-light.navbar-expand-md');
                               if (header) {
-                                 console.log('Header found and removed');
                                  header.remove();
                               } else {
-                                 console.log('Header not found');
                               }
-                        } else {
-                              console.log('Cannot access iframe DOM');
-                        }
-                     };
+                           }
+                        };
+                     }
                   }
-               }
-               // Appel de la fonction
-               removeNavbarFromIframe('iframe-content');
-            </script><?php
-         echo "</td></tr>";
+                  // Appel de la fonction
+                  removeNavbarFromIframe('iframe-content');
+               </script><?php
+            echo "</td></tr>";
+         }
       }
       //----------------------------------------------------------------------------------------------------------------
 
