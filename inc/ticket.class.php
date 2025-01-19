@@ -114,8 +114,9 @@ class PluginGestionTicket extends CommonDBTM {
       $sum = 0;
       $count = 0;
 
-      $params = ['job'        => $ticket->getField('id'),
-      'root_doc'   => PLUGIN_GESTION_WEBDIR];
+      $params = ['job'           => $ticket->getField('id'),
+                 'root_doc'      => PLUGIN_GESTION_WEBDIR,
+                 'root_modal'    => 'ticket-form'];
 
       if (!$ticket->can($ID, READ)) {
          return false;

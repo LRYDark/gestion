@@ -174,8 +174,10 @@ class PluginGestionSurvey extends CommonDBTM {
       global $DB;
       $config = new PluginGestionConfig();
 
-      $params = ['job'        => $ID,
-      'root_doc'   => PLUGIN_GESTION_WEBDIR];
+      $params = ['job'           => $ID,
+                 'root_doc'      => PLUGIN_GESTION_WEBDIR,
+                 'root_modal'    => 'survey-form'];
+
       
       if (!$this->canView()) {
          return false;

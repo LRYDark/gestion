@@ -41,8 +41,46 @@ class PluginGestionCri extends CommonDBTM {
 
    function showForm($ID, $options = []) {
       global $DB, $CFG_GLPI;
-      
+
       $id = $_POST["modal"];
+
+      if ($options["root_modal"] == 'ticket-form'){
+         $querytask = "SELECT id FROM glpi_tickettasks WHERE tickets_id = $ID";
+         $resulttask = $DB->query($querytask);
+         $numbertask = $DB->numrows($resulttask);
+
+         if($numbertask > 0){
+            
+         }else{
+            echo "<div class='alert alert-important alert-warning'>";
+            echo "<b><center>" . __("Vous ne pouvez pas signer le document sans avoir préalablement rempli le ticket.") . "</center></b></div>";
+            exit; 
+         } 
+      }
+
+      if ($options["root_modal"] == 'survey-form'){
+         $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$ID'")->fetch_object(); // Récupérer les informations du document  
+         
+         if($DOC->tickets_id != 0){
+            $querytask = "SELECT id FROM glpi_tickettasks WHERE tickets_id = $DOC->tickets_id";
+            $resulttask = $DB->query($querytask);
+            $numbertask = $DB->numrows($resulttask);
+
+            if($numbertask > 0){
+
+            }else{
+               echo "<div class='alert alert-important alert-warning'>";
+               echo "<b><center>" . __("Vous ne pouvez pas signer le document sans avoir préalablement rempli le ticket.") . "</center></b></div>";
+               echo '<center><a href="../../../front/ticket.form.php?id='.$DOC->tickets_id.'" class="btn btn-secondary">Allez au ticket</a></center>';
+               exit; 
+            }  
+         }else{
+            echo "<div class='alert alert-important alert-primary'>";
+            echo "<b><center>" . __("Aucun ticket associé") . "</center></b></div>";
+
+         }
+      }
+
       $config     = PluginGestionConfig::getInstance(); // Récupérer la configuration
       $documents  = new Document(); // Initialiser la classe Document
       $job        = new Ticket(); // Initialiser la classe Ticket
@@ -64,8 +102,8 @@ class PluginGestionCri extends CommonDBTM {
       }
 
       $params = ['job'         => $ID,
-                 'form'       => 'formReport',
-                 'root_doc'   => PLUGIN_GESTION_WEBDIR];
+                  'form'       => 'formReport',
+                  'root_doc'   => PLUGIN_GESTION_WEBDIR];
 
       ?><style> /*Style du modale et du tableau */
          /* Classe pour désactiver le défilement sur le body */
@@ -111,7 +149,7 @@ class PluginGestionCri extends CommonDBTM {
          function isMobile() {
             return preg_match('/(android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)/i', $_SERVER['HTTP_USER_AGENT']); // Vérifie si l'utilisateur est sur un appareil mobile
          }
-        
+      
          echo "<form action=\"" . PLUGIN_GESTION_WEBDIR . "/front/traitement.php\" method=\"post\" name=\"formReport\">"; // Formulaire pour envoyer les données
          echo Html::hidden('REPORT_ID', ['value' => $ID]);
          echo Html::hidden('DOC', ['value' => $Doc_Name]);
@@ -713,6 +751,6 @@ class PluginGestionCri extends CommonDBTM {
                   clearCanvas();
                }, false);
          </script>
-      <?php    
+      <?php 
    }
 }
