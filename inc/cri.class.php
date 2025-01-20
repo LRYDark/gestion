@@ -43,8 +43,10 @@ class PluginGestionCri extends CommonDBTM {
       global $DB, $CFG_GLPI;
 
       $id = $_POST["modal"];
+      $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$id'")->fetch_object(); // Récupérer les informations du document  
+         
 
-      if ($options["root_modal"] == 'ticket-form'){
+      if ($options["root_modal"] == 'ticket-form' && $DOC->signed == 0){
          $querytask = "SELECT id FROM glpi_tickettasks WHERE tickets_id = $ID";
          $resulttask = $DB->query($querytask);
          $numbertask = $DB->numrows($resulttask);
@@ -53,14 +55,12 @@ class PluginGestionCri extends CommonDBTM {
             
          }else{
             echo "<div class='alert alert-important alert-warning'>";
-            echo "<b><center>" . __("Vous ne pouvez pas signer le document sans avoir préalablement rempli le ticket.") . "</center></b></div>";
+            echo "<b><center>" . __("Vous ne pouvez pas signer le document avant d'avoir rempli votre fiche d'intervention.") . "</center></b></div>";
             exit; 
          } 
       }
 
-      if ($options["root_modal"] == 'survey-form'){
-         $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$ID'")->fetch_object(); // Récupérer les informations du document  
-         
+      if ($options["root_modal"] == 'survey-form' && $DOC->signed == 0){
          if($DOC->tickets_id != 0){
             $querytask = "SELECT id FROM glpi_tickettasks WHERE tickets_id = $DOC->tickets_id";
             $resulttask = $DB->query($querytask);
@@ -70,7 +70,7 @@ class PluginGestionCri extends CommonDBTM {
 
             }else{
                echo "<div class='alert alert-important alert-warning'>";
-               echo "<b><center>" . __("Vous ne pouvez pas signer le document sans avoir préalablement rempli le ticket.") . "</center></b></div>";
+               echo "<b><center>" . __("Vous ne pouvez pas signer le document avant d'avoir rempli votre fiche d'intervention.") . "</center></b></div>";
                echo '<center><a href="../../../front/ticket.form.php?id='.$DOC->tickets_id.'" class="btn btn-secondary">Allez au ticket</a></center>';
                exit; 
             }  
