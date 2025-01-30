@@ -146,6 +146,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
         }
     }
 
+    $UserId = 1;
     // Supprimer les éléments désélectionnés
     foreach ($items_to_remove as $item) {
         // Normaliser les noms des fichiers dans $current_items
@@ -163,11 +164,14 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
         $stmt = $DB->prepare($sql);
         if (!$stmt->execute([0, $item])){
             Session::addMessageAfterRedirect(__("Erreur de suppression des éléments", 'gestion'), true, ERROR);
+        }else{
+            //Event::log($UserId, "users", 5, "setup", sprintf(__('%s updates an item'), $_SESSION["glpiname"]));
         }
     }
 
     // Message de confirmation si tout s'est bien passé
     if ($success) {
+        //Event::log($UserId, "users", 5, "setup", sprintf(__('%s updates an item'), $_SESSION["glpiname"]));
         Session::addMessageAfterRedirect(__("Les éléments ont été mis à jour avec succès.", 'gestion'), true, INFO);
     }
 }

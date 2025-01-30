@@ -114,14 +114,20 @@ class PluginGestionSharepoint extends CommonDBTM {
         $config = new PluginGestionConfig();
         $NumberViews = $config->NumberViews();
 
+        // Éviter le double encodage : encoder uniquement les segments du chemin
+        $encodedFolderPath = empty($folderPath) ? '' : implode('/', array_map('rawurlencode', explode('/', $folderPath)));
+
         // Construire l'URL en fonction de la valeur de $folderPath
         if (empty($folderPath)) {
             // Si $folderPath est vide, utiliser l'URL pour le dossier racine
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children\$top=$NumberViews";
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children?\$top=$NumberViews";
         } else {
             // Sinon, utiliser l'URL pour le dossier spécifié
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children\$top=$NumberViews";
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$encodedFolderPath:/children?\$top=$NumberViews";
         }
+
+        // Log pour vérifier l'URL générée
+        error_log("URL générée : $url");
 
         $headers = [
             "Authorization: Bearer $accessToken",
@@ -134,15 +140,21 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
         $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        // Vérifier la réponse HTTP
+        if ($httpCode !== 200) {
+            throw new Exception("Erreur API (HTTP $httpCode) : $response");
+        }
 
         $responseObj = json_decode($response, true);
 
-        if (isset($responseObj['value'])) {
+        // Vérifier si la clé 'value' existe
+        if (isset($responseObj['value']) && is_array($responseObj['value'])) {
             return $responseObj['value'];
         } else {
-            echo "<br><br>";
-            throw new Exception("Impossible de récupérer le contenu du dossier : " . $response);
+            throw new Exception("Impossible de récupérer le contenu du dossier : " . json_encode($responseObj));
         }
     }
 
@@ -155,14 +167,21 @@ class PluginGestionSharepoint extends CommonDBTM {
         $config = new PluginGestionConfig();
         $NumberViews = $config->NumberViews();
 
-        // Construire l'URL en fonction de la valeur de $folderPath
+        // Récupérer tous les folder_name depuis la base de données
+        $folderNames = $this->getFolderNamesFromDatabase(10);  // Méthode mise à jour pour récupérer tous les folder_names
+
+        // Éviter le double encodage : ne pas encoder si $folderPath est vide
+        $encodedFolderPath = empty($folderPath) ? '' : implode('/', array_map('rawurlencode', explode('/', $folderPath)));
+
+        // Construire l'URL
         if (empty($folderPath)) {
-            // Si $folderPath est vide, utiliser l'URL pour le dossier racine
             $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children?\$top=$NumberViews";
         } else {
-            // Sinon, utiliser l'URL pour le dossier spécifié
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children?\$top=$NumberViews";
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$encodedFolderPath:/children?\$top=$NumberViews";
         }
+
+        // Log de l'URL pour débogage
+        error_log("URL générée : $url");
 
         $headers = [
             "Authorization: Bearer $accessToken",
@@ -175,19 +194,38 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
         $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+
+        // Vérifier la réponse HTTP
+        if ($httpCode !== 200) {
+            throw new Exception("Erreur API (HTTP $httpCode) : $response");
+        }
 
         $responseObj = json_decode($response, true);
 
-        if (!isset($responseObj['value'])) {
-            throw new Exception("Impossible de récupérer le contenu du dossier : " . $response);
+        // Vérifier si la clé 'value' existe
+        if (!isset($responseObj['value']) || !is_array($responseObj['value'])) {
+            throw new Exception("Clé 'value' absente ou réponse invalide : " . json_encode($responseObj));
         }
 
         $contents = [];
         foreach ($responseObj['value'] as $item) {
             if ($item['folder'] ?? false) {
-                // Si l'élément est un dossier, appeler récursivement la fonction
-                $subFolderPath = $folderPath . '/' . $item['name'];
+                $subfolderName = $item['name'];
+
+                // Si folderNames est défini, ne pas scanner les sous-dossiers contenant l'un des folder_names dans leur nom
+                if ($folderNames && $this->containsAnyFolderName($subfolderName, $folderNames)) {
+                    continue;  // Exclure ce sous-dossier
+                }
+
+                // Encoder le nom du sous-dossier pour éviter les problèmes
+                $encodedSubFolderName = rawurlencode($item['name']);
+
+                // Construire le chemin pour le sous-dossier
+                $subFolderPath = $folderPath ? ($folderPath . '/' . $item['name']) : $item['name'];
+
+                // Appeler récursivement la fonction
                 $contents = array_merge($contents, $this->listFolderContentsRecursive($subFolderPath));
             } else {
                 // Ajouter le fichier à la liste
@@ -586,11 +624,19 @@ class PluginGestionSharepoint extends CommonDBTM {
         $accessToken = $this->getAccessToken();
         $driveId = $this->GetDriveId();
 
+        // Récupérer tous les folder_name depuis la base de données
+        $folderNames = $this->getFolderNamesFromDatabase(11);  // Méthode mise à jour pour récupérer tous les folder_names
+
+        // Éviter le double encodage : encoder uniquement les segments du chemin
+        $encodedFolderPath = empty($folderPath) ? '' : implode('/', array_map(function ($segment) {
+            return rawurlencode(rawurldecode($segment)); // Éviter l'encodage double
+        }, explode('/', $folderPath)));
+
         // Construire l'URL en fonction de la valeur de $folderPath
         if (empty($folderPath)) {
             $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children";
         } else {
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
+            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$encodedFolderPath:/children";
         }
 
         $headers = [
@@ -604,19 +650,39 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
         $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        $files = json_decode($response, true)['value'];
-        if (!$files) {
+        if ($httpCode !== 200) {
             return [];
         }
 
+        $responseObj = json_decode($response, true);
+
+        // Vérification de la réponse API
+        if (!isset($responseObj['value']) || !is_array($responseObj['value'])) {
+            return [];
+        }
+
+        $files = $responseObj['value'];
         $recentFiles = [];
 
         foreach ($files as $file) {
-            if (isset($file['folder'])) {
-                // Si l'élément est un dossier, appeler la fonction récursive
-                $subfolderPath = $folderPath . '/' . $file['name'];
+            if (isset($file['folder']) && $file['folder']['childCount'] > 0) {
+                // Vérifier si le chemin est déjà encodé pour éviter un encodage double
+                $subfolderName = $file['name'];
+
+                // Si folderNames est défini, ne pas scanner les sous-dossiers contenant l'un des folder_names dans leur nom
+                if ($folderNames && $this->containsAnyFolderName($subfolderName, $folderNames)) {
+                    continue;  // Exclure ce sous-dossier
+                }
+
+                $encodedSubfolderName = rawurlencode(rawurldecode($subfolderName)); // Éviter le double encodage
+
+                // Construire le chemin pour le sous-dossier sans réencoder
+                $subfolderPath = $folderPath ? ($folderPath . '/' . $encodedSubfolderName) : $encodedSubfolderName;
+
+                // Appeler la fonction récursive
                 $recentFiles = array_merge($recentFiles, $this->getRecentFilesRecursive($subfolderPath, $startDate, $endDate));
             } elseif (isset($file['file']) && $file['file']['mimeType'] === 'application/pdf') {
                 // Vérifier la date de modification
@@ -641,10 +707,45 @@ class PluginGestionSharepoint extends CommonDBTM {
                 if ($includeFile) {
                     $recentFiles[] = $file;
                 }
+            } else {
+                // Log pour les éléments inattendus
+                //Session::addMessageAfterRedirect(__("Élément inattendu détecté : " . json_encode($file), 'gestion'), false, WARNING);
             }
         }
 
         return $recentFiles;
+    }
+
+    /**
+     * Récupérer tous les folder_name depuis la base de données
+     */
+    public function getFolderNamesFromDatabase($param) {
+        global $DB;
+
+        // Exemple de requête pour récupérer tous les folder_name de la base de données
+        $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = $param";
+        $result = $DB->query($query);
+
+        $folderNames = [];
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $folderNames[] = $row['folder_name'];
+            }
+        }
+
+        return $folderNames;
+    }
+
+    /**
+     * Vérifier si le sous-dossier contient l'une des valeurs de folderNames
+     */
+    public function containsAnyFolderName($subfolderName, $folderNames) {
+        foreach ($folderNames as $folderName) {
+            if (strpos($subfolderName, $folderName) !== false) {
+                return true;  // Si le sous-dossier contient l'une des valeurs, on retourne true
+            }
+        }
+        return false;  // Aucun folder_name trouvé dans le nom du sous-dossier
     }
 
     /**

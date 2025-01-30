@@ -91,6 +91,7 @@ class PluginGestionReminder extends CommonDBTM {
    static function cronGestionPdf($task = NULL) {
       global $DB, $CFG_GLPI;
       $config = new PluginGestionConfig();
+      $encodedFilePath = '';
   
       if($config->fields['ConfigModes'] == 1){
          require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
@@ -134,7 +135,11 @@ class PluginGestionReminder extends CommonDBTM {
                      $filePath = $file['parentReference']['path'] ?? '';
                      
                      if($config->EntitiesExtract() == 1){
-                        $entities = $file['parentReference']['name'];
+                        $pattern = $config->EntitiesExtractValue();
+                        if (preg_match("#/root:/$pattern([^/]+)#", $filePath, $matches)) {
+                           $entities = $matches[1];
+                        } 
+
                         $entities = $DB->query("SELECT id FROM `glpi_entities` WHERE name = '$entities'")->fetch_object();
                         if (!empty($entities->id)) {
                            $entitiesid = $entities->id;
@@ -142,7 +147,8 @@ class PluginGestionReminder extends CommonDBTM {
                      }
 
                      if (preg_match('/\/root:(.*)/', $filePath, $matches)) {
-                        $valueAfterRoot = $matches[1];
+                        $valueAfterRootNotEncode = $matches[1];
+                        $valueAfterRoot = empty($valueAfterRootNotEncode) ? '' : implode('/', array_map('rawurlencode', explode('/', $valueAfterRootNotEncode)));
                      }else{
                         $valueAfterRoot = NULL;
                      }

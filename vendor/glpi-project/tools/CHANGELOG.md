@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.7.4] - 2024-09-18
+- Fix compatibility with Twig 3.12.
+
+## [0.7.3] - 2024-06-20
+- Do not check licence headers of docker compose config files.
+
+## [0.7.2] - 2024-01-10
+- Fix copyright unduplicate logic in licence headers check command.
+
+## [0.7.1] - 2023-10-16
+- Fix default project directory on licence headers check command.
+
+## [0.7.0] - 2023-10-16
+- Update PHP namespace to prevent conflicts with GLPI core tools.
+- Add a PHPStan rule to ensure that global variable types are defined in PHPDoc.
+
+## [0.6.4] - 2023-07-27
+- Allow usage of `/*!` starting line in JS and PHP files license headers.
+
+## [0.6.3] - 2023-07-07
+- Exclude all hidden files from license headers checks.
+
+## [0.6.2] - 2023-01-12
+- Prevent locale extract from failing when some files types are not existing.
+- Fix handling of copyright dates updates.
+
+## [0.6.1] - 2022-11-07
+- Fix licence headers check command on PHP 8.x.
+
+## [0.6.0] - 2022-11-07
+- Accept `.licence-header` as source file for licence headers.
+- Allow usage of `symfony/console` 6.x.
+
 ## [0.5.1] - 2022-06-28
 - Fix locales extraction on `alpine` context
 
