@@ -324,7 +324,7 @@ class PluginGestionTicket extends CommonDBTM {
                               <div class="modal-body">
                                  <!-- Rond de chargement -->
                                  <div id="loading-spinner" style="display:none; text-align:center;">
-                                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                    <div class="spinner-border text-info" role="status" style="width: 3rem; height: 3rem; border-width: 0.4rem;">
                                           <span class="visually-hidden">Loading...</span>
                                     </div>
                                  </div>
@@ -337,13 +337,13 @@ class PluginGestionTicket extends CommonDBTM {
                   // Affichage du dropdown
                   Dropdown::showFromArray("groups_id", $groups, [
                      'multiple'     => true,
-                     'width'        => 500,
+                     'width'        => 650,
                      'values'       => json_decode($selected_values_json, true),
                      'disabled'     => $disabled,
                   ]);
                   echo <<<HTML
-  
-                                      <div class="modal-footer">
+
+                                      <div class="modal-footer" style="margin-top: 55px;">
                                           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
                                           <button type="submit" name="save_selection" class="btn btn-primary">Sauvegarder</button>
                                       </div>
@@ -401,7 +401,7 @@ class PluginGestionTicket extends CommonDBTM {
 
                                     // Réinitialiser Select2
                                     $('[name="groups_id[]"]').select2({
-                                          width: '500',
+                                          width: '650',
                                           dropdownAutoWidth: true,
                                           dropdownParent: $('[name="groups_id[]"]').closest('div.modal, div.dropdown-menu, body'),
                                           quietMillis: 100,

@@ -1,5 +1,7 @@
 <?php
 header('Content-Type: application/json');
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
 include ('../../../inc/includes.php'); // Inclure les fichiers nécessaires de GLPI
 require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
