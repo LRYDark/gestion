@@ -20,7 +20,6 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     $entityId = $entityResult->entities_id;
     
     $selected_items = isset($_POST['groups_id']) ? $_POST['groups_id'] : [];
-    print_r($selected_items);
 
     // Récupérer les éléments déjà en base
     $current_items = [];
@@ -45,7 +44,6 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
             $file_path = $item . ".pdf"; // Remplacez par le chemin exact de votre fichier
             // Étape 4 : Récupérez l'URL du fichier
-            echo $file_path;
             $fileUrl = $sharepoint->getFileUrl($file_path);
         }
 
@@ -148,7 +146,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
         }
     }
 
-    $UserId = 1;
+    //$UserId = 1;
     // Supprimer les éléments désélectionnés
     foreach ($items_to_remove as $item) {
         // Normaliser les noms des fichiers dans $current_items
@@ -167,13 +165,13 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
         if (!$stmt->execute([0, $item])){
             Session::addMessageAfterRedirect(__("Erreur de suppression des éléments", 'gestion'), true, ERROR);
         }else{
-            Event::log($UserId, "users", 5, "setup", sprintf(__('%s updates an item'), $_SESSION["glpiname"]));
+            //Event::log($UserId, "users", 5, "setup", sprintf(__('%s updates an item'), $_SESSION["glpiname"]));
         }
     }
 
     // Message de confirmation si tout s'est bien passé
     if ($success) {
-        Event::log($UserId, "users", 5, "setup", sprintf(__('%s updates an item'), $_SESSION["glpiname"]));
+        //Event::log($UserId, "users", 5, "setup", sprintf(__('%s updates an item'), $_SESSION["glpiname"]));
         Session::addMessageAfterRedirect(__("Les éléments ont été mis à jour avec succès.", 'gestion'), true, INFO);
     }
 }
