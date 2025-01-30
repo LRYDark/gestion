@@ -146,7 +146,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
         }
     }
 
-    $UserId = 1;
+    //$UserId = 1;
     // Supprimer les éléments désélectionnés
     foreach ($items_to_remove as $item) {
         // Normaliser les noms des fichiers dans $current_items
