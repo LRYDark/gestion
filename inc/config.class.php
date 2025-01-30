@@ -198,12 +198,6 @@ class PluginGestionConfig extends CommonDBTM
             echo "</td>";
          echo "</tr>";
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Extraire l'entité du dossier parent du PDF", "gestion") . "</td><td>";
-               Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
-            echo "</td>";
-         echo "</tr>";
-
          if (Plugin::isPluginActive('formcreator')) {
             echo "<tr class='tab_bg_1'>";
                echo "<td> Affichage du formulaire dans un modal (Vide pour désactivé) </td>";
@@ -230,61 +224,6 @@ class PluginGestionConfig extends CommonDBTM
             echo "</td></tr>";
          }
          
-            //--------------------------------------------
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
-         echo "</tr>";
-         
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Extraction d'un tracker dans le PDF", "gestion") . "</td><td>";
-               Dropdown::showYesNo('ExtractYesNo', $config->ExtractYesNo(), -1);
-            echo "</td>";
-         echo "</tr>";
-
-         if($config->ExtractYesNo() == 1){
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
-                  echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
-         }
-         //--------------------------------------------
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
-         echo "</tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Envoyé un mail si le contenu d'un tracker est détécté (Tâche Cron)", "gestion") . "</td><td>";
-               Dropdown::showYesNo('MailTrackerYesNo', $config->MailTrackerYesNo(), -1);
-            echo "</td>";
-         echo "</tr>";
-         
-         if($config->MailTrackerYesNo() == 1){
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Mail", "gestion") . "</td><td>";
-                  echo Html::input('MailTracker', ['value' => $config->MailTracker(), 'size' => 60]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
-
-            echo "<tr class='tab_bg_1'>";
-               echo "<td> Gabarit : Modèle de notifications pour la Tâche Cron (Tracker) </td>";
-               echo "<td>";
-
-               //notificationtemplates_id
-               Dropdown::show('NotificationTemplate', [
-                  'name' => 'gabarit_tracker',
-                  'value' => $config->gabarit_tracker(),
-                  'display_emptychoice' => 1,
-                  'specific_tags' => [],
-                  'itemtype' => 'NotificationTemplate',
-                  'displaywith' => [],
-                  'emptylabel' => "-----",
-                  'used' => [],
-                  'toadd' => [],
-                  'entity_restrict' => 0,
-               ]); 
-            echo "</td></tr>";
-         }
          //--------------------------------------------
          echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph)', 'rp') . "</th></tr>";
 
@@ -424,12 +363,14 @@ class PluginGestionConfig extends CommonDBTM
 
                      // Tableau des options pour le champ déroulant
                      $values2 = [
-                           0 => __('Dossier de récupération (Racine)', 'gestion'),
+                           0 => __('Dossier de récupération (Racine - Fichier du dossier uniquement)', 'gestion'),
                            1 => __('Dossier de récupération (Global - Recursive)', 'gestion'),
                            2 => __('Dossier de destination (Dépot Global)', 'gestion'),
                            5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
                            6 => __('Supprimer le dossier', 'gestion'),
                            8 => __('__Non attribué__', 'gestion'),
+                           10 => __("Sous dossier d'exclusion (Global - Recursive) ", 'gestion'),
+                           11 => __("Sous dossier d'exclusion Cron (Global - Recursive) ", 'gestion'),
                      ];
 
                      // Générer un champ déroulant avec les options
@@ -497,7 +438,89 @@ class PluginGestionConfig extends CommonDBTM
          echo "<tr class='tab_bg_1'><td>" . __("Dossier de déstination des PDFs : ".GLPI_PLUGIN_DOC_DIR."/gestion/signed/", "gestion") . "</td></tr>";
       }
 
-      echo "<tr><th colspan='2'>" . __("Dérnière synchronisation : ".$config->LastCronTask(), 'rp') . "</th></tr>";
+      echo "<tr><th colspan='2'>" . __("Entités et Tracker", 'rp') . "</th></tr>";
+         //--------------------------------------------
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Extraction d'un tracker dans le PDF", "gestion") . "</td><td>";
+               Dropdown::showYesNo('ExtractYesNo', $config->ExtractYesNo(), -1);
+            echo "</td>";
+         echo "</tr>";
+
+         if($config->ExtractYesNo() == 1){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
+                  echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+
+            //--------------------------------------------
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Envoyé un mail si le contenu d'un tracker est détécté (Tâche Cron)", "gestion") . "</td><td>";
+                  Dropdown::showYesNo('MailTrackerYesNo', $config->MailTrackerYesNo(), -1);
+               echo "</td>";
+            echo "</tr>";
+            
+            if($config->MailTrackerYesNo() == 1){
+               echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __("Mail", "gestion") . "</td><td>";
+                     echo Html::input('MailTracker', ['value' => $config->MailTracker(), 'size' => 60]);// bouton configuration du bas de page line 1
+                  echo "</td>";
+               echo "</tr>";
+
+               echo "<tr class='tab_bg_1'>";
+                  echo "<td> Gabarit : Modèle de notifications pour la Tâche Cron (Tracker) </td>";
+                  echo "<td>";
+
+                  //notificationtemplates_id
+                  Dropdown::show('NotificationTemplate', [
+                     'name' => 'gabarit_tracker',
+                     'value' => $config->gabarit_tracker(),
+                     'display_emptychoice' => 1,
+                     'specific_tags' => [],
+                     'itemtype' => 'NotificationTemplate',
+                     'displaywith' => [],
+                     'emptylabel' => "-----",
+                     'used' => [],
+                     'toadd' => [],
+                     'entity_restrict' => 0,
+                  ]); 
+               echo "</td></tr>";
+            }
+         }else{
+            if($config->MailTrackerYesNo() == 1){
+               // Préparer la requête SQL
+               $sql = "UPDATE glpi_plugin_gestion_configs 
+                       SET MailTrackerYesNo = ?
+                       WHERE id = 1";
+
+               // Exécution de la requête préparée
+               $stmt = $DB->prepare($sql);
+               $stmt->execute([0]);
+            }
+         }
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Extraire l'entité du dossier parent du PDF", "gestion") . "</td><td>";
+               Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
+            echo "</td>";
+         echo "</tr>";
+
+         if($config->EntitiesExtract() == 1){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Séparateurs pour l'extraction de l'entité", "gestion") . "</td><td>";
+                  echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                     echo '<label for="DateX">Après le chemin : </label>';
+                        echo Html::input('EntitiesExtractValue', ['value' => $config->EntitiesExtractValue(), 'size' => 60]);// bouton configuration du bas de page line 1
+                  echo '</div>';
+               echo "</td>";
+            echo "</tr>";
+         }
+
+      echo "<tr><th colspan='2'>" . __("Dérnière synchronisation Cron : ".$config->LastCronTask(), 'rp') . "</th></tr>";
 
       $config->showFormButtons(['candel' => false]);
       return false;
@@ -562,6 +585,10 @@ class PluginGestionConfig extends CommonDBTM
    function EntitiesExtract()
    {
       return ($this->fields['EntitiesExtract']);
+   } 
+   function EntitiesExtractValue()
+   {
+      return ($this->fields['EntitiesExtractValue']);
    } 
    function SignataireX()
    {
@@ -748,6 +775,10 @@ class PluginGestionConfig extends CommonDBTM
          if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.2.0'){
             include(PLUGIN_GESTION_DIR . "/install/update_120_130.php");
             update120to130(); 
+         }
+         if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.3.1'){
+            include(PLUGIN_GESTION_DIR . "/install/update_132_next.php");
+            update(); 
          }
       }
    }

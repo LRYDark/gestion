@@ -272,122 +272,63 @@ class PluginGestionTicket extends CommonDBTM {
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint();
   
-      if(Session::haveRight("plugin_gestion_add", READ)){
-         // Vérifier que la page actuelle est ticket.form.php
-         if (strpos($_SERVER['REQUEST_URI'], 'ticket.form.php') !== false) {
-            $ticketId = $_GET['id'];
-            if ($gestion == 0 && $ticketId != 0 && !empty($ticketId)) {
-               $gestion = 1;
+      if (Session::haveRight("plugin_gestion_add", READ)) {
+          if (strpos($_SERVER['REQUEST_URI'], 'ticket.form.php') !== false) {
+              $ticketId = $_GET['id'];
+              if ($gestion == 0 && $ticketId != 0 && !empty($ticketId)) {
+                  $gestion = 1;
 
-               // Récupérer toutes les valeurs 'bl' pour le ticket spécifié
-               $result = $DB->query("SELECT * FROM glpi_plugin_gestion_surveys WHERE tickets_id = $ticketId AND signed = 0");
+                  // Récupérer toutes les valeurs 'bl' pour le ticket spécifié
+                  $result = $DB->query("SELECT * FROM glpi_plugin_gestion_surveys WHERE tickets_id = $ticketId AND signed = 0");
 
-               $groups = [];
-               $selected_ids = [];
-               while ($data = $result->fetch_assoc()) {
-                     $groups[$data['bl']] = $data['bl']; // Utiliser 'bl' comme clé et valeur
-                     $url_bl = ""; // Par défaut, $folderPath est vide
-                     if (!empty($data['url_bl'])){
-                        $url_bl = $data['url_bl']."/";
-                     }
-                     $selected_ids[] = $url_bl.$data['bl'];
-               }
+                  $groups = [];
+                  $selected_ids = [];
+                  while ($data = $result->fetch_assoc()) {
+                        $groups[$data['bl']] = $data['bl']; // Utiliser 'bl' comme clé et valeur
+                        $url_bl = ""; // Par défaut, $folderPath est vide
+                        if (!empty($data['url_bl'])){
+                           $url_bl = $data['url_bl']."/";
+                        }
+                        $selected_ids[] = $url_bl.$data['bl'];
+                  }
+
+                  $groups = [];
+                  // On parcourt le tableau $selected_ids
+                  foreach ($selected_ids as $item) {
+                     // On récupère la dernière partie après le dernier "/"
+                     $last_part = basename($item); // Utilisation de basename pour obtenir la dernière partie
+
+                     // On ajoute dans $groups avec la clé étant l'élément complet et la valeur étant la dernière partie
+                     $groups[$item] = $last_part;
+                  }
   
-               if ($config->fields['ConfigModes'] == 0){
-                  // Récupérer les fichiers PDF du dossier et les ajouter au tableau $groups sans l'extension .pdf
-                  $directory = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned/";
-                  if (is_dir($directory)) {
-                        foreach (scandir($directory) as $file) {
-                           if (pathinfo($file, PATHINFO_EXTENSION) === 'pdf') {
-                              $file_name = pathinfo($file, PATHINFO_FILENAME);
-                              if (!array_key_exists($file_name, $groups)) {
-                                    $groups[$file_name] = $file_name; // Utiliser le nom du fichier sans extension
-                              }
-                           }
-                        }
-                  }
-               }elseif ($config->fields['ConfigModes'] == 1 && !empty($config->fields['Global'])){
-
-                  try {
-                     // Récupérer les lignes de la table où la colonne params est 0 ou 1
-                     $query = "SELECT folder_name, params FROM glpi_plugin_gestion_configsfolder WHERE params IN (0, 1)";
-                     $result = $DB->query($query); // Utilisation de la classe GLPI pour les requêtes
-                 
-                     if (!$result) {
-                         throw new Exception("Erreur lors de l'exécution de la requête SQL.");
-                     }
-                 
-                     // Initialisation des groupes et vérification des résultats
-                     $groups = [];
-                     $hasValidParams = false; // Indicateur pour vérifier si des valeurs de params existent
-                 
-                     while ($row = $DB->fetchAssoc($result)) {
-                        $hasValidParams = true; // Une ligne avec params 0 ou 1 a été trouvée
-                        $folderPath = $row['folder_name']; // Obtenir le chemin du dossier
-                        $params = $row['params']; // Obtenir la valeur de params
-               
-                        // Exécuter la méthode appropriée en fonction de la valeur de params
-                        if ($params == 0) {
-                           $contents = $sharepoint->listFolderContents($folderPath);
-                        } elseif ($params == 1) {
-                           $contents = $sharepoint->listFolderContentsRecursive($folderPath);
-                        }
-                        // Filtrer et ajouter les fichiers PDF
-                        foreach ($contents as $item) {
-                           if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
-                              // Extraire le nom du fichier sans extension
-                              $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
-                              // La clé 'parentReference.name' contient le dossier
-                              $fullPath = $item['parentReference']['name'].'/';
-                              // Ajouter au groupe
-                              $groups[$fullPath.$file_name] = $file_name; // Ajouter le nom du fichier
-                           }
-                        }
-                     }
-                 
-                     // Si aucune ligne valide n'a été trouvée, utiliser le chemin par défaut
-                     if (!$hasValidParams) {
-                         $folderPath = ''; // Récupérer le nom par défaut
-                         $contents = $sharepoint->listFolderContents($folderPath); // Utiliser listFolderContents
-                 
-                        // Filtrer et ajouter les fichiers PDF
-                        foreach ($contents as $item) {
-                           if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
-                              // Extraire le nom du fichier sans extension
-                              $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
-                              // La clé 'parentReference.name' contient le dossier
-                              $fullPath = $item['parentReference']['name'].'/';
-                              // Ajouter au groupe
-                              $groups[$fullPath.$file_name] = $file_name; // Ajouter le nom du fichier
-                           }
-                        }
-                     }
-                  } catch (Exception $e) {
-                        
-                  }
-               } 
-
-               $selected_values_json = json_encode($selected_ids);
-               $csrf_token = Session::getNewCSRFToken();
-
-               if(Session::haveRight("plugin_gestion_add", UPDATE)){
-                  $disabled          = false;
-               }else{
-                  $disabled          = true;
-               }
-               
-               // Modal HTML
-               echo <<<HTML
-               <div class="modal fade" id="AddGestionModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-                     <div class="modal-dialog">
-                        <div class="modal-content">
-                           <div class="modal-header">
-                                 <h5 class="modal-title" id="AddGestionModalLabel">Ajouter un BC / BL</h5>
-                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                           </div>
-                           <div class="modal-body">
-               HTML;
-               
+                  // CSRF Token
+                  $selected_values_json = json_encode($selected_ids);
+                  $csrf_token = Session::getNewCSRFToken();
+   
+                  if (Session::haveRight("plugin_gestion_add", UPDATE)) {
+                      $disabled = false;
+                  } else {
+                      $disabled = true;
+                  } 
+  
+                  // Modal HTML
+                  echo <<<HTML
+                  <div class="modal fade" id="AddGestionModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
+                      <div class="modal-dialog">
+                          <div class="modal-content">
+                              <div class="modal-header">
+                                  <h5 class="modal-title" id="AddGestionModalLabel">Ajouter un BC / BL</h5>
+                                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                              </div>
+                              <div class="modal-body">
+                                 <!-- Rond de chargement -->
+                                 <div id="loading-spinner" style="display:none; text-align:center;">
+                                    <div class="spinner-border text-info" role="status" style="width: 3rem; height: 3rem; border-width: 0.4rem;">
+                                          <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                 </div>
+                  HTML;
                   // Fermeture temporaire de HTML pour inclure du PHP
                   echo '<form method="post" action="' . Toolbox::getItemTypeFormURL('PluginGestionTicket') . '">';
                   echo '<input type="hidden" name="_glpi_csrf_token" value="' . $csrf_token . '">';
@@ -396,46 +337,100 @@ class PluginGestionTicket extends CommonDBTM {
                   // Affichage du dropdown
                   Dropdown::showFromArray("groups_id", $groups, [
                      'multiple'     => true,
-                     'width'        => 500,
+                     'width'        => 650,
                      'values'       => json_decode($selected_values_json, true),
                      'disabled'     => $disabled,
                   ]);
-               
-               echo <<<HTML
-                                    <div class="modal-footer">
-                                       <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                                       <button type="submit" name="save_selection" class="btn btn-primary">Sauvegarder</button>
-                                    </div>
-                                 </form>
-                           </div>
-                        </div>
-                     </div>
-               </div>
-               HTML;
-  
-               // Bouton d'ouverture du modal avec style ajusté
-               $entitie = "<div class='d-inline-block' style='margin-left: 0px; margin-top: 7px;'><button id='add_gestion' type='button' style='border: 1px solid; padding: 2px 10px;' class='btn-sm btn-outline-secondary' data-bs-toggle='modal' data-bs-target='#AddGestionModal'><i class='fas fa-plus'></i> Lié des documents</button></div>";
+                  echo <<<HTML
 
-               // Script pour ajouter dynamiquement le bouton uniquement dans la section 'Catégorie', indépendamment de la langue
-               $script = <<<JAVASCRIPT
+                                      <div class="modal-footer" style="margin-top: 55px;">
+                                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                                          <button type="submit" name="save_selection" class="btn btn-primary">Sauvegarder</button>
+                                      </div>
+                                  </form>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  HTML;
+  
+                  // Bouton d'ouverture du modal avec style ajusté
+                  $entitie = "<div class='d-inline-block' style='margin-left: 0px; margin-top: 7px;'><button id='add_gestion' type='button' style='border: 1px solid; padding: 2px 10px;' class='btn-sm btn-outline-secondary' data-bs-toggle='modal' data-bs-target='#AddGestionModal'><i class='fas fa-plus'></i> Lié des documents</button></div>";
+  
+                  // Script pour ajouter dynamiquement le bouton et gérer le clic
+                  $script = <<<JAVASCRIPT
                   $(document).ready(function() {
-                     // Ciblage du conteneur parent du champ select2 sans utiliser d'ID spécifique
                      var categorieContainer = $("select[name='itilcategories_id']").closest("div.field-container");
                      var boutonExist = document.getElementById('add_gestion');
-                     
-                     if (categorieContainer.length > 0 && boutonExist === null) {
-                           // Ajoute le bouton après le conteneur de la catégorie pour alignement
-                           categorieContainer.append("{$entitie}");
-                     }
-                  });
-               JAVASCRIPT;
 
-               echo Html::scriptBlock($script);
-            }
-         }
+                     // Si le bouton n'existe pas déjà, on l'ajoute
+                     if (categorieContainer.length > 0 && boutonExist === null) {
+                        categorieContainer.append("{$entitie}");
+                     }
+
+                     // Clic sur le bouton pour ouvrir le modal
+                     $('#add_gestion').click(function() {
+                        // Affichage du rond de chargement
+                        $('#loading-spinner').show();
+
+                        // Requête AJAX pour charger les données
+                        $.ajax({
+                              url: '../plugins/gestion/front/charger_dropdown.php',  // Chemin vers le fichier PHP
+                              method: 'GET',
+                              data: { ticketId: {$ticketId} },  // Passer le ticketId dans la requête
+                              dataType: 'json',  // Assurez-vous que jQuery gère la réponse comme JSON
+                              success: function(response) {
+                                 console.log('Réponse brute du serveur:', response);
+
+                                 if (response.error) {
+                                    alert('Erreur : ' + response.error);
+                                    return;
+                                 }
+
+                                 if (response.data) {
+                                    // Ajouter les options au dropdown sans doublons
+                                    $.each(response.data, function(index, value) {
+                                          // Vérifier si l'option est déjà présente avant de l'ajouter
+                                          if ($('[name="groups_id[]"] option[value="' + index + '"]').length === 0) {
+                                             $('[name="groups_id[]"]').append('<option value="' + index + '">' + value + '</option>');
+                                          }
+                                    });
+
+                                    // Réinitialiser Select2 après avoir ajouté les options
+                                    $('[name="groups_id[]"]').trigger('change');
+
+                                    // Réinitialiser Select2
+                                    $('[name="groups_id[]"]').select2({
+                                          width: '650',
+                                          dropdownAutoWidth: true,
+                                          dropdownParent: $('[name="groups_id[]"]').closest('div.modal, div.dropdown-menu, body'),
+                                          quietMillis: 100,
+                                          minimumResultsForSearch: 10
+                                    });
+                                 } else {
+                                    alert('Aucune donnée à afficher.');
+                                 }
+
+                                 // Masquer le rond de chargement
+                                 $('#loading-spinner').hide();
+                              },
+                              error: function(xhr, status, error) {
+                                 console.error('Erreur AJAX:', error);
+                                 $('#loading-spinner').hide();
+                                 alert('Erreur lors du chargement des données.');
+                              }
+                        });
+                     });
+                  });
+                  JAVASCRIPT;  
+
+                  // Inclure le script dans la page
+                  echo Html::scriptBlock($script);
+              }
+          }
       }
   }
-  
+    
    static function install(Migration $migration) { // fonction intsllation de la table en BDD
       global $DB;
 

@@ -36,48 +36,68 @@
 function update120to130() {
    global $DB;
 
-   $query= "ALTER TABLE glpi_plugin_gestion_configs
-            ADD COLUMN `extract` VARCHAR(255) NULL,
-            ADD COLUMN `ExtractYesNo` TINYINT NOT NULL DEFAULT '0',
-            ADD COLUMN `MailTracker` VARCHAR(255) NULL,
-            ADD COLUMN `MailTrackerYesNo` TINYINT NOT NULL DEFAULT '0',
-            ADD COLUMN `EntitiesExtract` TINYINT NOT NULL DEFAULT '0',
-            ADD COLUMN `gabarit_tracker` INT(10) NOT NULL DEFAULT '0',
-            ADD COLUMN `formulaire` INT(10) NOT NULL DEFAULT '0',
-            ADD COLUMN `LastCronTask` TIMESTAMP DEFAULT NULL;";
-   $DB->query($query) or die($DB->error());
+   // Vérifier si les colonnes existent déjà
+   $columns = $DB->query("SHOW COLUMNS FROM `glpi_plugin_gestion_configs`")->fetch_all(MYSQLI_ASSOC);
 
-   $query = "RENAME TABLE glpi_plugin_gestion_tickets TO glpi_plugin_gestion_surveys;";
-   $DB->query($query) or die($DB->error());
+   // Liste des colonnes à vérifier
+   $required_columns = [
+      'extract',
+      'ExtractYesNo',
+      'MailTracker',
+      'MailTrackerYesNo',
+      'EntitiesExtract',
+      'gabarit_tracker',
+      'formulaire',
+      'LastCronTask'
+   ];
 
-   $query= "ALTER TABLE glpi_plugin_gestion_surveys
-            ADD COLUMN `tracker` VARCHAR(255) NULL,
-            ADD COLUMN `doc_url` TEXT NULL,
-            ADD COLUMN `doc_date` TIMESTAMP NULL;";
-   $DB->query($query) or die($DB->error()); 
+   // Liste pour les colonnes manquantes
+   $missing_columns = array_diff($required_columns, array_column($columns, 'Field'));
 
-   require_once PLUGIN_GESTION_DIR.'/install/MailContent2.php';
-   $content_html2 = $ContentHtml2;
+   if (!empty($missing_columns)) {
+      $query= "ALTER TABLE glpi_plugin_gestion_configs
+               ADD COLUMN `extract` VARCHAR(255) NULL,
+               ADD COLUMN `ExtractYesNo` TINYINT NOT NULL DEFAULT '0',
+               ADD COLUMN `MailTracker` VARCHAR(255) NULL,
+               ADD COLUMN `MailTrackerYesNo` TINYINT NOT NULL DEFAULT '0',
+               ADD COLUMN `EntitiesExtract` TINYINT NOT NULL DEFAULT '0',
+               ADD COLUMN `gabarit_tracker` INT(10) NOT NULL DEFAULT '0',
+               ADD COLUMN `formulaire` INT(10) NOT NULL DEFAULT '0',
+               ADD COLUMN `LastCronTask` TIMESTAMP DEFAULT NULL;";
+      $DB->query($query) or die($DB->error());
 
-   // Échapper le contenu HTML
-   $content_html2_escaped = Toolbox::addslashes_deep($content_html2);
+      $query = "RENAME TABLE glpi_plugin_gestion_tickets TO glpi_plugin_gestion_surveys;";
+      $DB->query($query) or die($DB->error());
 
-   // Construire la requête d'insertion
-   $insertQuery1 = "INSERT INTO `glpi_notificationtemplates` (`name`, `itemtype`, `date_mod`, `comment`, `css`, `date_creation`) VALUES ('Gestion Mail PDF (Tracker)', 'Ticket', NULL, 'Created by the plugin gestion (Tracker)', '', NULL);";
-   // Exécuter la requête
-   $DB->query($insertQuery1);
+      $query= "ALTER TABLE glpi_plugin_gestion_surveys
+               ADD COLUMN `tracker` VARCHAR(255) NULL,
+               ADD COLUMN `doc_url` TEXT NULL,
+               ADD COLUMN `doc_date` TIMESTAMP NULL;";
+      $DB->query($query) or die($DB->error()); 
 
-   // Construire la requête d'insertion
-   $insertQuery2 = "INSERT INTO `glpi_notificationtemplatetranslations` 
-      (`notificationtemplates_id`, `language`, `subject`, `content_text`, `content_html`) 
-      VALUES (LAST_INSERT_ID(), 'fr_FR', '[GLPI] | Document ##gestion.tracker## généré', '', '{$content_html2_escaped}')";
-   // Exécuter la requête
-   $DB->query($insertQuery2);
+      require_once PLUGIN_GESTION_DIR.'/install/MailContent2.php';
+      $content_html2 = $ContentHtml2;
 
-   $ID = $DB->query("SELECT id FROM glpi_notificationtemplates WHERE NAME = 'Gestion Mail PDF (Tracker)' AND comment = 'Created by the plugin gestion (Tracker)'")->fetch_object();
+      // Échapper le contenu HTML
+      $content_html2_escaped = Toolbox::addslashes_deep($content_html2);
 
-   $query= "UPDATE glpi_plugin_gestion_configs SET gabarit_tracker = $ID->id WHERE id=1;";
-   $DB->query($query) or die($DB->error());   
+      // Construire la requête d'insertion
+      $insertQuery1 = "INSERT INTO `glpi_notificationtemplates` (`name`, `itemtype`, `date_mod`, `comment`, `css`, `date_creation`) VALUES ('Gestion Mail PDF (Tracker)', 'Ticket', NULL, 'Created by the plugin gestion (Tracker)', '', NULL);";
+      // Exécuter la requête
+      $DB->query($insertQuery1);
+
+      // Construire la requête d'insertion
+      $insertQuery2 = "INSERT INTO `glpi_notificationtemplatetranslations` 
+         (`notificationtemplates_id`, `language`, `subject`, `content_text`, `content_html`) 
+         VALUES (LAST_INSERT_ID(), 'fr_FR', '[GLPI] | Document ##gestion.tracker## généré', '', '{$content_html2_escaped}')";
+      // Exécuter la requête
+      $DB->query($insertQuery2);
+
+      $ID = $DB->query("SELECT id FROM glpi_notificationtemplates WHERE NAME = 'Gestion Mail PDF (Tracker)' AND comment = 'Created by the plugin gestion (Tracker)'")->fetch_object();
+
+      $query= "UPDATE glpi_plugin_gestion_configs SET gabarit_tracker = $ID->id WHERE id=1;";
+      $DB->query($query) or die($DB->error());   
+   }
 }
   
 ?>
