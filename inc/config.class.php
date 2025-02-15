@@ -363,14 +363,12 @@ class PluginGestionConfig extends CommonDBTM
 
                      // Tableau des options pour le champ déroulant
                      $values2 = [
-                           0 => __('Dossier de récupération (Racine - Fichier du dossier uniquement)', 'gestion'),
-                           1 => __('Dossier de récupération (Global - Recursive)', 'gestion'),
+                           1 => __('Dossier de récupération (Recursive)', 'gestion'),
                            2 => __('Dossier de destination (Dépot Global)', 'gestion'),
                            5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
                            6 => __('Supprimer le dossier', 'gestion'),
                            8 => __('__Non attribué__', 'gestion'),
-                           10 => __("Sous dossier d'exclusion (Global - Recursive) ", 'gestion'),
-                           11 => __("Sous dossier d'exclusion Cron (Global - Recursive) ", 'gestion'),
+                           10 => __("Eléments de recheche", 'gestion'),
                      ];
 
                      // Générer un champ déroulant avec les options

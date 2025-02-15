@@ -21,6 +21,10 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     
     $selected_items = isset($_POST['groups_id']) ? $_POST['groups_id'] : [];
 
+    echo "<pre>";
+    print_r($selected_items);
+    echo "</pre>";
+
     // Récupérer les éléments déjà en base
     $current_items = [];
     $result = $DB->query("SELECT url_bl, bl FROM glpi_plugin_gestion_surveys WHERE tickets_id = $ticketId AND signed = 0");
@@ -176,4 +180,4 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     }
 }
 
-Html::back();
+//Html::back();

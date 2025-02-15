@@ -18,31 +18,35 @@ class PluginGestionSharepoint extends CommonDBTM {
         $clientId       = $config->ClientID();
         $clientSecret   = $config->ClientSecret();
 
-        $url = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token";
-
-        $postFields = [
+        $token_url = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token";
+        $token_data = [
             'grant_type' => 'client_credentials',
             'client_id' => $clientId,
             'client_secret' => $clientSecret,
             'scope' => 'https://graph.microsoft.com/.default'
         ];
-
+    
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_URL, $token_url);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($token_data));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
+    
         $response = curl_exec($ch);
-        curl_close($ch);
-
-        $responseObj = json_decode($response, true);
-
-        if (isset($responseObj['access_token'])) {
-            return $responseObj['access_token'];
-        } else {
-            throw new Exception("Impossible d'obtenir le token d'accès : " . $response);
+        if (curl_errno($ch)) {
+            curl_close($ch);
+            return null;
         }
+    
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($http_status != 200) {
+            curl_close($ch);
+            return null;
+        }
+    
+        curl_close($ch);
+        $token_response = json_decode($response, true);
+        return $token_response['access_token'];
     }
 
     /**
@@ -126,9 +130,6 @@ class PluginGestionSharepoint extends CommonDBTM {
             $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$encodedFolderPath:/children?\$top=$NumberViews";
         }
 
-        // Log pour vérifier l'URL générée
-        error_log("URL générée : $url");
-
         $headers = [
             "Authorization: Bearer $accessToken",
             "Content-Type: application/json"
@@ -179,9 +180,6 @@ class PluginGestionSharepoint extends CommonDBTM {
         } else {
             $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$encodedFolderPath:/children?\$top=$NumberViews";
         }
-
-        // Log de l'URL pour débogage
-        error_log("URL générée : $url");
 
         $headers = [
             "Authorization: Bearer $accessToken",
@@ -236,6 +234,246 @@ class PluginGestionSharepoint extends CommonDBTM {
         return $contents;
     }
 
+    /*public function searchPdfFiles() {
+        $accessToken = $this->getAccessToken();
+        $driveId = $this->GetDriveId();
+        $config = new PluginGestionConfig();
+        $NumberViews = $config->NumberViews();
+    
+        // Vérifier que driveId n'est pas vide
+        if (empty($driveId)) {
+            throw new Exception("Erreur : Impossible de récupérer driveId !");
+        }
+
+        if (empty($accessToken)) {
+            throw new Exception("Erreur : AccessToken vide ou non valide !");
+        }        
+
+        // Utilisation de la recherche native pour récupérer directement les fichiers PDF
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/search(q='pdf')";
+    
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/json"
+        ];
+    
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_VERBOSE, true);
+        curl_setopt($ch, CURLOPT_FAILONERROR, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    
+        $response = curl_exec($ch);
+        if ($response === false) {
+            throw new Exception("Erreur cURL : " . curl_error($ch));
+        }
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+    
+        // Vérifier la réponse HTTP
+        if ($httpCode !== 200) {
+            throw new Exception("Erreur API (HTTP $httpCode) : $response");
+        }
+    
+        $responseObj = json_decode($response, true);
+    
+        // Vérifier si la clé 'value' existe
+        if (!isset($responseObj['value']) || !is_array($responseObj['value'])) {
+            throw new Exception("Clé 'value' absente ou réponse invalide : " . json_encode($responseObj));
+        }
+    
+        $pdfFiles = [];
+        foreach ($responseObj['value'] as $item) {
+            if (!empty($item['file']) && strpos(strtolower($item['name']), '.pdf') !== false) {
+                $pdfFiles[] = $item;
+            }
+        }        
+    
+        return $pdfFiles;
+    }*/
+
+    // Récupérer les dossiers pour params = 8 (dossiers de recherche)
+    public function getFoldersByParams8() {
+        global $DB;
+        $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 8";
+        $result = $DB->query($query);
+
+        $folders = [];
+        while ($row = $DB->fetchassoc($result)) {
+            $folders[] = $row['folder_name'];
+        }
+
+        return $folders;
+    }
+
+    // Récupérer les éléments à rechercher pour params = 10 (ex: "Ticket", "Facture")
+    public function getSearchKeywordsByParams10() {
+        global $DB;
+        $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 10";
+        $result = $DB->query($query);
+
+        $keywords = [];
+        while ($row = $DB->fetchassoc($result)) {
+            $keywords[] = $row['folder_name'];
+        }
+
+        return $keywords;
+    }
+
+    // Fonction pour effectuer la requête de recherche
+    public function searchSharePoint() {
+        $accessToken = $this->getAccessToken();
+        $config = new PluginGestionConfig();
+        $NumberViews = $config->NumberViews();
+        $Hostname = $config->Hostname();
+        $SitePath = $config->SitePath();
+
+        $pdfFiles = [];
+    
+        // Récupérer les dossiers concernés en base de données (params = 8)
+        $folders = $this->getFoldersByParams8();
+        // Si aucun dossier n'est défini pour params = 8, on recherche dans "Documents partages"
+        if (empty($folders)) {
+            $folders = ["Documents partages"];
+        } else {
+            // Ajouter le préfixe "Documents partages/" à chaque dossier récupéré
+            foreach ($folders as &$folder) {
+                $folder = "Documents partages/$folder";
+            }
+        }
+    
+        // Récupérer les éléments à rechercher (params = 10)
+        $keywords = $this->getSearchKeywordsByParams10();
+        if (empty($keywords)) {
+            return $pdfFiles;
+        }
+    
+        $search_url = 'https://graph.microsoft.com/v1.0/search/microsoft.graph.query';
+        $SiteUrl = "https://$Hostname"."$SitePath";
+        
+        foreach ($folders as $folderName) {
+            foreach ($keywords as $keyword) {
+                $queryString = "$keyword AND filetype:pdf path:\"$SiteUrl/$folderName\"";
+    
+                // Définition de la requête
+                $search_data = [
+                    "requests" => [
+                        [
+                            "entityTypes" => ["driveItem"],
+                            "query" => [
+                                "queryString" => $queryString
+                            ],
+                            "size" => $NumberViews,
+                            "sortProperties" => [
+                                [
+                                    "name" => "lastModifiedDateTime",
+                                    "isDescending" => true
+                                ]
+                            ],
+                            "region" => "FRA"
+                        ]
+                    ]
+                ];
+    
+                $search_data_json = json_encode($search_data);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new Exception("Erreur d'encodage JSON : " . json_last_error_msg());
+                }
+    
+                $nextLink = $search_url;
+    
+                do {
+                    $ch = curl_init();
+                    curl_setopt($ch, CURLOPT_URL, $nextLink);
+                    curl_setopt($ch, CURLOPT_POST, true);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                        'Authorization: Bearer ' . $accessToken,
+                        'Content-Type: application/json'
+                    ]);
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, $search_data_json);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    
+                    $response = curl_exec($ch);
+    
+                    if (curl_errno($ch)) {
+                        throw new Exception("Erreur cURL : " . curl_error($ch));
+                    }
+    
+                    $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
+    
+                    if ($http_status != 200) {
+                        throw new Exception("Erreur API (HTTP $http_status) : $response");
+                    }
+    
+                    // Décodage de la réponse JSON
+                    $responseObj = json_decode($response, true);
+                    if (!isset($responseObj['value'][0]['hitsContainers'][0]['hits'])) {
+                        break;
+                    }
+    
+                    // Extraire les informations demandées
+                    foreach ($responseObj['value'][0]['hitsContainers'][0]['hits'] as $hit) {
+                        if (isset($hit['resource']['name'])) {
+                            $pdfFiles[] = [
+                                'name' => $hit['resource']['name'],
+                                'lastModifiedDateTime' => $hit['resource']['lastModifiedDateTime'] ?? 'Non disponible',
+                                'webUrl' => $hit['resource']['webUrl'] ?? 'Non disponible'
+                            ];
+                        }
+                    }
+    
+                    // Vérifier s'il y a une page suivante (pagination)
+                    $nextLink = $responseObj['@odata.nextLink'] ?? null;
+    
+                } while ($nextLink);
+            }
+        }
+    
+        return $pdfFiles;
+    }
+    
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+    
+
     /**
      * Fonction de test de connexion au SharePoint
      */
@@ -272,7 +510,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         }
     
         $responseObj = json_decode($response, true);
-        $accessToken = $responseObj['access_token'] ?? null;
+        $accessToken = $responseObj['accessToken'] ?? null;
     
         if (!$accessToken) {
             return [

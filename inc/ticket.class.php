@@ -311,7 +311,46 @@ class PluginGestionTicket extends CommonDBTM {
                   } else {
                       $disabled = true;
                   } 
-  
+
+
+                  //------------------------------------------------------------------------------------            
+                  $accessToken = $sharepoint->getAccessToken();
+                  echo 'Token Accès : '.$accessToken;
+
+                  echo '<br>';
+                  ECHO '<br>';
+
+                  $Hostname = $config->Hostname();
+                  $SitePath = $config->SitePath();
+                  $SiteUrl = "https://$Hostname"."$SitePath";
+                  echo 'SiteUrl : '.$SiteUrl;
+
+
+
+                  $folderPath = 'test';
+
+                  /*$contents = $sharepoint->listFolderContents($folderPath);
+                  echo '<pre>';       
+                     print_r($contents);
+                  echo '</pre>';*/
+
+                  $responseObj = $sharepoint->searchSharePoint();
+                  echo '<pre>';       
+                     print_r($responseObj);
+                  echo '</pre>';
+
+
+
+
+
+
+
+
+
+
+
+                  
+                  
                   // Modal HTML
                   echo <<<HTML
                   <div class="modal fade" id="AddGestionModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
