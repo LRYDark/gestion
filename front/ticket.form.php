@@ -21,10 +21,6 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     
     $selected_items = isset($_POST['groups_id']) ? $_POST['groups_id'] : [];
 
-    echo "<pre>";
-    print_r($selected_items);
-    echo "</pre>";
-
     // Récupérer les éléments déjà en base
     $current_items = [];
     $result = $DB->query("SELECT url_bl, bl FROM glpi_plugin_gestion_surveys WHERE tickets_id = $ticketId AND signed = 0");
@@ -92,6 +88,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                 $success = false;
             }
         }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
+            $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
             if ($sharepoint->checkFileExists($file_path)) {
                 // Expression régulière pour extraire les deux parties
                 $pattern = '#^(.*)/(.*)$#';
@@ -138,7 +135,6 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
 
             if ($success) {
                 if($config->ExtractYesNo() == 1 && $config->fields['ConfigModes'] == 1){
-                    $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
                     if (!empty($tracker)){
                         Session::addMessageAfterRedirect(__("$item - <strong>Tracker : $tracker</strong>", 'gestion'), false, INFO);
                     }else{
@@ -180,4 +176,4 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     }
 }
 
-//Html::back();
+Html::back();

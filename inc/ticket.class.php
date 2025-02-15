@@ -63,7 +63,7 @@ class PluginGestionTicket extends CommonDBTM {
       return $vouchers;
    }
 
-   static function getTableViews(){
+   /*static function getTableViews(){
       global $DB;
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint();
@@ -100,7 +100,7 @@ class PluginGestionTicket extends CommonDBTM {
       }
 
       return $contents;
-   }
+   }*/
 //*--------------------------------------------------------------------------------------------- 
 
    static function showForTicket(Ticket $ticket) { // formulaire sur le ticket
@@ -310,46 +310,7 @@ class PluginGestionTicket extends CommonDBTM {
                       $disabled = false;
                   } else {
                       $disabled = true;
-                  } 
-
-
-                  //------------------------------------------------------------------------------------            
-                  $accessToken = $sharepoint->getAccessToken();
-                  echo 'Token Accès : '.$accessToken;
-
-                  echo '<br>';
-                  ECHO '<br>';
-
-                  $Hostname = $config->Hostname();
-                  $SitePath = $config->SitePath();
-                  $SiteUrl = "https://$Hostname"."$SitePath";
-                  echo 'SiteUrl : '.$SiteUrl;
-
-
-
-                  $folderPath = 'test';
-
-                  /*$contents = $sharepoint->listFolderContents($folderPath);
-                  echo '<pre>';       
-                     print_r($contents);
-                  echo '</pre>';*/
-
-                  $responseObj = $sharepoint->searchSharePoint();
-                  echo '<pre>';       
-                     print_r($responseObj);
-                  echo '</pre>';
-
-
-
-
-
-
-
-
-
-
-
-                  
+                  }                 
                   
                   // Modal HTML
                   echo <<<HTML

@@ -300,10 +300,17 @@ if ($config->fields['ConfigModes'] == 0){
                 throw new Exception("Erreur lors de l'exécution de la requête SQL.");
             }
 
+            if ($DOC->entities_id == 0 || $DOC->entities_id == NULL){
+                $entityId = "AUTRES";
+            }else{
+                $entityResult = $DB->query("SELECT name FROM glpi_entities WHERE id = $DOC->entities_id")->fetch_object();
+                $EntitiesName = $entityResult->name;
+            }
+
             // Vérifier si une ligne correspondante existe
             $folderPath = ""; // Par défaut, $folderPath est vide
             if ($row = $DB->fetchAssoc($result)) {
-                $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
+                $folderPath = $row['folder_name']. '/' .$EntitiesName; // Récupérer le folder_name si params = 3
             }
 
             $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement
