@@ -182,11 +182,11 @@ class PluginGestionConfig extends CommonDBTM
 
          // Générer les options du menu déroulant
          $dropdownValues = [];
-         for ($i = 100; $i <= 20000; $i += 100) {
+         for ($i = 10; $i <= 500; $i += 10) {
             $dropdownValues[$i] = $i; // La clé et la valeur sont identiques dans ce cas
          }
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Nombre d'éléments maximum à afficher", "gestion") . "</td><td>";
+            echo "<td>" . __("Nombre d'éléments maximum à afficher par requête", "gestion") . "</td><td>";
                // Afficher le menu déroulant avec Dropdown::show()
                Dropdown::showFromArray(
                   'NumberViews',  // Nom de l'identifiant du champ
@@ -320,7 +320,7 @@ class PluginGestionConfig extends CommonDBTM
                echo "</td>";
             echo "</tr>";
 
-            if ($result['message'] == 'Connexion validée : Accès SharePoint réussi.'){
+            if ($result['status'] == true){
                echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
 
                echo "<tr class='tab_bg_1'>";
@@ -509,7 +509,7 @@ class PluginGestionConfig extends CommonDBTM
 
          if($config->EntitiesExtract() == 1){
             echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Séparateurs pour l'extraction de l'entité", "gestion") . "</td><td>";
+               echo "<td>" . __("Séparateurs pour l'extraction de l'entité depuis la Bibliothèques du site", "gestion") . "</td><td>";
                   echo '<div style="display: flex; align-items: center; gap: 5px;">';
                      echo '<label for="DateX">Après le chemin : </label>';
                         echo Html::input('EntitiesExtractValue', ['value' => $config->EntitiesExtractValue(), 'size' => 60]);// bouton configuration du bas de page line 1

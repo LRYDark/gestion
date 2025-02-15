@@ -702,6 +702,129 @@ class PluginGestionSharepoint extends CommonDBTM {
         return $recentFiles;
     }
 
+    /* ################################################################################################################################ */
+     // Fonction pour effectuer la requête de recherche
+     public function searchSharePointCron($startDate = null, $endDate = null) {
+        $accessToken = $this->getAccessToken();
+        $config = new PluginGestionConfig();
+        $NumberViews = $config->NumberViews();
+        $Hostname = $config->Hostname();
+        $SitePath = $config->SitePath();
+
+        $pdfFiles = [];
+        
+        // Récupérer les éléments à rechercher (params = 10)
+        $keywords = $this->getSearchKeywordsByParams10();
+        if (empty($keywords)) {
+            return $pdfFiles;
+        }
+    
+        $search_url = 'https://graph.microsoft.com/v1.0/search/microsoft.graph.query';
+        $SiteUrl = "https://$Hostname"."$SitePath";
+        
+        foreach ($keywords as $keyword) {
+            $queryString = "$keyword AND filetype:pdf path:\"$SiteUrl\"";
+
+            // Définition de la requête
+            $search_data = [
+                "requests" => [
+                    [
+                        "entityTypes" => ["driveItem"],
+                        "query" => [
+                            "queryString" => $queryString
+                        ],
+                        "size" => $NumberViews,
+                        "sortProperties" => [
+                            [
+                                "name" => "lastModifiedDateTime",
+                                "isDescending" => true
+                            ]
+                        ],
+                        "region" => "FRA"
+                    ]
+                ]
+            ];
+
+            $search_data_json = json_encode($search_data);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new Exception("Erreur d'encodage JSON : " . json_last_error_msg());
+            }
+
+            $nextLink = $search_url;
+
+            do {
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $nextLink);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Authorization: Bearer ' . $accessToken,
+                    'Content-Type: application/json'
+                ]);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $search_data_json);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+                $response = curl_exec($ch);
+
+                if (curl_errno($ch)) {
+                    throw new Exception("Erreur cURL : " . curl_error($ch));
+                }
+
+                $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($http_status != 200) {
+                    throw new Exception("Erreur API (HTTP $http_status) : $response");
+                }
+
+                // Décodage de la réponse JSON
+                $responseObj = json_decode($response, true);
+                if (!isset($responseObj['value'][0]['hitsContainers'][0]['hits'])) {
+                    break;
+                }
+
+                // Extraire les informations demandées
+                foreach ($responseObj['value'][0]['hitsContainers'][0]['hits'] as $hit) {
+                    if (isset($hit['resource']['name'])) {
+
+                        // Vérifier la date de modification
+                        $lastModified = new DateTime($hit['resource']['lastModifiedDateTime']);
+                        $includeFile = true;
+
+                        if ($startDate) {
+                            $start = new DateTime($startDate);
+                            if ($lastModified < $start) {
+                                $includeFile = false;
+                            }
+                        }
+
+                        if ($endDate) {
+                            $end = new DateTime($endDate);
+                            if ($lastModified > $end) {
+                                $includeFile = false;
+                            }
+                        }
+
+                        // Ajouter le fichier si les critères de date sont respectés
+                        if ($includeFile) {
+                            $pdfFiles[] = [
+                                'name' => $hit['resource']['name'],
+                                'lastModifiedDateTime' => $hit['resource']['lastModifiedDateTime'] ?? 'Non disponible',
+                                'webUrl' => $hit['resource']['webUrl'] ?? 'Non disponible'
+                            ];
+                        }
+                    }
+                }
+
+                // Vérifier s'il y a une page suivante (pagination)
+                $nextLink = $responseObj['@odata.nextLink'] ?? null;
+
+            } while ($nextLink);
+        }
+    
+        return $pdfFiles;
+    } 
+    /* ################################################################################################################################ */
+
     /**
      * Récupérer tous les folder_name depuis la base de données
      */
