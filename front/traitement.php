@@ -301,7 +301,7 @@ if ($config->fields['ConfigModes'] == 0){
             }
 
             if ($DOC->entities_id == 0 || $DOC->entities_id == NULL){
-                $entityId = "AUTRES";
+                $EntitiesName = "AUTRES";
             }else{
                 $entityResult = $DB->query("SELECT name FROM glpi_entities WHERE id = $DOC->entities_id")->fetch_object();
                 $EntitiesName = $entityResult->name;
