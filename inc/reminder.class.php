@@ -110,13 +110,10 @@ class PluginGestionReminder extends CommonDBTM {
             $endDate = (new DateTime())->format('Y-m-d\TH:i:s\Z');
 
             // Étape 2 : Récupérer les fichiers récents
-            $folderPath = '';
-            $recentFiles = $sharepoint->getRecentFilesRecursive($folderPath, $startDate, $endDate);
-
-            $addedFiles = [];
+            $recentFiles = $sharepoint->searchSharePointCron($startDate, $endDate);
 
             $requet2 = $DB->query("SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1")->fetch_object();
-            $fileDestination = $requet2->folder_name ?? null;
+            $fileDestination = $requet2->folder_name ?? NULL;
 
             foreach ($recentFiles as $file) {
                $lastModified = $sharepoint->convertFromISO8601($file['lastModifiedDateTime']);
@@ -132,13 +129,22 @@ class PluginGestionReminder extends CommonDBTM {
                   $isSigned = 0;
                   $entitiesid = 0;
                   if ($fileDestination) {
-                     $filePath = $file['parentReference']['path'] ?? '';
+                     $filePath = $file['webUrl'] ?? '';
                      
                      if($config->EntitiesExtract() == 1){
                         $pattern = $config->EntitiesExtractValue();
-                        if (preg_match("#/root:/$pattern([^/]+)#", $filePath, $matches)) {
+                        // Vérifier si "Clients" est présent
+                        if (strpos($filePath, $pattern) !== false && preg_match("~" . preg_quote($pattern, '~') . "/([^/]+)/~", $filePath, $matches)) {
                            $entities = $matches[1];
-                        } 
+                        }
+                        // Si "Clients" n'est pas présent mais "Bl_Signe" est là, récupérer après "Bl_Signe/"
+                        elseif (strpos($filePath, $fileDestination) !== false && preg_match("~" . preg_quote($fileDestination, '~') . "/([^/]+)/~", $filePath, $matches)) {
+                           $entities = $matches[1];
+                        }
+                        // Si ni "Clients" ni "Bl_Signe" ne sont trouvés, récupérer après "Documents partages/"
+                        elseif (preg_match("~Documents partages/([^/]+)/~", $filePath, $matches)) {
+                           $entities = $matches[1];
+                        }       
 
                         $entities = $DB->query("SELECT id FROM `glpi_entities` WHERE name = '$entities'")->fetch_object();
                         if (!empty($entities->id)) {
@@ -146,16 +152,17 @@ class PluginGestionReminder extends CommonDBTM {
                         }
                      }
 
-                     if (preg_match('/\/root:(.*)/', $filePath, $matches)) {
+                     if (preg_match('/Documents partages\/(.*)\/[^\/]+\.pdf/', $filePath, $matches)) {
                         $valueAfterRootNotEncode = $matches[1];
                         $valueAfterRoot = empty($valueAfterRootNotEncode) ? '' : implode('/', array_map('rawurlencode', explode('/', $valueAfterRootNotEncode)));
                      }else{
                         $valueAfterRoot = NULL;
                      }
-                     // Normaliser le chemin de destination et vérifier s'il est inclus dans le chemin parent
-                     $normalizedDestination = strtolower(trim($fileDestination, '/'));
-                     if (strpos(strtolower($filePath), "/root:/$normalizedDestination") !== false) {
-                        $isSigned = 1;
+
+                     if ($fileDestination !== NULL){
+                        if (strpos($valueAfterRoot, $fileDestination) !== false) {
+                           $isSigned = 1; // "Bl_Signe" est présent dans la chaîne
+                        }
                      }
                   }
                   
@@ -185,7 +192,6 @@ class PluginGestionReminder extends CommonDBTM {
                            $row = $result->fetch_assoc();
                            $id_survey = $row['id'];
                         } 
-                        $addedFiles[] = $fileName;
                      } else {
                         Session::addMessageAfterRedirect(__('Insertion failed for file: ' . $fileName . '. Error: ' . $DB->error(), 'gestion'), false, ERROR);
                      }

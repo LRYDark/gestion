@@ -36,7 +36,6 @@ if ($config->fields['ConfigModes'] == 0) {
 } elseif ($config->fields['ConfigModes'] == 1 && !empty($config->fields['Global'])) {
     try {
             $contents = $sharepoint->searchSharePoint();            
-            $pattern = '/Documents partages\/(.*)\/[^\/]+\.pdf/';
             // Filtrer et ajouter les fichiers PDF
             foreach ($contents as $item) {
                 if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
@@ -44,7 +43,7 @@ if ($config->fields['ConfigModes'] == 0) {
                     $url = $item['webUrl'] . '/';
 
                     // Utiliser une expression régulière pour capturer le chemin après 'root:/'
-                    if ( preg_match($pattern, $url, $matches)) {
+                    if ( preg_match('/Documents partages\/(.*)\/[^\/]+\.pdf/', $url, $matches)) {
                         $relativePath = $matches[1];
                         $relativePath = implode('/', array_map('rawurlencode', explode('/', $relativePath)));
                     }

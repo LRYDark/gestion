@@ -604,110 +604,11 @@ class PluginGestionSharepoint extends CommonDBTM {
     }
 
     /**
-     * Fonction récursive pour récupérer les fichiers récents dans un dossier SharePoint (incluant les sous-dossiers)
+     * Fonction pour effectuer la requête de recherche pour la tâche cron
      */
-    public function getRecentFilesRecursive($folderPath, $startDate = null, $endDate = null) {
-        $accessToken = $this->getAccessToken();
-        $driveId = $this->GetDriveId();
-
-        // Récupérer tous les folder_name depuis la base de données
-        $folderNames = $this->getFolderNamesFromDatabase(11);  // Méthode mise à jour pour récupérer tous les folder_names
-
-        // Éviter le double encodage : encoder uniquement les segments du chemin
-        $encodedFolderPath = empty($folderPath) ? '' : implode('/', array_map(function ($segment) {
-            return rawurlencode(rawurldecode($segment)); // Éviter l'encodage double
-        }, explode('/', $folderPath)));
-
-        // Construire l'URL en fonction de la valeur de $folderPath
-        if (empty($folderPath)) {
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children";
-        } else {
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$encodedFolderPath:/children";
-        }
-
-        $headers = [
-            "Authorization: Bearer $accessToken",
-            "Content-Type: application/json"
-        ];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode !== 200) {
-            return [];
-        }
-
-        $responseObj = json_decode($response, true);
-
-        // Vérification de la réponse API
-        if (!isset($responseObj['value']) || !is_array($responseObj['value'])) {
-            return [];
-        }
-
-        $files = $responseObj['value'];
-        $recentFiles = [];
-
-        foreach ($files as $file) {
-            if (isset($file['folder']) && $file['folder']['childCount'] > 0) {
-                // Vérifier si le chemin est déjà encodé pour éviter un encodage double
-                $subfolderName = $file['name'];
-
-                // Si folderNames est défini, ne pas scanner les sous-dossiers contenant l'un des folder_names dans leur nom
-                if ($folderNames && $this->containsAnyFolderName($subfolderName, $folderNames)) {
-                    continue;  // Exclure ce sous-dossier
-                }
-
-                $encodedSubfolderName = rawurlencode(rawurldecode($subfolderName)); // Éviter le double encodage
-
-                // Construire le chemin pour le sous-dossier sans réencoder
-                $subfolderPath = $folderPath ? ($folderPath . '/' . $encodedSubfolderName) : $encodedSubfolderName;
-
-                // Appeler la fonction récursive
-                $recentFiles = array_merge($recentFiles, $this->getRecentFilesRecursive($subfolderPath, $startDate, $endDate));
-            } elseif (isset($file['file']) && $file['file']['mimeType'] === 'application/pdf') {
-                // Vérifier la date de modification
-                $lastModified = new DateTime($file['lastModifiedDateTime']);
-                $includeFile = true;
-
-                if ($startDate) {
-                    $start = new DateTime($startDate);
-                    if ($lastModified < $start) {
-                        $includeFile = false;
-                    }
-                }
-
-                if ($endDate) {
-                    $end = new DateTime($endDate);
-                    if ($lastModified > $end) {
-                        $includeFile = false;
-                    }
-                }
-
-                // Ajouter le fichier si les critères de date sont respectés
-                if ($includeFile) {
-                    $recentFiles[] = $file;
-                }
-            } else {
-                // Log pour les éléments inattendus
-                //Session::addMessageAfterRedirect(__("Élément inattendu détecté : " . json_encode($file), 'gestion'), false, WARNING);
-            }
-        }
-
-        return $recentFiles;
-    }
-
-    /* ################################################################################################################################ */
-     // Fonction pour effectuer la requête de recherche
      public function searchSharePointCron($startDate = null, $endDate = null) {
         $accessToken = $this->getAccessToken();
         $config = new PluginGestionConfig();
-        $NumberViews = $config->NumberViews();
         $Hostname = $config->Hostname();
         $SitePath = $config->SitePath();
 
@@ -723,7 +624,12 @@ class PluginGestionSharepoint extends CommonDBTM {
         $SiteUrl = "https://$Hostname"."$SitePath";
         
         foreach ($keywords as $keyword) {
-            $queryString = "$keyword AND filetype:pdf path:\"$SiteUrl\"";
+            if ($startDate) {
+                $queryString = "$keyword AND filetype:pdf path:\"$SiteUrl/Documents partages\" AND created>=$startDate AND created<=$endDate";
+            } else {
+                // Si $startDate est NULL, on ne met que la condition sur endDate
+                $queryString = "$keyword AND filetype:pdf path:\"$SiteUrl/Documents partages\" AND created<=$endDate";
+            }
 
             // Définition de la requête
             $search_data = [
@@ -733,7 +639,7 @@ class PluginGestionSharepoint extends CommonDBTM {
                         "query" => [
                             "queryString" => $queryString
                         ],
-                        "size" => $NumberViews,
+                        "size" => 500,
                         "sortProperties" => [
                             [
                                 "name" => "lastModifiedDateTime",
@@ -785,33 +691,12 @@ class PluginGestionSharepoint extends CommonDBTM {
                 // Extraire les informations demandées
                 foreach ($responseObj['value'][0]['hitsContainers'][0]['hits'] as $hit) {
                     if (isset($hit['resource']['name'])) {
-
-                        // Vérifier la date de modification
-                        $lastModified = new DateTime($hit['resource']['lastModifiedDateTime']);
-                        $includeFile = true;
-
-                        if ($startDate) {
-                            $start = new DateTime($startDate);
-                            if ($lastModified < $start) {
-                                $includeFile = false;
-                            }
-                        }
-
-                        if ($endDate) {
-                            $end = new DateTime($endDate);
-                            if ($lastModified > $end) {
-                                $includeFile = false;
-                            }
-                        }
-
-                        // Ajouter le fichier si les critères de date sont respectés
-                        if ($includeFile) {
-                            $pdfFiles[] = [
-                                'name' => $hit['resource']['name'],
-                                'lastModifiedDateTime' => $hit['resource']['lastModifiedDateTime'] ?? 'Non disponible',
-                                'webUrl' => $hit['resource']['webUrl'] ?? 'Non disponible'
-                            ];
-                        }
+                        $pdfFiles[] = [
+                            'name' => $hit['resource']['name'],
+                            'lastModifiedDateTime' => $hit['resource']['lastModifiedDateTime'] ?? 'Non disponible',
+                            'createdDateTime' => $hit['resource']['createdDateTime'] ?? 'Non disponible',
+                            'webUrl' => $hit['resource']['webUrl'] ?? 'Non disponible'
+                        ];
                     }
                 }
 
@@ -823,7 +708,6 @@ class PluginGestionSharepoint extends CommonDBTM {
     
         return $pdfFiles;
     } 
-    /* ################################################################################################################################ */
 
     /**
      * Récupérer tous les folder_name depuis la base de données

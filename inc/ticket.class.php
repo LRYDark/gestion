@@ -310,7 +310,22 @@ class PluginGestionTicket extends CommonDBTM {
                       $disabled = false;
                   } else {
                       $disabled = true;
-                  }                 
+                  }     
+                  
+                  $contents  = $sharepoint->searchSharePoint();
+                  echo '<pre>';
+                  print_r($contents);
+                  echo '</pre>';
+
+
+
+
+
+
+
+
+
+
                   
                   // Modal HTML
                   echo <<<HTML
