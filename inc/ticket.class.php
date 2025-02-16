@@ -311,22 +311,7 @@ class PluginGestionTicket extends CommonDBTM {
                   } else {
                       $disabled = true;
                   }     
-                  
-                  $contents  = $sharepoint->searchSharePoint();
-                  echo '<pre>';
-                  print_r($contents);
-                  echo '</pre>';
-
-
-
-
-
-
-
-
-
-
-                  
+                                 
                   // Modal HTML
                   echo <<<HTML
                   <div class="modal fade" id="AddGestionModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">

@@ -324,17 +324,28 @@ class PluginGestionConfig extends CommonDBTM
                echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
 
                echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Global (ID de la Bibliothèques principlale du site)", "gestion") ;
+                  echo "<td>" . __("Bibliothèques de recherche :", "gestion") ;
                      //Récupérer les bibliothèques de documents du site
                      $drives = $sharepoint->getDrives($siteId);
-
+                     $values2 = [];
                      // Afficher toutes les bibliothèques disponibles
-                     echo "<br><br>Bibliothèques disponibles sur le site :<br>";
                      foreach ($drives as $drive) {
-                           echo "- Nom : " . $drive['name'] . "<br>";
+                        if ($drive['name'] == 'Documents') {
+                           $drive['name'] = 'Documents partages';
+                        }
+                           $values2[$drive['name']] = $drive['name'];
                      }
                   echo  "</td><td>";
-                     echo Html::input('Global', ['value' => $config->Global(), 'size' => 30]);// bouton configuration du bas de page line 1
+                     //echo Html::input('Global', ['value' => $config->Global(), 'size' => 30]);// bouton configuration du bas de page line 1
+                     Dropdown::showFromArray(
+                        'Global',
+                        $values2,
+                        [
+                           'value' => $config->Global(),
+                           'class' => 'folder-dropdown', // Ajouter une classe CSS
+                           'data-folder' => 'Global' // Ajouter un attribut unique pour JS
+                        ]
+                  );
                   echo "</td>";
                echo "</tr>";
 

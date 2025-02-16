@@ -144,18 +144,19 @@ class PluginGestionSharepoint extends CommonDBTM {
         $NumberViews = $config->NumberViews();
         $Hostname = $config->Hostname();
         $SitePath = $config->SitePath();
+        $bibliotheque = $config->Global();
 
         $pdfFiles = [];
     
         // Récupérer les dossiers concernés en base de données (params = 8)
         $folders = $this->getFoldersByParams8();
-        // Si aucun dossier n'est défini pour params = 8, on recherche dans "Documents partages"
+        // Si aucun dossier n'est défini pour params = 8, on recherche dans "la bibliotheque"
         if (empty($folders)) {
-            $folders = ["Documents partages"];
+            $folders = ["$bibliotheque"];
         } else {
-            // Ajouter le préfixe "Documents partages/" à chaque dossier récupéré
+            // Ajouter le préfixe "bibliotheque/" à chaque dossier récupéré
             foreach ($folders as &$folder) {
-                $folder = "Documents partages/$folder";
+                $folder = "$bibliotheque/$folder";
             }
         }
     
@@ -581,13 +582,19 @@ class PluginGestionSharepoint extends CommonDBTM {
      */
     public function GetDriveId() {
         $config = new PluginGestionConfig();
+        $bibliotheque = $config->Global();
+
+        if($bibliotheque == 'Documents partages'){
+            $globaldrive = strtolower(trim('Documents'));
+        }else{
+            $globaldrive = strtolower(trim($bibliotheque));
+        }
 
         $siteId = '';
         $siteId = $this->getSiteId($config->Hostname(), $config->SitePath());
         $drives = $this->getDrives($siteId);
 
         // Trouver la bibliothèque "Documents partagés"
-        $globaldrive = strtolower(trim($config->Global()));
         $driveId = null;
         foreach ($drives as $drive) {
             if (strtolower($drive['name']) === $globaldrive) {
@@ -611,6 +618,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         $config = new PluginGestionConfig();
         $Hostname = $config->Hostname();
         $SitePath = $config->SitePath();
+        $bibliotheque = $config->Global();
 
         $pdfFiles = [];
         
@@ -625,10 +633,10 @@ class PluginGestionSharepoint extends CommonDBTM {
         
         foreach ($keywords as $keyword) {
             if ($startDate) {
-                $queryString = "$keyword AND filetype:pdf path:\"$SiteUrl/Documents partages\" AND created>=$startDate AND created<=$endDate";
+                $queryString = "$keyword AND filetype:pdf path:\"$SiteUrl/$bibliotheque\" AND created>=$startDate AND created<=$endDate";
             } else {
                 // Si $startDate est NULL, on ne met que la condition sur endDate
-                $queryString = "$keyword AND filetype:pdf path:\"$SiteUrl/Documents partages\" AND created<=$endDate";
+                $queryString = "$keyword AND filetype:pdf path:\"$SiteUrl/$bibliotheque\" AND created<=$endDate";
             }
 
             // Définition de la requête

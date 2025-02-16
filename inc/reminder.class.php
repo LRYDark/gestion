@@ -91,6 +91,7 @@ class PluginGestionReminder extends CommonDBTM {
    static function cronGestionPdf($task = NULL) {
       global $DB, $CFG_GLPI;
       $config = new PluginGestionConfig();
+      $bibliotheque = $config->Global();
       $encodedFilePath = '';
   
       if($config->fields['ConfigModes'] == 1){
@@ -141,8 +142,8 @@ class PluginGestionReminder extends CommonDBTM {
                         elseif (strpos($filePath, $fileDestination) !== false && preg_match("~" . preg_quote($fileDestination, '~') . "/([^/]+)/~", $filePath, $matches)) {
                            $entities = $matches[1];
                         }
-                        // Si ni "Clients" ni "Bl_Signe" ne sont trouvés, récupérer après "Documents partages/"
-                        elseif (preg_match("~Documents partages/([^/]+)/~", $filePath, $matches)) {
+                        // Si ni "Clients" ni "Bl_Signe" ne sont trouvés, récupérer après "la bibliotheque/"
+                        elseif (preg_match("~" . preg_quote($bibliotheque, "~") . "/([^/]+)/~", $filePath, $matches)) {
                            $entities = $matches[1];
                         }       
 
@@ -152,7 +153,7 @@ class PluginGestionReminder extends CommonDBTM {
                         }
                      }
 
-                     if (preg_match('/Documents partages\/(.*)\/[^\/]+\.pdf/', $filePath, $matches)) {
+                     if (preg_match("/" . preg_quote($bibliotheque, "/") . "\/(.*)\/[^\/]+\.pdf/", $filePath, $matches)) {
                         $valueAfterRootNotEncode = $matches[1];
                         $valueAfterRoot = empty($valueAfterRootNotEncode) ? '' : implode('/', array_map('rawurlencode', explode('/', $valueAfterRootNotEncode)));
                      }else{

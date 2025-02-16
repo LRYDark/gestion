@@ -9,6 +9,7 @@ global $DB, $CFG_GLPI;
 
 $sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
+$bibliotheque = $config->Global();
 
 // Vérifier si le paramètre 'id' est défini dans la requête GET
 if (!isset($_GET['ticketId']) || empty($_GET['ticketId'])) {
@@ -43,7 +44,7 @@ if ($config->fields['ConfigModes'] == 0) {
                     $url = $item['webUrl'] . '/';
 
                     // Utiliser une expression régulière pour capturer le chemin après 'root:/'
-                    if ( preg_match('/Documents partages\/(.*)\/[^\/]+\.pdf/', $url, $matches)) {
+                    if (preg_match("/" . preg_quote($bibliotheque, "/") . "\/(.*)\/[^\/]+\.pdf/", $url, $matches)) {
                         $relativePath = $matches[1];
                         $relativePath = implode('/', array_map('rawurlencode', explode('/', $relativePath)));
                     }
