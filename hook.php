@@ -38,8 +38,8 @@ function plugin_gestion_install() { // fonction installation du plugin
    PluginGestionProfile::initProfile();
    PluginGestionProfile::createFirstAccess($_SESSION['glpiactiveprofile']['id']);
 
-   CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
-   return true;
+   /*CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
+   return true;*/
 }
 
 function plugin_gestion_uninstall() { // fonction desintallation du plugin

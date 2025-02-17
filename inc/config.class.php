@@ -288,23 +288,20 @@ class PluginGestionConfig extends CommonDBTM
                   echo "<td>" . __("Bibliothèques de recherche :", "gestion") ;
                      //Récupérer les bibliothèques de documents du site
                      $drives = $sharepoint->getDrives($siteId);
-                     $values2 = [];
+                     $values3 = [];
                      // Afficher toutes les bibliothèques disponibles
                      foreach ($drives as $drive) {
                         if ($drive['name'] == 'Documents') {
                            $drive['name'] = 'Documents partages';
                         }
-                           $values2[$drive['name']] = $drive['name'];
+                           $values3[$drive['name']] = $drive['name'];
                      }
                   echo  "</td><td>";
-                     //echo Html::input('Global', ['value' => $config->Global(), 'size' => 30]);// bouton configuration du bas de page line 1
                      Dropdown::showFromArray(
                         'Global',
-                        $values2,
+                        $values3,
                         [
                            'value' => $config->Global(),
-                           'class' => 'folder-dropdown', // Ajouter une classe CSS
-                           'data-folder' => 'Global' // Ajouter un attribut unique pour JS
                         ]
                   );
                   echo "</td>";
@@ -827,6 +824,11 @@ class PluginGestionConfig extends CommonDBTM
          if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.3.1'){
             include(PLUGIN_GESTION_DIR . "/install/update_132_next.php");
             update(); 
+         }
+
+         $CronTaskCheck = $DB->query("SELECT itemtype FROM glpi_crontasks WHERE NAME = 'GestionPdf'")->fetch_object();
+         if(!isset($CronTaskCheck->itemtype)){
+            CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
          }
       }
    }
