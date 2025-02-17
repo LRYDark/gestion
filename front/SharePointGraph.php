@@ -110,9 +110,9 @@ class PluginGestionSharepoint extends CommonDBTM {
     }
 
     // Récupérer les dossiers pour params = 8 (dossiers de recherche)
-    public function getFoldersByParams8() {
+    public function getFoldersByParams1() {
         global $DB;
-        $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 8";
+        $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 1";
         $result = $DB->query($query);
 
         $folders = [];
@@ -148,9 +148,9 @@ class PluginGestionSharepoint extends CommonDBTM {
 
         $pdfFiles = [];
     
-        // Récupérer les dossiers concernés en base de données (params = 8)
-        $folders = $this->getFoldersByParams8();
-        // Si aucun dossier n'est défini pour params = 8, on recherche dans "la bibliotheque"
+        // Récupérer les dossiers concernés en base de données (params = 1)
+        $folders = $this->getFoldersByParams1();
+        // Si aucun dossier n'est défini pour params = 1, on recherche dans "la bibliotheque"
         if (empty($folders)) {
             $folders = ["$bibliotheque"];
         } else {
@@ -288,7 +288,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         if ($httpStatusSite === 200) {
             return [
                 'status' => true,
-                'message' => "Connexion validée : Accès SharePoint réussi."
+                'message' => "Connexion validée : Accès API SharePoint réussi."
             ];
         } elseif ($httpStatusSite === 403) {
             return [
@@ -916,5 +916,176 @@ class PluginGestionSharepoint extends CommonDBTM {
             
         $mmail->ClearAddresses();
     }
-}
 
+    /* ##########################################################################  CHECK */
+    /**
+     * Fonction globale pour tester l'accès à l'API Microsoft Graph et SharePoint
+     */
+    public function checkSharePointAccess() {
+        $config = new PluginGestionConfig();
+        $tenantId = $config->TenantID();
+        $clientId = $config->ClientID();
+        $clientSecret = $config->ClientSecret();
+        $hostname = $config->Hostname();
+        $sitePath = $config->SitePath();
+
+        $results = [
+            'accessToken' => ['status' => false, 'message' => ''],
+            'sharePointAccess' => ['status' => false, 'message' => ''],
+            'siteID' => ['status' => false, 'message' => ''],
+            'graphQuery' => ['status' => false, 'message' => '']
+        ];
+
+        // 1. Obtenir le token d'accès en utilisant `getAccessToken()`
+        try {
+            $accessToken = $this->getAccessToken(); 
+
+            if ($accessToken) {
+                $results['accessToken']['status'] = true;
+                $results['accessToken']['message'] = "Token obtenu avec succès";
+            } else {
+                throw new Exception("Impossible d'obtenir un token d'accès");
+            }
+        } catch (Exception $e) {
+            $results['accessToken']['message'] = $e->getMessage();
+            return $results;
+        }
+
+        // Définition des headers pour les requêtes suivantes
+        $headers = [
+            "Authorization: Bearer $accessToken",
+            "Content-Type: application/json"
+        ];
+
+        // 2. Vérifier l'accès à SharePoint
+        try {
+            $checkSharePointUrl = "https://graph.microsoft.com/v1.0/sites/root";
+            $response = $this->apiRequest($checkSharePointUrl, $headers);
+
+            if (isset($response['id'])) {
+                $results['sharePointAccess']['status'] = true;
+                $results['sharePointAccess']['message'] = "Accès à SharePoint autorisé";
+            } else {
+                throw new Exception("Accès refusé à SharePoint");
+            }
+        } catch (Exception $e) {
+            $results['sharePointAccess']['message'] = $e->getMessage();
+            return $results;
+        }
+
+        // 3. Obtenir le Site ID en utilisant `getSiteId()`
+        try {
+            $siteId = $this->getSiteId($hostname, $sitePath);
+
+            if ($siteId) {
+                $results['siteID']['status'] = true;
+                $results['siteID']['message'] = $siteId;
+            } else {
+                throw new Exception("Impossible de récupérer l'ID du site");
+            }
+        } catch (Exception $e) {
+            $results['siteID']['message'] = $e->getMessage();
+            return $results;
+        }
+
+        // 4. Tester si Microsoft Graph Query est accessible
+        try {
+            $graphQueryResult = $this->testGraphQueryAccess();
+
+            if ($graphQueryResult['status']) {
+                $results['graphQuery']['status'] = true;
+                $results['graphQuery']['message'] = $graphQueryResult['message']; // Message par défaut
+            } else {
+                throw new Exception($graphQueryResult['message']);
+            }
+        } catch (Exception $e) {
+            $results['graphQuery']['message'] = $e->getMessage();
+            if (isset($graphQueryResult['response']['error']['message'])) {
+                $results['graphQuery']['message'] .= ' -> ' . $graphQueryResult['response']['error']['message'];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Fonction pour tester si Microsoft Graph Query est accessible (sans récupérer les fichiers)
+     */
+    public function testGraphQueryAccess() {
+        $accessToken = $this->getAccessToken();
+        
+        if (!$accessToken) {
+            return ['status' => false, 'message' => 'Échec de récupération du token d’accès'];
+        }
+
+        $search_url = 'https://graph.microsoft.com/v1.0/search/query';
+
+        // Définition d'une requête minimale pour tester l'accès
+        $search_data = [
+            "requests" => [
+                [
+                    "entityTypes" => ["driveItem"], // Vérifie l'accès aux fichiers SharePoint
+                    "query" => [
+                        "queryString" => "filetype:pdf" // Requête de base sans condition complexe
+                    ],
+                    "region" => "FRA"
+                ]
+            ]
+        ];
+
+        $search_data_json = json_encode($search_data);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return ['status' => false, 'message' => 'Erreur lors de l’encodage JSON : ' . json_last_error_msg()];
+        }
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $search_url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $accessToken,
+            'Content-Type: application/json'
+        ]);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $search_data_json);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+        $response = curl_exec($ch);
+        if (curl_errno($ch)) {
+            curl_close($ch);
+            return ['status' => false, 'message' => 'Erreur cURL : ' . curl_error($ch)];
+        }
+
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($http_status == 200) {
+            return ['status' => true, 'message' => 'Accès à Microsoft Graph Query validé'];
+        } else {
+            return ['status' => false, 'message' => "Erreur de requête Graph API. Code HTTP : $http_status", 'response' => json_decode($response, true)];
+        }
+    }
+
+    /**
+     * Fonction générique pour envoyer une requête API avec cURL
+     */
+    public function apiRequest($url, $headers, $postData = null, $method = "GET") {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        
+        if ($method === "POST") {
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+        }
+
+        $response = curl_exec($ch);
+        $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpStatus >= 400) {
+            throw new Exception("Erreur HTTP $httpStatus lors de la requête à $url");
+        }
+
+        return json_decode($response, true);
+    }
+}

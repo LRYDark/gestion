@@ -310,8 +310,8 @@ class PluginGestionTicket extends CommonDBTM {
                       $disabled = false;
                   } else {
                       $disabled = true;
-                  }     
-                                 
+                  }    
+     
                   // Modal HTML
                   echo <<<HTML
                   <div class="modal fade" id="AddGestionModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">

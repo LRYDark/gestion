@@ -225,7 +225,30 @@ class PluginGestionConfig extends CommonDBTM
          }
          
          //--------------------------------------------
-         echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph)', 'rp') . "</th></tr>";
+         if(!empty($config->TenantID())){
+            // Utilisation
+            $errorcon = "";
+            try {
+               $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
+               if ($result['status']) {
+                  $checkcon = 'Connexion API : <i class="fa fa-check-circle fa-xl text-success"></i></i>' . "\n";
+                  try {              
+                     // Étape 2 : Récupérer l'ID du site
+                     $siteId = '';
+                     $siteId = $sharepoint->getSiteId($config->Hostname(), $config->SitePath());
+                  } catch (Exception $e) {
+                     $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Erreur : '.$e->getMessage().'"></i>';
+                  }
+               } else {
+                  $checkcon = 'Connexion API : <i class="fa fa-times-circle fa-xl text-danger"></i>' . "\n";
+                  $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="'.$result['message'].'"></i>';
+               }
+            } catch (Exception $e) {
+               $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Erreur inattendue : '.$e->getMessage().'"></i>';
+            }      
+         }
+
+         echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph) | '.$checkcon . $errorcon, 'rp') . "</th></tr>";
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
@@ -258,68 +281,6 @@ class PluginGestionConfig extends CommonDBTM
          echo "</tr>";
 
          if(!empty($config->TenantID())){
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Test de connexion", "gestion") . "</td><td>";
-   
-                  ?><button id="openModalButton" type="button" class="btn btn-primary">Test de connexion</button>
-
-                  <script type="text/javascript">
-                     $(document).ready(function() {
-                        $('#openModalButton').on('click', function() {
-                              $('#customModal').modal('show');
-                        });
-                     });
-                  </script><?php
-
-                  // Modal HTML
-                  echo <<<HTML
-                  <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-                        <div class="modal-dialog">
-                           <div class="modal-content">
-                              <div class="modal-header">
-                                    <h5 class="modal-title" id="AddGestionModalLabel">Test de connexion</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div class="modal-body">
-                  HTML;
-                     // Utilisation
-                     try {
-                        $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-                        if ($result['status']) {
-                           echo $result['message'] . "\n";
-                        } else {
-                           echo $result['message'] . "\n";
-                        }
-                     } catch (Exception $e) {
-                        echo "Erreur inattendue : " . $e->getMessage() . "\n";
-                     }
-
-                     echo '<br><br><br>';
-                     // Utilisation
-                     try {              
-                        // Étape 2 : Récupérer l'ID du site
-                        $siteId = '';
-                        $siteId = $sharepoint->getSiteId($config->Hostname(), $config->SitePath());
-                        echo "Site ID : $siteId\n";
-               
-                        // Vous pouvez maintenant utiliser $siteId pour d'autres appels API
-                     } catch (Exception $e) {
-                           echo "Erreur : " . $e->getMessage();
-                     }
-               
-                  echo <<<HTML
-                                       <div class="modal-footer">
-                                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                                       </div>
-                                    </form>
-                              </div>
-                           </div>
-                        </div>
-                  </div>
-                  HTML;
-               echo "</td>";
-            echo "</tr>";
-
             if ($result['status'] == true){
                echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
 
@@ -441,95 +402,173 @@ class PluginGestionConfig extends CommonDBTM
                }
             }
          }
+    
+         echo "<tr><th colspan='2'>" . __("Entités et Tracker", 'rp') . "</th></tr>";
+            //--------------------------------------------
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Extraction d'un tracker dans le PDF", "gestion") . "</td><td>";
+                  Dropdown::showYesNo('ExtractYesNo', $config->ExtractYesNo(), -1);
+               echo "</td>";
+            echo "</tr>";
+
+            if($config->ExtractYesNo() == 1){
+               echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
+                     echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
+                  echo "</td>";
+               echo "</tr>";
+
+               //--------------------------------------------
+               echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __("Envoyé un mail si le contenu d'un tracker est détécté (Tâche Cron)", "gestion") . "</td><td>";
+                     Dropdown::showYesNo('MailTrackerYesNo', $config->MailTrackerYesNo(), -1);
+                  echo "</td>";
+               echo "</tr>";
+               
+               if($config->MailTrackerYesNo() == 1){
+                  echo "<tr class='tab_bg_1'>";
+                     echo "<td>" . __("Mail", "gestion") . "</td><td>";
+                        echo Html::input('MailTracker', ['value' => $config->MailTracker(), 'size' => 60]);// bouton configuration du bas de page line 1
+                     echo "</td>";
+                  echo "</tr>";
+
+                  echo "<tr class='tab_bg_1'>";
+                     echo "<td> Gabarit : Modèle de notifications pour la Tâche Cron (Tracker) </td>";
+                     echo "<td>";
+
+                     //notificationtemplates_id
+                     Dropdown::show('NotificationTemplate', [
+                        'name' => 'gabarit_tracker',
+                        'value' => $config->gabarit_tracker(),
+                        'display_emptychoice' => 1,
+                        'specific_tags' => [],
+                        'itemtype' => 'NotificationTemplate',
+                        'displaywith' => [],
+                        'emptylabel' => "-----",
+                        'used' => [],
+                        'toadd' => [],
+                        'entity_restrict' => 0,
+                     ]); 
+                  echo "</td></tr>";
+               }
+            }else{
+               if($config->MailTrackerYesNo() == 1){
+                  // Préparer la requête SQL
+                  $sql = "UPDATE glpi_plugin_gestion_configs 
+                        SET MailTrackerYesNo = ?
+                        WHERE id = 1";
+
+                  // Exécution de la requête préparée
+                  $stmt = $DB->prepare($sql);
+                  $stmt->execute([0]);
+               }
+            }
+
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
+            echo "</tr>";
+
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Extraire l'entité du dossier parent du PDF", "gestion") . "</td><td>";
+                  Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
+               echo "</td>";
+            echo "</tr>";
+
+            if($config->EntitiesExtract() == 1){
+               echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __("Séparateurs pour l'extraction de l'entité depuis la Bibliothèques du site", "gestion") . "</td><td>";
+                     echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                        echo '<label for="DateX">Après le chemin : </label>';
+                           echo Html::input('EntitiesExtractValue', ['value' => $config->EntitiesExtractValue(), 'size' => 60]);// bouton configuration du bas de page line 1
+                     echo '</div>';
+                  echo "</td>";
+               echo "</tr>";
+            }
+
+         echo "<tr><th colspan='2'>" . __("Dérnière synchronisation Cron : ".$config->LastCronTask(), 'rp') . "</th></tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Statut de connexion", "gestion") . "</td><td>";
+
+               ?><button id="openModalButton" type="button" class="btn btn-primary">Statut de connexion</button>
+
+               <script type="text/javascript">
+                  $(document).ready(function() {
+                     $('#openModalButton').on('click', function() {
+                           $('#customModal').modal('show');
+                     });
+                  });
+               </script><?php
+
+               // Modal HTML
+               echo <<<HTML
+               <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
+                  <div class="modal-dialog modal-lg">
+                     <div class="modal-content">
+                        <div class="modal-header">
+                              <h5 class="modal-title" id="AddGestionModalLabel">Statut de connexion</h5>
+                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                           <ul class="list-group">
+                              <li class="list-group-item d-flex fw-bold">
+                                 <div class="col-4">Champ</div>
+                                 <div class="col-6">Statut</div>
+                                 <div class="col-2 text-center">Validation</div>
+                              </li>
+               HTML;
+               
+               try {
+                  $result = $sharepoint->checkSharePointAccess(); 
+               
+                  $statusIcons = [
+                     1 => '<i class="fa fa-check-circle text-success"></i>', // ✅ Succès
+                     0 => '<i class="fa fa-times-circle text-danger"></i>'   // ❌ Échec
+                  ];
+               
+                  $fields = [
+                     'accessToken'      => 'Token d\'accès',
+                     'sharePointAccess' => 'Accès SharePoint',
+                     'siteID'           => 'Site ID',
+                     'graphQuery'       => 'Microsoft Graph Query'
+                  ];
+               
+                  foreach ($fields as $key => $label) {
+                     if (isset($result[$key])) {
+                           $status = $result[$key]['status'] ?? 0;
+                           $message = htmlspecialchars($result[$key]['message'], ENT_QUOTES, 'UTF-8');
+                           $icon = $statusIcons[$status] ?? $statusIcons[0];
+                           $displayMessage = $message;
+                     
+                           echo "<li class='list-group-item d-flex'>";
+                           echo "<div class='col-4'><strong>$label</strong></div>";
+                           echo "<div class='col-6'>$displayMessage</div>";
+                           echo "<div class='col-2 text-center'>$icon</div>";
+                           echo "</li>";
+                     }
+                  }
+               
+               } catch (Exception $e) {
+                  echo "<li class='list-group-item text-danger'><i class='fa fa-exclamation-circle'></i> Erreur : " . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . "</li>";
+               }
+               
+               echo <<<HTML
+                           </ul>
+                        </div>
+                        <div class="modal-footer">
+                           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+               HTML; 
+            echo "</td>";
+         echo "</tr>";
       }else{
          echo "<tr><th colspan='2'>" . __("Dossier de récupération et de déstination des PDFs en Local", 'rp') . "</th></tr>";
          echo "<tr class='tab_bg_1'><td>" . __("Dossier de récupération des PDFs : ".GLPI_PLUGIN_DOC_DIR."/gestion/unsigned/", "gestion") . "</td></tr>";
          echo "<tr class='tab_bg_1'><td>" . __("Dossier de déstination des PDFs : ".GLPI_PLUGIN_DOC_DIR."/gestion/signed/", "gestion") . "</td></tr>";
       }
-
-      echo "<tr><th colspan='2'>" . __("Entités et Tracker", 'rp') . "</th></tr>";
-         //--------------------------------------------
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Extraction d'un tracker dans le PDF", "gestion") . "</td><td>";
-               Dropdown::showYesNo('ExtractYesNo', $config->ExtractYesNo(), -1);
-            echo "</td>";
-         echo "</tr>";
-
-         if($config->ExtractYesNo() == 1){
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
-                  echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
-
-            //--------------------------------------------
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Envoyé un mail si le contenu d'un tracker est détécté (Tâche Cron)", "gestion") . "</td><td>";
-                  Dropdown::showYesNo('MailTrackerYesNo', $config->MailTrackerYesNo(), -1);
-               echo "</td>";
-            echo "</tr>";
-            
-            if($config->MailTrackerYesNo() == 1){
-               echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Mail", "gestion") . "</td><td>";
-                     echo Html::input('MailTracker', ['value' => $config->MailTracker(), 'size' => 60]);// bouton configuration du bas de page line 1
-                  echo "</td>";
-               echo "</tr>";
-
-               echo "<tr class='tab_bg_1'>";
-                  echo "<td> Gabarit : Modèle de notifications pour la Tâche Cron (Tracker) </td>";
-                  echo "<td>";
-
-                  //notificationtemplates_id
-                  Dropdown::show('NotificationTemplate', [
-                     'name' => 'gabarit_tracker',
-                     'value' => $config->gabarit_tracker(),
-                     'display_emptychoice' => 1,
-                     'specific_tags' => [],
-                     'itemtype' => 'NotificationTemplate',
-                     'displaywith' => [],
-                     'emptylabel' => "-----",
-                     'used' => [],
-                     'toadd' => [],
-                     'entity_restrict' => 0,
-                  ]); 
-               echo "</td></tr>";
-            }
-         }else{
-            if($config->MailTrackerYesNo() == 1){
-               // Préparer la requête SQL
-               $sql = "UPDATE glpi_plugin_gestion_configs 
-                       SET MailTrackerYesNo = ?
-                       WHERE id = 1";
-
-               // Exécution de la requête préparée
-               $stmt = $DB->prepare($sql);
-               $stmt->execute([0]);
-            }
-         }
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
-         echo "</tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Extraire l'entité du dossier parent du PDF", "gestion") . "</td><td>";
-               Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
-            echo "</td>";
-         echo "</tr>";
-
-         if($config->EntitiesExtract() == 1){
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Séparateurs pour l'extraction de l'entité depuis la Bibliothèques du site", "gestion") . "</td><td>";
-                  echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                     echo '<label for="DateX">Après le chemin : </label>';
-                        echo Html::input('EntitiesExtractValue', ['value' => $config->EntitiesExtractValue(), 'size' => 60]);// bouton configuration du bas de page line 1
-                  echo '</div>';
-               echo "</td>";
-            echo "</tr>";
-         }
-
-      echo "<tr><th colspan='2'>" . __("Dérnière synchronisation Cron : ".$config->LastCronTask(), 'rp') . "</th></tr>";
 
       $config->showFormButtons(['candel' => false]);
       return false;
