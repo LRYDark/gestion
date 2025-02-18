@@ -186,13 +186,6 @@ class PluginGestionSurvey extends CommonDBTM {
       $this->initForm($ID, $options);
       $this->showFormHeader($options);
 
-      if($config->fields['ConfigModes'] == 0){
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __('Non du document : ') . "</td>";
-            echo "<td>";
-            echo $this->fields['bl'].'.pdf';
-         echo "</td></tr>";
-      }elseif($config->fields['ConfigModes'] == 1){// CONFIG SHAREPOINT 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __('Non du document : ') . "</td>";
             echo "<td>";
@@ -201,69 +194,84 @@ class PluginGestionSurvey extends CommonDBTM {
             echo "<td>";
             echo '<a href="' . $this->fields['doc_url'] . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
          echo "</td></tr>";
-      }
 
       //----------------------------------------------------------------------------------------------------------------
       if (Plugin::isPluginActive('formcreator')) {
          if(empty($this->fields["tickets_id"]) && $config->fields['formulaire'] != 0){
             $formId = $config->fields['formulaire']; // Exemple d'ID dynamique
 
-            echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Création d'un formulaire")."</td>";
-            echo "<td>";
+            $chemin1 = __DIR__ . "/../../formcreator/front/formdisplay.php";
+            $chemin2 = __DIR__ . "/../../../marketplace/formcreator/front/formdisplay.php";
 
-               ?>
-               <!-- Bouton pour ouvrir le modal -->
-               <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#myModal">
-                  <?php echo __('Générer un formulaire'); ?>
-               </button>
+            if (file_exists($chemin1) && is_file($chemin1)) {
+               $form  = "../../formcreator/front/formdisplay.php?id=$formId";
+               $title = "(Plugin) ";
+            } elseif (file_exists($chemin2) && is_file($chemin2)) {
+               $title = "(Marketplace) ";
+               $form  = "../../../marketplace/formcreator/front/formdisplay.php?id=$formId";
+            } else {
+               $title = null;
+               $form  = null;
+            }
 
-               <!-- Modal Bootstrap -->
-               <div class="modal fade" id="myModal" tabindex="-1" aria-labelledby="myModalLabel" aria-hidden="true">
-                  <div class="modal-dialog modal-xl" style="max-width: 50%;">
-                     <div class="modal-content" style="height: 90vh;">
-                           <div class="modal-header">
-                              <h5 class="modal-title" id="myModalLabel"><?php echo __('Formulaire'); ?></h5>
-                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                           </div>
-                           <div class="modal-body p-0" style="height: calc(100% - 56px); overflow: auto;">
-                              <!-- Iframe -->
-                              <iframe id="iframe-content" 
-                                       src="../../formcreator/front/formdisplay.php?id=<?php echo $formId; ?>" 
-                                       style="width: 100%; height: 99%; border: none;"></iframe>
-                           </div>
+            if($form != null){
+               echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Création d'un formulaire")."</td>";
+               echo "<td>";
+
+                  ?>
+                  <!-- Bouton pour ouvrir le modal -->
+                  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#myModal">
+                     <?php echo __('Générer un formulaire'); ?>
+                  </button>
+
+                  <!-- Modal Bootstrap -->
+                  <div class="modal fade" id="myModal" tabindex="-1" aria-labelledby="myModalLabel" aria-hidden="true">
+                     <div class="modal-dialog modal-xl" style="max-width: 50%;">
+                        <div class="modal-content" style="height: 90vh;">
+                              <div class="modal-header">
+                                 <h5 class="modal-title" id="myModalLabel"><?php echo $title.__('Formulaire'); ?></h5>
+                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                              </div>
+                              <div class="modal-body p-0" style="height: calc(100% - 56px); overflow: auto;">
+                                 <!-- Iframe -->
+                                 <iframe id="iframe-content" 
+                                          src=<?php echo $form; ?> 
+                                          style="width: 100%; height: 99%; border: none;"></iframe>
+                              </div>
+                        </div>
                      </div>
                   </div>
-               </div>
 
-               <script>
-                  function removeNavbarFromIframe(iframeId) {
-                     const iframe = document.getElementById(iframeId);
-                     if (iframe) {
-                        iframe.onload = function () {
-                           const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                           if (iframeDoc) {
-                              // Supprimer la barre de navigation (aside)
-                              const navbar = iframeDoc.querySelector('aside.navbar.navbar-vertical.navbar-expand-lg.sticky-lg-top.sidebar');
-                              if (navbar) {
-                                 navbar.remove();
-                              } else {
-                              }
+                  <script>
+                     function removeNavbarFromIframe(iframeId) {
+                        const iframe = document.getElementById(iframeId);
+                        if (iframe) {
+                           iframe.onload = function () {
+                              const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                              if (iframeDoc) {
+                                 // Supprimer la barre de navigation (aside)
+                                 const navbar = iframeDoc.querySelector('aside.navbar.navbar-vertical.navbar-expand-lg.sticky-lg-top.sidebar');
+                                 if (navbar) {
+                                    navbar.remove();
+                                 } else {
+                                 }
 
-                              // Supprimer l'en-tête (header)
-                              const header = iframeDoc.querySelector('header.navbar.d-print-none.sticky-lg-top.shadow-sm.navbar-light.navbar-expand-md');
-                              if (header) {
-                                 header.remove();
-                              } else {
+                                 // Supprimer l'en-tête (header)
+                                 const header = iframeDoc.querySelector('header.navbar.d-print-none.sticky-lg-top.shadow-sm.navbar-light.navbar-expand-md');
+                                 if (header) {
+                                    header.remove();
+                                 } else {
+                                 }
                               }
-                           }
-                        };
+                           };
+                        }
                      }
-                  }
-                  // Appel de la fonction
-                  removeNavbarFromIframe('iframe-content');
-               </script><?php
-            echo "</td></tr>";
+                     // Appel de la fonction
+                     removeNavbarFromIframe('iframe-content');
+                  </script><?php
+               echo "</td></tr>";
+            }
          }
       }
       //----------------------------------------------------------------------------------------------------------------

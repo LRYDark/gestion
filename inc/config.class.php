@@ -94,25 +94,7 @@ class PluginGestionConfig extends CommonDBTM
             echo Html::input('ZenDocMail', ['value' => $config->ZenDocMail(), 'size' => 40]);// bouton configuration du bas de page line 1
          echo "</td>";
       echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      
-      // Mode de configuration de récupération
-         $values = [
-            0 => __('Dossier Local','gestion'),
-            1 => __('SharePoint (Graph)','gestion'),
-         ];
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Mode de configuration des Sauvegardes/Récupérations des PDF", "gestion") . "</td><td>";
-               Dropdown::showFromArray(
-                  'ConfigModes',
-                  $values,
-                  [
-                     'value' => $config->fields['ConfigModes']
-                  ]
-               );
-            echo "</td>";
-         echo "</tr>";
+    
       // -----------------------------------------------------------------------
 
       echo "<tr><th colspan='2'>" . __("Positionnement des éléments (0 pour masqué)", 'rp') . "</th></tr>";
@@ -172,400 +154,388 @@ class PluginGestionConfig extends CommonDBTM
             echo "</td>";
          echo "</tr>";
 
-      if($config->fields['ConfigModes'] == 1){
-         echo "<tr><th colspan='2'>" . __("Configuration de l'affichage et Tâche cron", 'rp') . "</th></tr>";
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Prévisualisation du PDF avant signature (cela peut provoquer des ralentissements). Vérifiez également la configuration de SharePoint pour le partage par lien.", "gestion") . "</td><td>";
-               Dropdown::showYesNo('SharePointLinkDisplay', $config->SharePointLinkDisplay(), -1);
-            echo "</td>";
-         echo "</tr>";
+      echo "<tr><th colspan='2'>" . __("Configuration de l'affichage et Tâche cron", 'rp') . "</th></tr>";
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Prévisualisation du PDF avant signature <i class='fa-solid fa-circle-info text-secondary' data-bs-toggle='tooltip' data-bs-placement='top' title=\"(cela peut provoquer des ralentissements). Vérifiez également la configuration de SharePoint pour l'autorisation de partage par lien.\"></i>", "gestion") . "</td><td>";
+            Dropdown::showYesNo('SharePointLinkDisplay', $config->SharePointLinkDisplay(), -1);
+         echo "</td>";
+      echo "</tr>";
 
-         // Générer les options du menu déroulant
-         $dropdownValues = [];
-         for ($i = 10; $i <= 500; $i += 10) {
-            $dropdownValues[$i] = $i; // La clé et la valeur sont identiques dans ce cas
-         }
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Nombre d'éléments maximum à afficher par requête", "gestion") . "</td><td>";
-               // Afficher le menu déroulant avec Dropdown::show()
-               Dropdown::showFromArray(
-                  'NumberViews',  // Nom de l'identifiant du champ
-                  $dropdownValues,    // Tableau des options
-                  [
-                     'value'      => $config->NumberViews(),        // Valeur sélectionnée par défaut (optionnel)
-                  ]
-               );
-            echo "</td>";
-         echo "</tr>";
+      // Générer les options du menu déroulant
+      $dropdownValues = [];
+      for ($i = 10; $i <= 500; $i += 10) {
+         $dropdownValues[$i] = $i; // La clé et la valeur sont identiques dans ce cas
+      }
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Nombre d'éléments maximum à afficher par requête", "gestion") . "</td><td>";
+            // Afficher le menu déroulant avec Dropdown::show()
+            Dropdown::showFromArray(
+               'NumberViews',  // Nom de l'identifiant du champ
+               $dropdownValues,    // Tableau des options
+               [
+                  'value'      => $config->NumberViews(),        // Valeur sélectionnée par défaut (optionnel)
+               ]
+            );
+         echo "</td>";
+      echo "</tr>";
 
-         if (Plugin::isPluginActive('formcreator')) {
+      if (Plugin::isPluginActive('formcreator')) {
+         echo "<tr class='tab_bg_1'>";
+            echo "<td> Affichage du formulaire dans un modal (Vide pour désactivé) </td>";
+            echo "<td>";
+            
+            // Récupérer les données depuis la table glpi_plugin_formcreator_forms
+            $formcreator_forms = [];
+            global $DB;
+            $query = "SELECT `id`, `name` FROM `glpi_plugin_formcreator_forms`";
+            $result = $DB->query($query);
+            
+            if ($result) {
+               while ($data = $DB->fetchAssoc($result)) {
+                  $formcreator_forms[$data['id']] = $data['name'];
+               }
+            }
+            
+            // Afficher le dropdown
+            Dropdown::showFromArray('formulaire', $formcreator_forms, [
+               'value' => $config->formulaire(), // ID par défaut sélectionné
+               'display_emptychoice' => 1,
+               'emptylabel' => "-----"
+            ]);
+         echo "</td></tr>";
+      }
+      
+      //--------------------------------------------
+      if(!empty($config->TenantID())){
+         // Utilisation
+         $errorcon = "";
+         try {
+            $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
+            if ($result['status']) {
+               $checkcon = 'Connexion API : <i class="fa fa-check-circle fa-xl text-success"></i></i>' . "\n";
+               try {              
+                  // Étape 2 : Récupérer l'ID du site
+                  $siteId = '';
+                  $siteId = $sharepoint->getSiteId($config->Hostname(), $config->SitePath());
+               } catch (Exception $e) {
+                  $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Erreur : '.$e->getMessage().'"></i>';
+               }
+            } else {
+               $checkcon = 'Connexion API : <i class="fa fa-times-circle fa-xl text-danger"></i>' . "\n";
+               $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="'.$result['message'].'"></i>';
+            }
+         } catch (Exception $e) {
+            $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Erreur inattendue : '.$e->getMessage().'"></i>';
+         }      
+      }
+
+      echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph) | '.$checkcon . $errorcon, 'rp') . "</th></tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
+            echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 80]);// bouton configuration du bas de page line 1
+         echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Client ID", "gestion") . "</td><td>";
+            echo Html::input('ClientID', ['value' => $config->ClientID(), 'size' => 80]);// bouton configuration du bas de page line 1
+         echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Client Secret", "gestion") . "</td><td>";
+            echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'size' => 80]);// bouton configuration du bas de page line 1
+         echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Nom d’hôte", "gestion") . "</td><td>";
+            echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 80]);// bouton configuration du bas de page line 1
+         echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Chemin du Site (/sites/XXXX)", "gestion") . "</td><td>";
+            echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
+         echo "</td>";
+      echo "</tr>";
+
+      if(!empty($config->TenantID())){
+         if ($result['status'] == true){
+            echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
+
             echo "<tr class='tab_bg_1'>";
-               echo "<td> Affichage du formulaire dans un modal (Vide pour désactivé) </td>";
-               echo "<td>";
-               
-               // Récupérer les données depuis la table glpi_plugin_formcreator_forms
-               $formcreator_forms = [];
-               global $DB;
-               $query = "SELECT `id`, `name` FROM `glpi_plugin_formcreator_forms`";
-               $result = $DB->query($query);
-               
-               if ($result) {
-                  while ($data = $DB->fetchAssoc($result)) {
-                     $formcreator_forms[$data['id']] = $data['name'];
-                  }
-               }
-               
-               // Afficher le dropdown
-               Dropdown::showFromArray('formulaire', $formcreator_forms, [
-                  'value' => $config->formulaire(), // ID par défaut sélectionné
-                  'display_emptychoice' => 1,
-                  'emptylabel' => "-----"
-               ]);
-            echo "</td></tr>";
-         }
-         
-         //--------------------------------------------
-         if(!empty($config->TenantID())){
-            // Utilisation
-            $errorcon = "";
-            try {
-               $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-               if ($result['status']) {
-                  $checkcon = 'Connexion API : <i class="fa fa-check-circle fa-xl text-success"></i></i>' . "\n";
-                  try {              
-                     // Étape 2 : Récupérer l'ID du site
-                     $siteId = '';
-                     $siteId = $sharepoint->getSiteId($config->Hostname(), $config->SitePath());
-                  } catch (Exception $e) {
-                     $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Erreur : '.$e->getMessage().'"></i>';
-                  }
-               } else {
-                  $checkcon = 'Connexion API : <i class="fa fa-times-circle fa-xl text-danger"></i>' . "\n";
-                  $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="'.$result['message'].'"></i>';
-               }
-            } catch (Exception $e) {
-               $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Erreur inattendue : '.$e->getMessage().'"></i>';
-            }      
-         }
-
-         echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph) | '.$checkcon . $errorcon, 'rp') . "</th></tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
-               echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Client ID", "gestion") . "</td><td>";
-               echo Html::input('ClientID', ['value' => $config->ClientID(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Client Secret", "gestion") . "</td><td>";
-               echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Nom d’hôte", "gestion") . "</td><td>";
-               echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Chemin du Site (/sites/XXXX)", "gestion") . "</td><td>";
-               echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
-
-         if(!empty($config->TenantID())){
-            if ($result['status'] == true){
-               echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
-
-               echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Bibliothèques de recherche :", "gestion") ;
-                     //Récupérer les bibliothèques de documents du site
-                     $drives = $sharepoint->getDrives($siteId);
-                     $values3 = [];
-                     // Afficher toutes les bibliothèques disponibles
-                     foreach ($drives as $drive) {
-                        if ($drive['name'] == 'Documents') {
-                           $drive['name'] = 'Documents partages';
-                        }
-                           $values3[$drive['name']] = $drive['name'];
+               echo "<td>" . __("Bibliothèques de recherche :", "gestion") ;
+                  //Récupérer les bibliothèques de documents du site
+                  $drives = $sharepoint->getDrives($siteId);
+                  $values3 = [];
+                  // Afficher toutes les bibliothèques disponibles
+                  foreach ($drives as $drive) {
+                     if ($drive['name'] == 'Documents') {
+                        $drive['name'] = 'Documents partages';
                      }
-                  echo  "</td><td>";
-                     Dropdown::showFromArray(
-                        'Global',
-                        $values3,
+                        $values3[$drive['name']] = $drive['name'];
+                  }
+               echo  "</td><td>";
+                  Dropdown::showFromArray(
+                     'Global',
+                     $values3,
+                     [
+                        'value' => $config->Global(),
+                     ]
+               );
+               echo "</td>";
+            echo "</tr>";
+
+            echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'rp') . "</th></tr>";
+            
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Ajouter un dossier (Nom du dossier)", "gestion") . "</td><td>";
+                  echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+            
+            global $DB;
+            // Récupération des lignes (params) de la table
+            $queryRows = "SELECT * FROM `glpi_plugin_gestion_configsfolder`;";
+
+            $resultRows = $DB->query($queryRows);
+
+            if ($resultRows && $DB->numrows($resultRows) > 0) {
+               while ($row = $DB->fetchAssoc($resultRows)) {
+                  $folder_name = $row['folder_name'];
+                  $value = $row['params'];
+
+                  // Générer une ligne HTML pour chaque enregistrement
+                  echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __($folder_name, "gestion") . "</td><td>";
+
+                  // Tableau des options pour le champ déroulant
+                  $values2 = [
+                        1 => __('Dossier de récupération (Recursive)', 'gestion'),
+                        2 => __('Dossier de destination (Dépot Global)', 'gestion'),
+                        5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
+                        6 => __('Supprimer le dossier', 'gestion'),
+                        8 => __('__Non attribué__', 'gestion'),
+                        10 => __("Eléments de recheche", 'gestion'),
+                  ];
+
+                  // Générer un champ déroulant avec les options
+                  Dropdown::showFromArray(
+                        $folder_name,
+                        $values2,
                         [
-                           'value' => $config->Global(),
+                           'value' => $value,
+                           'class' => 'folder-dropdown', // Ajouter une classe CSS
+                           'data-folder' => $folder_name // Ajouter un attribut unique pour JS
                         ]
                   );
                   echo "</td>";
-               echo "</tr>";
+                  echo "</tr>";
+               }
 
-               echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'rp') . "</th></tr>";
-               
-               echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Ajouter un dossier (Nom du dossier)", "gestion") . "</td><td>";
-                     echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
-                  echo "</td>";
-               echo "</tr>";
-               
-               global $DB;
-               // Récupération des lignes (params) de la table
-               $queryRows = "SELECT * FROM `glpi_plugin_gestion_configsfolder`;";
+               ?><script defer>
+                  const dropdowns = document.querySelectorAll('.folder-dropdown');
 
-               $resultRows = $DB->query($queryRows);
+                  // Fonction pour désactiver uniquement l'option avec la valeur `2`
+                  function updateDropdowns() {
+                     // Récupérer toutes les valeurs actuellement sélectionnées
+                     const selectedValues = Array.from(dropdowns).map(dropdown => dropdown.value);
 
-               if ($resultRows && $DB->numrows($resultRows) > 0) {
-                  while ($row = $DB->fetchAssoc($resultRows)) {
-                     $folder_name = $row['folder_name'];
-                     $value = $row['params'];
+                     // Vérifier si la valeur `2` est sélectionnée
+                     const isOption2Selected = selectedValues.includes("2");
 
-                     // Générer une ligne HTML pour chaque enregistrement
-                     echo "<tr class='tab_bg_1'>";
-                     echo "<td>" . __($folder_name, "gestion") . "</td><td>";
+                     // Si l'option 2 est sélectionnée, désactiver uniquement celle-ci dans les autres dropdowns
+                     dropdowns.forEach(dropdown => {
+                        const options = dropdown.querySelectorAll('option'); // Cibler les <option>
+                        const currentValue = dropdown.value;
 
-                     // Tableau des options pour le champ déroulant
-                     $values2 = [
-                           1 => __('Dossier de récupération (Recursive)', 'gestion'),
-                           2 => __('Dossier de destination (Dépot Global)', 'gestion'),
-                           5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
-                           6 => __('Supprimer le dossier', 'gestion'),
-                           8 => __('__Non attribué__', 'gestion'),
-                           10 => __("Eléments de recheche", 'gestion'),
-                     ];
+                        options.forEach(option => {
+                              const value = option.value;
 
-                     // Générer un champ déroulant avec les options
-                     Dropdown::showFromArray(
-                           $folder_name,
-                           $values2,
-                           [
-                              'value' => $value,
-                              'class' => 'folder-dropdown', // Ajouter une classe CSS
-                              'data-folder' => $folder_name // Ajouter un attribut unique pour JS
-                           ]
-                     );
-                     echo "</td>";
-                     echo "</tr>";
+                              if (value === "2" && isOption2Selected && currentValue !== "2") {
+                                 option.disabled = true;
+                              } else {
+                                 option.disabled = false; // Réactiver si elle devient disponible
+                              }
+                        });
+
+                        // Rafraîchir le rendu Select2 après modification des options
+                        $(dropdown).select2();
+                     });
                   }
 
-                  ?><script defer>
-                     const dropdowns = document.querySelectorAll('.folder-dropdown');
+                  // Ajouter les événements sur chaque dropdown pour mettre à jour les options dynamiquement
+                  dropdowns.forEach(dropdown => {
+                     $(dropdown).on('select2:select', updateDropdowns); // Lorsqu'une option est sélectionnée
+                     $(dropdown).on('select2:unselect', updateDropdowns); // Si une option est désélectionnée (utile pour multi-sélection)
+                  });
 
-                     // Fonction pour désactiver uniquement l'option avec la valeur `2`
-                     function updateDropdowns() {
-                        // Récupérer toutes les valeurs actuellement sélectionnées
-                        const selectedValues = Array.from(dropdowns).map(dropdown => dropdown.value);
-
-                        // Vérifier si la valeur `2` est sélectionnée
-                        const isOption2Selected = selectedValues.includes("2");
-
-                        // Si l'option 2 est sélectionnée, désactiver uniquement celle-ci dans les autres dropdowns
-                        dropdowns.forEach(dropdown => {
-                           const options = dropdown.querySelectorAll('option'); // Cibler les <option>
-                           const currentValue = dropdown.value;
-
-                           options.forEach(option => {
-                                 const value = option.value;
-
-                                 if (value === "2" && isOption2Selected && currentValue !== "2") {
-                                    option.disabled = true;
-                                 } else {
-                                    option.disabled = false; // Réactiver si elle devient disponible
-                                 }
-                           });
-
-                           // Rafraîchir le rendu Select2 après modification des options
-                           $(dropdown).select2();
-                        });
-                     }
-
-                     // Ajouter les événements sur chaque dropdown pour mettre à jour les options dynamiquement
-                     dropdowns.forEach(dropdown => {
-                        $(dropdown).on('select2:select', updateDropdowns); // Lorsqu'une option est sélectionnée
-                        $(dropdown).on('select2:unselect', updateDropdowns); // Si une option est désélectionnée (utile pour multi-sélection)
-                     });
-
-                     // Mise à jour initiale
-                     updateDropdowns();
-                  </script><?php
-               } else {
-                  echo "<tr><td colspan='2'>Aucun paramètre trouvé ou erreur dans la base de données.</td></tr>";
-               }
+                  // Mise à jour initiale
+                  updateDropdowns();
+               </script><?php
+            } else {
+               echo "<tr><td colspan='2'>Aucun paramètre trouvé ou erreur dans la base de données.</td></tr>";
             }
          }
-    
-         echo "<tr><th colspan='2'>" . __("Entités et Tracker", 'rp') . "</th></tr>";
+      }
+   
+      echo "<tr><th colspan='2'>" . __("Entités et Tracker", 'rp') . "</th></tr>";
+         //--------------------------------------------
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Extraction d'un tracker dans le PDF", "gestion") . "</td><td>";
+               Dropdown::showYesNo('ExtractYesNo', $config->ExtractYesNo(), -1);
+            echo "</td>";
+         echo "</tr>";
+
+         if($config->ExtractYesNo() == 1){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
+                  echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+
             //--------------------------------------------
             echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Extraction d'un tracker dans le PDF", "gestion") . "</td><td>";
-                  Dropdown::showYesNo('ExtractYesNo', $config->ExtractYesNo(), -1);
+               echo "<td>" . __("Envoyé un mail si le contenu d'un tracker est détécté (Tâche Cron)", "gestion") . "</td><td>";
+                  Dropdown::showYesNo('MailTrackerYesNo', $config->MailTrackerYesNo(), -1);
                echo "</td>";
             echo "</tr>";
-
-            if($config->ExtractYesNo() == 1){
+            
+            if($config->MailTrackerYesNo() == 1){
                echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
-                     echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
+                  echo "<td>" . __("Mail", "gestion") . "</td><td>";
+                     echo Html::input('MailTracker', ['value' => $config->MailTracker(), 'size' => 60]);// bouton configuration du bas de page line 1
                   echo "</td>";
                echo "</tr>";
 
-               //--------------------------------------------
                echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Envoyé un mail si le contenu d'un tracker est détécté (Tâche Cron)", "gestion") . "</td><td>";
-                     Dropdown::showYesNo('MailTrackerYesNo', $config->MailTrackerYesNo(), -1);
-                  echo "</td>";
-               echo "</tr>";
-               
-               if($config->MailTrackerYesNo() == 1){
-                  echo "<tr class='tab_bg_1'>";
-                     echo "<td>" . __("Mail", "gestion") . "</td><td>";
-                        echo Html::input('MailTracker', ['value' => $config->MailTracker(), 'size' => 60]);// bouton configuration du bas de page line 1
-                     echo "</td>";
-                  echo "</tr>";
+                  echo "<td> Gabarit : Modèle de notifications pour la Tâche Cron (Tracker) </td>";
+                  echo "<td>";
 
-                  echo "<tr class='tab_bg_1'>";
-                     echo "<td> Gabarit : Modèle de notifications pour la Tâche Cron (Tracker) </td>";
-                     echo "<td>";
-
-                     //notificationtemplates_id
-                     Dropdown::show('NotificationTemplate', [
-                        'name' => 'gabarit_tracker',
-                        'value' => $config->gabarit_tracker(),
-                        'display_emptychoice' => 1,
-                        'specific_tags' => [],
-                        'itemtype' => 'NotificationTemplate',
-                        'displaywith' => [],
-                        'emptylabel' => "-----",
-                        'used' => [],
-                        'toadd' => [],
-                        'entity_restrict' => 0,
-                     ]); 
-                  echo "</td></tr>";
-               }
-            }else{
-               if($config->MailTrackerYesNo() == 1){
-                  // Préparer la requête SQL
-                  $sql = "UPDATE glpi_plugin_gestion_configs 
-                        SET MailTrackerYesNo = ?
-                        WHERE id = 1";
-
-                  // Exécution de la requête préparée
-                  $stmt = $DB->prepare($sql);
-                  $stmt->execute([0]);
-               }
+                  //notificationtemplates_id
+                  Dropdown::show('NotificationTemplate', [
+                     'name' => 'gabarit_tracker',
+                     'value' => $config->gabarit_tracker(),
+                     'display_emptychoice' => 1,
+                     'specific_tags' => [],
+                     'itemtype' => 'NotificationTemplate',
+                     'displaywith' => [],
+                     'emptylabel' => "-----",
+                     'used' => [],
+                     'toadd' => [],
+                     'entity_restrict' => 0,
+                  ]); 
+               echo "</td></tr>";
             }
+         }else{
+            if($config->MailTrackerYesNo() == 1){
+               // Préparer la requête SQL
+               $sql = "UPDATE glpi_plugin_gestion_configs 
+                     SET MailTrackerYesNo = ?
+                     WHERE id = 1";
 
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
-            echo "</tr>";
-
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Extraire l'entité du dossier parent du PDF", "gestion") . "</td><td>";
-                  Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
-               echo "</td>";
-            echo "</tr>";
-
-            if($config->EntitiesExtract() == 1){
-               echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Séparateurs pour l'extraction de l'entité depuis la Bibliothèques du site", "gestion") . "</td><td>";
-                     echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                        echo '<label for="DateX">Après le chemin : </label>';
-                           echo Html::input('EntitiesExtractValue', ['value' => $config->EntitiesExtractValue(), 'size' => 60]);// bouton configuration du bas de page line 1
-                     echo '</div>';
-                  echo "</td>";
-               echo "</tr>";
+               // Exécution de la requête préparée
+               $stmt = $DB->prepare($sql);
+               $stmt->execute([0]);
             }
-
-         echo "<tr><th colspan='2'>" . __("Dérnière synchronisation Cron : ".$config->LastCronTask(), 'rp') . "</th></tr>";
+         }
 
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Statut de connexion", "gestion") . "</td><td>";
+            echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
+         echo "</tr>";
 
-               ?><button id="openModalButton" type="button" class="btn btn-primary">Statut de connexion</button>
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Extraire l'entité du dossier parent du PDF", "gestion") . "</td><td>";
+               Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
+            echo "</td>";
+         echo "</tr>";
 
-               <script type="text/javascript">
-                  $(document).ready(function() {
-                     $('#openModalButton').on('click', function() {
-                           $('#customModal').modal('show');
-                     });
+         if($config->EntitiesExtract() == 1){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Séparateurs pour l'extraction de l'entité depuis la Bibliothèques du site", "gestion") . "</td><td>";
+                  echo '<div style="display: flex; align-items: center; gap: 5px;">';
+                     echo '<label for="DateX">Après le chemin : </label>';
+                        echo Html::input('EntitiesExtractValue', ['value' => $config->EntitiesExtractValue(), 'size' => 60]);// bouton configuration du bas de page line 1
+                  echo '</div>';
+               echo "</td>";
+            echo "</tr>";
+         }
+
+      echo "<tr><th colspan='2'>" . __("Dérnière synchronisation Cron : ".$config->LastCronTask(), 'rp') . "</th></tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Statut de connexion", "gestion") . "</td><td>";
+
+            ?><button id="openModalButton" type="button" class="btn btn-primary">Statut de connexion</button>
+
+            <script type="text/javascript">
+               $(document).ready(function() {
+                  $('#openModalButton').on('click', function() {
+                        $('#customModal').modal('show');
                   });
-               </script><?php
+               });
+            </script><?php
 
-               // Modal HTML
-               echo <<<HTML
-               <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-                  <div class="modal-dialog modal-lg">
-                     <div class="modal-content">
-                        <div class="modal-header">
-                              <h5 class="modal-title" id="AddGestionModalLabel">Statut de connexion</h5>
-                              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                           <ul class="list-group">
-                              <li class="list-group-item d-flex fw-bold">
-                                 <div class="col-4">Champ</div>
-                                 <div class="col-6">Statut</div>
-                                 <div class="col-2 text-center">Validation</div>
-                              </li>
-               HTML;
-               
-               try {
-                  $result = $sharepoint->checkSharePointAccess(); 
-               
-                  $statusIcons = [
-                     1 => '<i class="fa fa-check-circle text-success"></i>', // ✅ Succès
-                     0 => '<i class="fa fa-times-circle text-danger"></i>'   // ❌ Échec
-                  ];
-               
-                  $fields = [
-                     'accessToken'      => 'Token d\'accès',
-                     'sharePointAccess' => 'Accès SharePoint',
-                     'siteID'           => 'Site ID',
-                     'graphQuery'       => 'Microsoft Graph Query'
-                  ];
-               
-                  foreach ($fields as $key => $label) {
-                     if (isset($result[$key])) {
-                           $status = $result[$key]['status'] ?? 0;
-                           $message = htmlspecialchars($result[$key]['message'], ENT_QUOTES, 'UTF-8');
-                           $icon = $statusIcons[$status] ?? $statusIcons[0];
-                           $displayMessage = $message;
-                     
-                           echo "<li class='list-group-item d-flex'>";
-                           echo "<div class='col-4'><strong>$label</strong></div>";
-                           echo "<div class='col-6'>$displayMessage</div>";
-                           echo "<div class='col-2 text-center'>$icon</div>";
-                           echo "</li>";
-                     }
+            // Modal HTML
+            echo <<<HTML
+            <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
+               <div class="modal-dialog modal-lg">
+                  <div class="modal-content">
+                     <div class="modal-header">
+                           <h5 class="modal-title" id="AddGestionModalLabel">Statut de connexion</h5>
+                           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                     </div>
+                     <div class="modal-body">
+                        <ul class="list-group">
+                           <li class="list-group-item d-flex fw-bold">
+                              <div class="col-4">Champ</div>
+                              <div class="col-6">Statut</div>
+                              <div class="col-2 text-center">Validation</div>
+                           </li>
+            HTML;
+               $result = $sharepoint->checkSharePointAccess(); 
+            
+               $statusIcons = [
+                  1 => '<i class="fa fa-check-circle text-success"></i>', // ✅ Succès
+                  0 => '<i class="fa fa-times-circle text-danger"></i>'   // ❌ Échec
+               ];
+            
+               $fields = [
+                  'accessToken'      => 'Token d\'accès',
+                  'sharePointAccess' => 'Accès SharePoint',
+                  'siteID'           => 'Site ID',
+                  'graphQuery'       => 'Microsoft Graph Query'
+               ];
+            
+               foreach ($fields as $key => $label) {
+                  if (isset($result[$key])) {
+                        $status = $result[$key]['status'] ?? 0;
+                        $message = htmlspecialchars($result[$key]['message'], ENT_QUOTES, 'UTF-8');
+                        $icon = $statusIcons[$status] ?? $statusIcons[0];
+                        $displayMessage = $message;
+                  
+                        echo "<li class='list-group-item d-flex'>";
+                        echo "<div class='col-4'><strong>$label</strong></div>";
+                        echo "<div class='col-6'>$displayMessage</div>";
+                        echo "<div class='col-2 text-center'>$icon</div>";
+                        echo "</li>";
                   }
-               
-               } catch (Exception $e) {
-                  echo "<li class='list-group-item text-danger'><i class='fa fa-exclamation-circle'></i> Erreur : " . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . "</li>";
                }
-               
-               echo <<<HTML
-                           </ul>
-                        </div>
-                        <div class="modal-footer">
-                           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                        </div>
+               echo "<br><br>Pensez à vérifier les droits de suppression, de lecture et d'écriture sur le site SharePoint afin d'assurer son bon fonctionnement et une récupération optimale des métadonnées.";
+            echo <<<HTML
+                        </ul>
+                     </div>
+                     <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
                      </div>
                   </div>
                </div>
-               HTML; 
-            echo "</td>";
-         echo "</tr>";
-      }else{
-         echo "<tr><th colspan='2'>" . __("Dossier de récupération et de déstination des PDFs en Local", 'rp') . "</th></tr>";
-         echo "<tr class='tab_bg_1'><td>" . __("Dossier de récupération des PDFs : ".GLPI_PLUGIN_DOC_DIR."/gestion/unsigned/", "gestion") . "</td></tr>";
-         echo "<tr class='tab_bg_1'><td>" . __("Dossier de déstination des PDFs : ".GLPI_PLUGIN_DOC_DIR."/gestion/signed/", "gestion") . "</td></tr>";
-      }
+            </div>
+            HTML; 
+         echo "</td>";
+      echo "</tr>";
 
       $config->showFormButtons(['candel' => false]);
       return false;
@@ -590,10 +560,6 @@ class PluginGestionConfig extends CommonDBTM
    function Global()
    {
       return ($this->fields['Global']);
-   }
-   function ConfigModes()
-   {
-      return ($this->fields['ConfigModes']);
    }
    function LastCronTask()
    {
@@ -745,7 +711,6 @@ class PluginGestionConfig extends CommonDBTM
 
          $query = "CREATE TABLE IF NOT EXISTS $table (
                   `id` int {$default_key_sign} NOT NULL auto_increment,
-                  `ConfigModes` TINYINT NOT NULL DEFAULT '0',
                   `TenantID` TEXT NULL,
                   `ClientID` TEXT NULL,
                   `ClientSecret` TEXT NULL,
@@ -818,13 +783,17 @@ class PluginGestionConfig extends CommonDBTM
          $DB->query($query) or die($DB->error());
       }
       
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.2.0'){
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.2.0'){
          include(PLUGIN_GESTION_DIR . "/install/update_120_130.php");
          update120to130(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.3.1'){
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.3.1'){
          include(PLUGIN_GESTION_DIR . "/install/update_132_next.php");
          update(); 
+      }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.4.1'){
+         $query = "ALTER TABLE $table DROP COLUMN ConfigModes;";
+         $DB->query($query) or die($DB->error());
       }
    }
 

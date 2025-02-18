@@ -168,21 +168,7 @@ class PluginGestionCri extends CommonDBTM {
                echo 'Non Signé';
                echo '<br><br>';
                
-               if ($config->fields['ConfigModes'] == 0){ //----------------------------------- LOCAL -----------------------------------
-                  // Affichage du PDF en mode image
-                  echo "<tr>";
-                  // Affiche le PDF intégré avec une classe CSS pour le responsive
-                  echo "<embed src='document.send.php?docid=$doc_id' type='application/pdf' class='responsive-pdf' />"; // Affiche le PDF intégré avec une classe CSS pour le responsive
-                  echo "</tr>";
-
-                  // Bouton pour voir le PDF en plein écran
-                  echo "<tr>";
-                     echo '<a href="document.send.php?docid=' . $doc_id . '" target="_blank">Voir le PDF en plein écran</a>'; // Bouton pour voir le PDF en plein écran
-                  echo "</tr><br><br>";
-                  //----------------------------------- FIN LOCAL -----------------------------------
-               }elseif ($config->fields['ConfigModes'] == 1){ //----------------------------------- SHAREPOINT -----------------------------------
                   $DocUrlSharePoint  = $DOC->doc_url;
-
                   function AffichageNoSigneMobile($DocUrlSharePoint){
                      // Bouton pour voir le PDF en plein écran
                      echo "<tr>";
@@ -221,7 +207,6 @@ class PluginGestionCri extends CommonDBTM {
                   }else{
                      AffichageNoSigneMobile($DocUrlSharePoint);
                   }
-               } //----------------------------------- FIN SHAREPOINT -----------------------------------
 
                   echo "<tr>";   
                      // Bouton de capture photo -->
@@ -267,8 +252,8 @@ class PluginGestionCri extends CommonDBTM {
                echo '<div class="table-responsive">';
                echo "<table class='table'>"; 
 
-                  if ($config->fields['ConfigModes'] == 0){ // ----------------------------------- LOCAL -----------------------------------
-                     // Affichage du PDF en mode image
+                  $DocUrlSharePoint  = $DOC->doc_url;
+                  function AffichageNoSigneNoMobile($Doc_Name, $DocUrlSharePoint){
                      echo "<tr>";
                         echo "<td class='table-secondary' style='width: 20%;'>"; // Réduit la largeur de la colonne de gauche
                            echo 'Document : <strong>'.$Doc_Name.'</strong>';
@@ -280,23 +265,35 @@ class PluginGestionCri extends CommonDBTM {
                         
                         echo "<td style='width: 80%;'>"; // Augmente la largeur de la colonne droite pour le PDF
                            // Affiche le PDF intégré avec une classe CSS pour le responsive
-                           echo "<embed src='document.send.php?docid=$doc_id' type='application/pdf' class='responsive-pdf' />"; // Affiche le PDF intégré avec une classe CSS pour le responsive
+                           echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>'; // Affiche le PDF intégré avec une classe CSS pour le responsive
                         echo "</td>";
                      echo "</tr>";
+                  }
 
-                     // Voir PDF
-                     echo "<tr>";
-                        echo "<td class='table-secondary'>";
-                        echo "</td>";
-                        echo "<td>";
-                           echo '<a href="document.send.php?docid=' . $doc_id . '" target="_blank">Voir le PDF en plein écran</a>'; // Bouton pour voir le PDF en plein écran
-                        echo "</td>";
-                     echo "</tr>";
-                     //----------------------------------- FIN LOCAL -----------------------------------
-                  }elseif ($config->fields['ConfigModes'] == 1){ // ----------------------------------- SHAREPOINT -----------------------------------
-                     $DocUrlSharePoint  = $DOC->doc_url;
+                  if ($config->fields['SharePointLinkDisplay'] == 1){ 
+                     // Utilisation
+                     try {
+                        // Vérifier si une ligne correspondante existe
+                        $folderPath = ""; // Par défaut, $folderPath est vide
+                        if (!empty($DOC->url_bl)){
+                           $folderPath = $DOC->url_bl . "/";
+                        }
+                        // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+                        $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
 
-                     function AffichageNoSigneNoMobile($Doc_Name, $DocUrlSharePoint){
+                        // Étape 3 : Récupérez l'ID du fichier
+                        $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
+
+                        if ($fileId) {
+                           $itemId = $fileId;
+                        } else {
+                           echo "Erreur : Fichier '$itemId' introuvable dans le dossier '$folderPath'.\n";
+                        }
+
+                        // Étape 3 : Obtenez le lien de partage
+                        $shareLink = $sharepoint->createShareLink($itemId);
+
+                        // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
                            echo "<td class='table-secondary' style='width: 20%;'>"; // Réduit la largeur de la colonne de gauche
                               echo 'Document : <strong>'.$Doc_Name.'</strong>';
@@ -308,65 +305,24 @@ class PluginGestionCri extends CommonDBTM {
                            
                            echo "<td style='width: 80%;'>"; // Augmente la largeur de la colonne droite pour le PDF
                               // Affiche le PDF intégré avec une classe CSS pour le responsive
-                              echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>'; // Affiche le PDF intégré avec une classe CSS pour le responsive
+                              echo "<embed src='$shareLink' type='application/pdf' class='responsive-pdf' />";
                            echo "</td>";
                         echo "</tr>";
-                     }
 
-                     if ($config->fields['SharePointLinkDisplay'] == 1){ 
-                        // Utilisation
-                        try {
-                           // Vérifier si une ligne correspondante existe
-                           $folderPath = ""; // Par défaut, $folderPath est vide
-                           if (!empty($DOC->url_bl)){
-                              $folderPath = $DOC->url_bl . "/";
-                           }
-                           // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-                           $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
-
-                           // Étape 3 : Récupérez l'ID du fichier
-                           $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
-
-                           if ($fileId) {
-                              $itemId = $fileId;
-                           } else {
-                              echo "Erreur : Fichier '$itemId' introuvable dans le dossier '$folderPath'.\n";
-                           }
-
-                           // Étape 3 : Obtenez le lien de partage
-                           $shareLink = $sharepoint->createShareLink($itemId);
-
-                           // Étape 4 : Affichez le PDF via <embed>
-                           echo "<tr>";
-                              echo "<td class='table-secondary' style='width: 20%;'>"; // Réduit la largeur de la colonne de gauche
-                                 echo 'Document : <strong>'.$Doc_Name.'</strong>';
-                                 echo '<br><br><br>';
-                                 echo "<strong><u>STATUS</u></strong>";
-                                 echo '<br>';
-                                 echo 'Non Signé';
-                              echo "</td>";
-                              
-                              echo "<td style='width: 80%;'>"; // Augmente la largeur de la colonne droite pour le PDF
-                                 // Affiche le PDF intégré avec une classe CSS pour le responsive
-                                 echo "<embed src='$shareLink' type='application/pdf' class='responsive-pdf' />";
-                              echo "</td>";
-                           echo "</tr>";
-
-                           // Voir PDF
-                           echo "<tr>";
-                              echo "<td class='table-secondary'>";
-                              echo "</td>";
-                              echo "<td>";
-                                 echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>'; // Bouton pour voir le PDF en plein écran
-                              echo "</td>";
-                           echo "</tr>";
-                        } catch (Exception $e) {
-                           AffichageNoSigneNoMobile($Doc_Name, $DocUrlSharePoint);
-                        }
-                     }else{
+                        // Voir PDF
+                        echo "<tr>";
+                           echo "<td class='table-secondary'>";
+                           echo "</td>";
+                           echo "<td>";
+                              echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>'; // Bouton pour voir le PDF en plein écran
+                           echo "</td>";
+                        echo "</tr>";
+                     } catch (Exception $e) {
                         AffichageNoSigneNoMobile($Doc_Name, $DocUrlSharePoint);
                      }
-                  } // ----------------------------------- FIN SHAREPOINT -----------------------------------
+                  }else{
+                     AffichageNoSigneNoMobile($Doc_Name, $DocUrlSharePoint);
+                  }
 
                   // enregistrer un fichier 
                   echo "<tr>";
@@ -458,21 +414,7 @@ class PluginGestionCri extends CommonDBTM {
                echo 'Livré par : '.getUserName($DOC->users_id).' ';
                echo '<br><br>';
 
-               if ($config->fields['ConfigModes'] == 0){ // ----------------------------------- LOCAL -----------------------------------
-                  // Affichage du PDF en mode image
-                  echo "<tr>";
-                  // Affiche le PDF intégré avec une classe CSS pour le responsive
-                  echo "<embed src='document.send.php?docid=$doc_id' type='application/pdf' class='responsive-pdf' />"; // Affiche le PDF intégré avec une classe CSS pour le responsive
-                  echo "</tr>";
-
-                  // Bouton pour voir le PDF en plein écran
-                  echo "<tr>";
-                     echo '<a href="document.send.php?docid=' . $doc_id . '" target="_blank">Voir le PDF en plein écran</a>'; // Bouton pour voir le PDF en plein écran
-                  echo "</tr><br><br>";
-                           // ----------------------------------- FIN LOCAL -----------------------------------
-               }elseif ($config->fields['ConfigModes'] == 1){ // ----------------------------------- SHAREPOINT ----------------------------------- 
                   $DocUrlSharePoint  = $DOC->doc_url;
-
                   function AffichageSigneMobile($DocUrlSharePoint){
                      // Bouton pour voir le PDF en plein écran
                      echo "<tr>";
@@ -503,7 +445,6 @@ class PluginGestionCri extends CommonDBTM {
                   }else{
                      AffichageSigneMobile($DocUrlSharePoint);
                   }
-               } // ----------------------------------- FIN SHAREPOINT -----------------------------------
                            // ----------------------------------- FIN MOBILE -----------------------------------
             }else{// -------------------------------------------------------------------------------- ORDINATEUR----------------------------------------------------------------
                // Affichage du PDF en mode image
@@ -520,27 +461,7 @@ class PluginGestionCri extends CommonDBTM {
                      echo 'Livré par : '.getUserName($DOC->users_id).' ';
                   echo "</td>";
 
-               if ($config->fields['ConfigModes'] == 0){ // ----------------------------------- LOCAL -----------------------------------
-                  // Affichage du PDF en mode image
-                  
-                     echo "<td style='width: 70%;'>"; // Augmente la largeur de la colonne droite pour le PDF
-                        // Affiche le PDF intégré avec une classe CSS pour le responsive
-                        echo "<embed src='document.send.php?docid=$doc_id' type='application/pdf' class='responsive-pdf' />";  // Affiche le PDF intégré avec une classe CSS pour le responsive
-                     echo "</td>";
-                  echo "</tr>";
-
-                  // Voir PDF
-                  echo "<tr>";
-                     echo "<td class='table-secondary'>";// Réduit la largeur de la colonne de gauche
-                     echo "</td>";
-                     echo "<td>";
-                        echo '<a href="document.send.php?docid=' . $doc_id . '" target="_blank">Voir le PDF en plein écran</a>'; // Bouton pour voir le PDF en plein écran
-                     echo "</td>";
-                  echo "</tr>";
-                                       // ----------------------------------- FIN LOCAL -----------------------------------
-               }elseif ($config->fields['ConfigModes'] == 1){ // ----------------------------------- SHAREPOINT -----------------------------------
                   $DocUrlSharePoint  = $DOC->doc_url;
-
                   function AffichageSigneNoMobile($DocUrlSharePoint){
                            echo "<td style='width: 70%;'>"; // Augmente la largeur de la colonne droite pour le PDF
                            // Affiche le PDF intégré avec une classe CSS pour le responsive
@@ -576,7 +497,6 @@ class PluginGestionCri extends CommonDBTM {
                   }else{
                      AffichageSigneNoMobile($DocUrlSharePoint);
                   }
-               } //----------------------------- FIN SHAREPOINT -----------------------------------
             } // -------------------------------------------------------------------------------- FIN ORDINATEUR ----------------------------------------------------------------
             echo "</table>"; 
             echo "</div>";

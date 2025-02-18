@@ -37,112 +37,65 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
 
     // Ajouter les nouveaux éléments
     foreach ($items_to_add as $item) {
-        if ($config->fields['ConfigModes'] == 0){
-            // Chemin du fichier PDF
-            $file_path = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned/" . $item . ".pdf"; 
-        }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
-            // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-            $file_path = $item . ".pdf"; // Remplacez par le chemin exact de votre fichier
-            // Étape 4 : Récupérez l'URL du fichier
-            $fileUrl = $sharepoint->getFileUrl($file_path);
-        }
+        // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+        $file_path = $item . ".pdf"; // Remplacez par le chemin exact de votre fichier
+        // Étape 4 : Récupérez l'URL du fichier
+        $fileUrl = $sharepoint->getFileUrl($file_path);
 
-        if ($config->fields['ConfigModes'] == 0){
-            if (file_exists($file_path)) {
-                $file_name = basename($file_path);
-                $file_path_bdd = "_plugins/gestion/unsigned/" . $item . ".pdf";
-    
-                // Préparer les informations pour le document
-                $input = [
-                    'name'        => 'PDF : Doc - ' . str_replace("?", "°", $item),
-                    'filename'    => $file_name,
-                    'filepath'    => $file_path_bdd,
-                    'mime'        => 'application/pdf',
-                    'users_id'    => Session::getLoginUserID(),
-                    'entities_id' => $entityId,
-                    'tickets_id'  => $ticketId,
-                    'is_recursive'=> 1
-                ];
-    
-                $existedoc = $DB->query("SELECT tickets_id FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
-                if(empty($existedoc->tickets_id)){
-                    // Ajouter le document dans GLPI
-                    $doc = new Document();
-                    if ($doc_id = $doc->add($input)) {
-                        // Insérer le ticket et l'ID de document dans glpi_plugin_gestion_surveys
-                        if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, bl, doc_id) VALUES ($ticketId, $entityId, '".$DB->escape($item)."', $doc_id)")) {
-                            $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
-                        }
-                    } else {
-                        // Gérer le cas d'erreur lors de l'ajout du document
-                        Session::addMessageAfterRedirect(__("Erreur lors de l'ajout du document pour $item.", 'gestion'), false, ERROR);
-                        $success = false;
-                    }
-                }else{
+        $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
+        if ($sharepoint->checkFileExists($file_path)) {
+            // Expression régulière pour extraire les deux parties
+            $pattern = '#^(.*)/(.*)$#';
+
+            // Vérification et extraction
+            if (preg_match($pattern, $item, $matches)) {
+                $itemUrl = $matches[1]; // xxx/zzzz ou xxx/xxxx/zzzz
+                $item = $matches[2]; // zzzz
+            }    
+            
+            $existedoc = $DB->query("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
+            if(empty($existedoc->bl)){
+                // Insérer le ticket et l'ID de document dans glpi_plugin_gestion_surveys
+                if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker')")) {
+                    Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
+                    $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
+                }
+            }else{
+                if($existedoc->tickets_id == NULL){
+                    // Validation des entrées numériques
+                    $ticketId = intval($ticketId);
+
+                    // Préparer la requête SQL
+                    $sql = "UPDATE glpi_plugin_gestion_surveys 
+                            SET tickets_id = ?, 
+                                url_bl = ?,
+                                tracker = ?
+                            WHERE bl = ?";
+
+                    // Exécution de la requête préparée
+                    $stmt = $DB->prepare($sql);
+                    $stmt->execute([$ticketId, $itemUrl, $tracker, $item]);
+                }elseif($existedoc->tickets_id != $ticketId){
                     Session::addMessageAfterRedirect(__($DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
                     $success = false;
                 }
-            } else {
-                // Gérer le cas où le fichier n'existe pas
-                Session::addMessageAfterRedirect(__("Le fichier $file_path n'existe pas.", 'gestion'), false, ERROR);
-                $success = false;
             }
-        }elseif ($config->fields['ConfigModes'] == 1){ // CONFIG SHAREPOINT 
-            $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
-            if ($sharepoint->checkFileExists($file_path)) {
-                // Expression régulière pour extraire les deux parties
-                $pattern = '#^(.*)/(.*)$#';
 
-                // Vérification et extraction
-                if (preg_match($pattern, $item, $matches)) {
-                    $itemUrl = $matches[1]; // xxx/zzzz ou xxx/xxxx/zzzz
-                    $item = $matches[2]; // zzzz
-                }    
-                
-                $existedoc = $DB->query("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
-                if(empty($existedoc->bl)){
-                    // Insérer le ticket et l'ID de document dans glpi_plugin_gestion_surveys
-                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker')")) {
-                        Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
-                        $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
-                    }
+        } else {
+            // Gérer le cas où le fichier n'existe pas
+            Session::addMessageAfterRedirect(__("Le fichier $file_path n'existe pas.", 'gestion'), false, ERROR);
+            $success = false;
+        }
+
+        if ($success) {
+            if($config->ExtractYesNo() == 1){
+                if (!empty($tracker)){
+                    Session::addMessageAfterRedirect(__("$item - <strong>Tracker : $tracker</strong>", 'gestion'), false, INFO);
                 }else{
-                    if($existedoc->tickets_id == NULL){
-                        // Validation des entrées numériques
-                        $ticketId = intval($ticketId);
-
-                        // Préparer la requête SQL
-                        $sql = "UPDATE glpi_plugin_gestion_surveys 
-                                SET tickets_id = ?, 
-                                    url_bl = ?,
-                                    tracker = ?
-                                WHERE bl = ?";
-
-                        // Exécution de la requête préparée
-                        $stmt = $DB->prepare($sql);
-                        $stmt->execute([$ticketId, $itemUrl, $tracker, $item]);
-                    }elseif($existedoc->tickets_id != $ticketId){
-                        Session::addMessageAfterRedirect(__($DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
-                        $success = false;
-                    }
+                    $tracker = NULL;
+                    Session::addMessageAfterRedirect(__("$item - Aucun tracker", 'gestion'), false, WARNING);
                 }
-
-            } else {
-                // Gérer le cas où le fichier n'existe pas
-                Session::addMessageAfterRedirect(__("Le fichier $file_path n'existe pas.", 'gestion'), false, ERROR);
-                $success = false;
-            }
-
-            if ($success) {
-                if($config->ExtractYesNo() == 1 && $config->fields['ConfigModes'] == 1){
-                    if (!empty($tracker)){
-                        Session::addMessageAfterRedirect(__("$item - <strong>Tracker : $tracker</strong>", 'gestion'), false, INFO);
-                    }else{
-                        $tracker = NULL;
-                        Session::addMessageAfterRedirect(__("$item - Aucun tracker", 'gestion'), false, WARNING);
-                    }
-                }        
-            }
+            }        
         }
     }
 

@@ -94,134 +94,132 @@ class PluginGestionReminder extends CommonDBTM {
       $bibliotheque = $config->Global();
       $encodedFilePath = '';
   
-      if($config->fields['ConfigModes'] == 1){
-         require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
-         $sharepoint = new PluginGestionSharepoint();
-   
-         try {
-            // Étape 1 : Déterminer les dates pour la récupération
-            if($config->fields['LastCronTask'] == NULL){
-               $startDate = NULL;
-            }else{
-               $startDate = $config->fields['LastCronTask'];
-               $datetime = new DateTime($startDate); 
-               $startDate = $datetime->format('Y-m-d\TH:i:s\Z');
-            }
+      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
+      $sharepoint = new PluginGestionSharepoint();
 
-            $endDate = (new DateTime())->format('Y-m-d\TH:i:s\Z');
+      try {
+         // Étape 1 : Déterminer les dates pour la récupération
+         if($config->fields['LastCronTask'] == NULL){
+            $startDate = NULL;
+         }else{
+            $startDate = $config->fields['LastCronTask'];
+            $datetime = new DateTime($startDate); 
+            $startDate = $datetime->format('Y-m-d\TH:i:s\Z');
+         }
 
-            // Étape 2 : Récupérer les fichiers récents
-            $recentFiles = $sharepoint->searchSharePointCron($startDate, $endDate);
+         $endDate = (new DateTime())->format('Y-m-d\TH:i:s\Z');
 
-            $requet2 = $DB->query("SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1")->fetch_object();
-            $fileDestination = $requet2->folder_name ?? NULL;
+         // Étape 2 : Récupérer les fichiers récents
+         $recentFiles = $sharepoint->searchSharePointCron($startDate, $endDate);
 
-            foreach ($recentFiles as $file) {
-               $lastModified = $sharepoint->convertFromISO8601($file['lastModifiedDateTime']);
+         $requet2 = $DB->query("SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1")->fetch_object();
+         $fileDestination = $requet2->folder_name ?? NULL;
 
-               // Vérifier l'extension du fichier
-               if (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) === 'pdf') {
-                  // Extraire les informations nécessaires
-                  $fileName = pathinfo($file['name'], PATHINFO_FILENAME);
-                  $createdDateTime = $sharepoint->convertFromISO8601($file['createdDateTime']);
-                  $webUrl = $file['webUrl'];
+         foreach ($recentFiles as $file) {
+            $lastModified = $sharepoint->convertFromISO8601($file['lastModifiedDateTime']);
 
-                  // Vérifier si le fichier est dans le dossier spécifique ou ses sous-dossiers
-                  $isSigned = 0;
-                  $entitiesid = 0;
-                  if ($fileDestination) {
-                     $filePath = $file['webUrl'] ?? '';
-                     
-                     if($config->EntitiesExtract() == 1){
-                        $pattern = $config->EntitiesExtractValue();
-                        // Vérifier si "Clients" est présent
-                        if (strpos($filePath, $pattern) !== false && preg_match("~" . preg_quote($pattern, '~') . "/([^/]+)/~", $filePath, $matches)) {
-                           $entities = $matches[1];
-                        }
-                        // Si "Clients" n'est pas présent mais "Bl_Signe" est là, récupérer après "Bl_Signe/"
-                        elseif (strpos($filePath, $fileDestination) !== false && preg_match("~" . preg_quote($fileDestination, '~') . "/([^/]+)/~", $filePath, $matches)) {
-                           $entities = $matches[1];
-                        }
-                        // Si ni "Clients" ni "Bl_Signe" ne sont trouvés, récupérer après "la bibliotheque/"
-                        elseif (preg_match("~" . preg_quote($bibliotheque, "~") . "/([^/]+)/~", $filePath, $matches)) {
-                           $entities = $matches[1];
-                        }       
+            // Vérifier l'extension du fichier
+            if (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) === 'pdf') {
+               // Extraire les informations nécessaires
+               $fileName = pathinfo($file['name'], PATHINFO_FILENAME);
+               $createdDateTime = $sharepoint->convertFromISO8601($file['createdDateTime']);
+               $webUrl = $file['webUrl'];
 
-                        $entities = $DB->query("SELECT id FROM `glpi_entities` WHERE name = '$entities'")->fetch_object();
-                        if (!empty($entities->id)) {
-                           $entitiesid = $entities->id;
-                        }
-                     }
-
-                     if (preg_match("/" . preg_quote($bibliotheque, "/") . "\/(.*)\/[^\/]+\.pdf/", $filePath, $matches)) {
-                        $valueAfterRootNotEncode = $matches[1];
-                        $valueAfterRoot = empty($valueAfterRootNotEncode) ? '' : implode('/', array_map('rawurlencode', explode('/', $valueAfterRootNotEncode)));
-                     }else{
-                        $valueAfterRoot = NULL;
-                     }
-
-                     if ($fileDestination !== NULL){
-                        if (strpos($valueAfterRoot, $fileDestination) !== false) {
-                           $isSigned = 1; // "Bl_Signe" est présent dans la chaîne
-                        }
-                     }
-                  }
+               // Vérifier si le fichier est dans le dossier spécifique ou ses sous-dossiers
+               $isSigned = 0;
+               $entitiesid = 0;
+               if ($fileDestination) {
+                  $filePath = $file['webUrl'] ?? '';
                   
-                  if($config->ExtractYesNo() == 1){
-                     $tracker = $sharepoint->GetTrackerPdfDownload($valueAfterRoot.'/'.$fileName.'.pdf');
-                     if (empty($tracker)){
-                        $tracker = NULL;
+                  if($config->EntitiesExtract() == 1){
+                     $pattern = $config->EntitiesExtractValue();
+                     // Vérifier si "Clients" est présent
+                     if (strpos($filePath, $pattern) !== false && preg_match("~" . preg_quote($pattern, '~') . "/([^/]+)/~", $filePath, $matches)) {
+                        $entities = $matches[1];
+                     }
+                     // Si "Clients" n'est pas présent mais "Bl_Signe" est là, récupérer après "Bl_Signe/"
+                     elseif (strpos($filePath, $fileDestination) !== false && preg_match("~" . preg_quote($fileDestination, '~') . "/([^/]+)/~", $filePath, $matches)) {
+                        $entities = $matches[1];
+                     }
+                     // Si ni "Clients" ni "Bl_Signe" ne sont trouvés, récupérer après "la bibliotheque/"
+                     elseif (preg_match("~" . preg_quote($bibliotheque, "~") . "/([^/]+)/~", $filePath, $matches)) {
+                        $entities = $matches[1];
+                     }       
+
+                     $entities = $DB->query("SELECT id FROM `glpi_entities` WHERE name = '$entities'")->fetch_object();
+                     if (!empty($entities->id)) {
+                        $entitiesid = $entities->id;
                      }
                   }
 
-                  // Vérifier si le fichier existe déjà en base
-                  $query = "SELECT COUNT(*) AS count FROM `glpi_plugin_gestion_surveys` WHERE `bl` = '$fileName';";
+                  if (preg_match("/" . preg_quote($bibliotheque, "/") . "\/(.*)\/[^\/]+\.pdf/", $filePath, $matches)) {
+                     $valueAfterRootNotEncode = $matches[1];
+                     $valueAfterRoot = empty($valueAfterRootNotEncode) ? '' : implode('/', array_map('rawurlencode', explode('/', $valueAfterRootNotEncode)));
+                  }else{
+                     $valueAfterRoot = NULL;
+                  }
+
+                  if ($fileDestination !== NULL){
+                     if (strpos($valueAfterRoot, $fileDestination) !== false) {
+                        $isSigned = 1; // "Bl_Signe" est présent dans la chaîne
+                     }
+                  }
+               }
+               
+               if($config->ExtractYesNo() == 1){
+                  $tracker = $sharepoint->GetTrackerPdfDownload($valueAfterRoot.'/'.$fileName.'.pdf');
+                  if (empty($tracker)){
+                     $tracker = NULL;
+                  }
+               }
+
+               // Vérifier si le fichier existe déjà en base
+               $query = "SELECT COUNT(*) AS count FROM `glpi_plugin_gestion_surveys` WHERE `bl` = '$fileName';";
+               $result = $DB->query($query);
+               $row = $DB->fetchassoc($result);
+               $id_survey = 0;
+
+               if ($row['count'] == 0) {                  
+                  // Ajouter le fichier en base
+                  $sql = $isSigned
+                     ? "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, signed, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned, '$tracker')"
+                     : "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', '$tracker')";
+                     
+                  if ($DB->query($sql)) {
+                     // Récupérer l'ID de la dernière ligne insérée avec LAST_INSERT_ID()
+                     $result = $DB->query("SELECT LAST_INSERT_ID() AS id");
+                     if ($result) {
+                        $row = $result->fetch_assoc();
+                        $id_survey = $row['id'];
+                     } 
+                  } else {
+                     Session::addMessageAfterRedirect(__('Insertion failed for file: ' . $fileName . '. Error: ' . $DB->error(), 'gestion'), false, ERROR);
+                  }
+               }
+
+               if($config->MailTrackerYesNo() == 1 && !empty($config->MailTracker())){
+                  // Requête pour récupérer les enregistrements ayant params = 5
+                  $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 5";
                   $result = $DB->query($query);
-                  $row = $DB->fetchassoc($result);
-                  $id_survey = 0;
 
-                  if ($row['count'] == 0) {                  
-                     // Ajouter le fichier en base
-                     $sql = $isSigned
-                        ? "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, signed, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned, '$tracker')"
-                        : "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', '$tracker')";
-                        
-                     if ($DB->query($sql)) {
-                        // Récupérer l'ID de la dernière ligne insérée avec LAST_INSERT_ID()
-                        $result = $DB->query("SELECT LAST_INSERT_ID() AS id");
-                        if ($result) {
-                           $row = $result->fetch_assoc();
-                           $id_survey = $row['id'];
+                  if ($result || $DB->numrows($result) != 0) {
+                     // Vérification des correspondances
+                     while ($data = $DB->fetchAssoc($result)) {
+                        $folder_name = $data['folder_name'];
+                        if (strpos($tracker, $folder_name) !== false) { 
+                           $sharepoint->MailSend($config->fields['MailTracker'], $config->fields['gabarit_tracker'], $outputPath = NULL, $message = NULL, $id_survey, $tracker, $webUrl);
                         } 
-                     } else {
-                        Session::addMessageAfterRedirect(__('Insertion failed for file: ' . $fileName . '. Error: ' . $DB->error(), 'gestion'), false, ERROR);
-                     }
-                  }
-
-                  if($config->MailTrackerYesNo() == 1 && !empty($config->MailTracker())){
-                     // Requête pour récupérer les enregistrements ayant params = 5
-                     $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 5";
-                     $result = $DB->query($query);
-
-                     if ($result || $DB->numrows($result) != 0) {
-                        // Vérification des correspondances
-                        while ($data = $DB->fetchAssoc($result)) {
-                           $folder_name = $data['folder_name'];
-                           if (strpos($tracker, $folder_name) !== false) { 
-                              $sharepoint->MailSend($config->fields['MailTracker'], $config->fields['gabarit_tracker'], $outputPath = NULL, $message = NULL, $id_survey, $tracker, $webUrl);
-                           } 
-                        }
                      }
                   }
                }
             }
-
-            $lastdate = date('Y-m-d H:i:s');
-            $DB->query("UPDATE glpi_plugin_gestion_configs SET LastCronTask = '$lastdate' WHERE id = 1");
-
-         } catch (Exception $e) {
-            Session::addMessageAfterRedirect(__($e->getMessage(), 'gestion'), false, ERROR);
          }
+
+         $lastdate = date('Y-m-d H:i:s');
+         $DB->query("UPDATE glpi_plugin_gestion_configs SET LastCronTask = '$lastdate' WHERE id = 1");
+
+      } catch (Exception $e) {
+         Session::addMessageAfterRedirect(__($e->getMessage(), 'gestion'), false, ERROR);
       }
    }     
 }

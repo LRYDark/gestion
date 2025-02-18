@@ -315,7 +315,7 @@ class PluginGestionTicket extends CommonDBTM {
                   // Modal HTML
                   echo <<<HTML
                   <div class="modal fade" id="AddGestionModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-                      <div class="modal-dialog">
+                      <div class="modal-dialog modal-lg">
                           <div class="modal-content">
                               <div class="modal-header">
                                   <h5 class="modal-title" id="AddGestionModalLabel">Ajouter un BC / BL</h5>
@@ -337,7 +337,7 @@ class PluginGestionTicket extends CommonDBTM {
                   // Affichage du dropdown
                   Dropdown::showFromArray("groups_id", $groups, [
                      'multiple'     => true,
-                     'width'        => 650,
+                     'width'        => 655,
                      'values'       => json_decode($selected_values_json, true),
                      'disabled'     => $disabled,
                   ]);

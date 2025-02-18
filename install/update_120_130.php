@@ -66,14 +66,17 @@ function update120to130() {
                ADD COLUMN `LastCronTask` TIMESTAMP DEFAULT NULL;";
       $DB->query($query) or die($DB->error());
 
-      $query = "RENAME TABLE glpi_plugin_gestion_tickets TO glpi_plugin_gestion_surveys;";
-      $DB->query($query) or die($DB->error());
+      $table = 'glpi_plugin_gestion_tickets';
+      if($DB->tableExists($table)){
+         $query = "RENAME TABLE glpi_plugin_gestion_tickets TO glpi_plugin_gestion_surveys;";
+         $DB->query($query) or die($DB->error());
 
-      $query= "ALTER TABLE glpi_plugin_gestion_surveys
-               ADD COLUMN `tracker` VARCHAR(255) NULL,
-               ADD COLUMN `doc_url` TEXT NULL,
-               ADD COLUMN `doc_date` TIMESTAMP NULL;";
-      $DB->query($query) or die($DB->error()); 
+         $query= "ALTER TABLE glpi_plugin_gestion_surveys
+            ADD COLUMN `tracker` VARCHAR(255) NULL,
+            ADD COLUMN `doc_url` TEXT NULL,
+            ADD COLUMN `doc_date` TIMESTAMP NULL;";
+         $DB->query($query) or die($DB->error()); 
+      }
 
       require_once PLUGIN_GESTION_DIR.'/install/MailContent2.php';
       $content_html2 = $ContentHtml2;

@@ -23,18 +23,7 @@ $ticketId = $_GET['ticketId'];
 $groups = [];
 $selected_ids = [];
 
-// Si le mode est 0, on récupère aussi les fichiers PDF dans un dossier
-if ($config->fields['ConfigModes'] == 0) {
-    $directory = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned/";
-    if (is_dir($directory)) {
-        foreach (scandir($directory) as $file) {
-            if (pathinfo($file, PATHINFO_EXTENSION) === 'pdf') {
-                $file_name = pathinfo($file, PATHINFO_FILENAME);
-                $groups[$file_name] = $file_name; // Ajout du fichier sans l'extension
-            }
-        }
-    }
-} elseif ($config->fields['ConfigModes'] == 1 && !empty($config->fields['Global'])) {
+if(!empty($config->fields['Global'])) {
     try {
             $contents = $sharepoint->searchSharePoint();            
             // Filtrer et ajouter les fichiers PDF
