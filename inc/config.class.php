@@ -816,20 +816,20 @@ class PluginGestionConfig extends CommonDBTM
    
          $query= "UPDATE glpi_plugin_gestion_configs SET gabarit = $ID->id WHERE id=1;";
          $DB->query($query) or die($DB->error());
-      }else{
-         if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.2.0'){
-            include(PLUGIN_GESTION_DIR . "/install/update_120_130.php");
-            update120to130(); 
-         }
-         if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.3.1'){
-            include(PLUGIN_GESTION_DIR . "/install/update_132_next.php");
-            update(); 
-         }
+      }
+      
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.2.0'){
+         include(PLUGIN_GESTION_DIR . "/install/update_120_130.php");
+         update120to130(); 
+      }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_RP_VERSION'] > '1.3.1'){
+         include(PLUGIN_GESTION_DIR . "/install/update_132_next.php");
+         update(); 
+      }
 
-         $CronTaskCheck = $DB->query("SELECT itemtype FROM glpi_crontasks WHERE NAME = 'GestionPdf'")->fetch_object();
-         if(!isset($CronTaskCheck->itemtype)){
-            CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
-         }
+      $CronTaskCheck = $DB->query("SELECT itemtype FROM glpi_crontasks WHERE NAME = 'GestionPdf'")->fetch_object();
+      if(!isset($CronTaskCheck->itemtype) && $_SESSION['PLUGIN_RP_VERSION'] > '1.3.1'){
+         CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
       }
    }
 
