@@ -826,11 +826,6 @@ class PluginGestionConfig extends CommonDBTM
          include(PLUGIN_GESTION_DIR . "/install/update_132_next.php");
          update(); 
       }
-
-      $CronTaskCheck = $DB->query("SELECT itemtype FROM glpi_crontasks WHERE NAME = 'GestionPdf'")->fetch_object();
-      if(!isset($CronTaskCheck->itemtype) && $_SESSION['PLUGIN_RP_VERSION'] > '1.3.1'){
-         CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
-      }
    }
 
    static function uninstall(Migration $migration)
