@@ -6,14 +6,6 @@ function plugin_gestion_install() { // fonction installation du plugin
    if (!is_dir($rep_files_gestion))
       mkdir($rep_files_gestion);
 
-   $rep_files_gestion = GLPI_PLUGIN_DOC_DIR . "/gestion/signed";
-   if (!is_dir($rep_files_gestion))
-      mkdir($rep_files_gestion);
-
-   $rep_files_gestion = GLPI_PLUGIN_DOC_DIR . "/gestion/unsigned";
-   if (!is_dir($rep_files_gestion))
-      mkdir($rep_files_gestion);
-
    $rep_files_gestion = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint";
    if (!is_dir($rep_files_gestion))
       mkdir($rep_files_gestion);
