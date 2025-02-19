@@ -159,12 +159,6 @@ class PluginGestionReminder extends CommonDBTM {
                      $valueAfterRoot = NULL;
                   }
 
-                  Session::addMessageAfterRedirect(__('matches[1] : '.$matches[1], 'gestion'), false, ERROR);
-
-                  Session::addMessageAfterRedirect(__('valueAfterRoot: '.$valueAfterRoot, 'gestion'), false, ERROR);
-
-                  Session::addMessageAfterRedirect(__('fileDestination: '.$fileDestination, 'gestion'), false, ERROR);
-
                   if ($fileDestination !== NULL){
                      if (stripos($valueAfterRoot, $fileDestination) !== false) {
                         $isSigned = 1; // "Bl_Signe" est présent, peu importe la casse

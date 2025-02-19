@@ -63,46 +63,6 @@ class PluginGestionTicket extends CommonDBTM {
       return $vouchers;
    }
 
-   /*static function getTableViews(){
-      global $DB;
-      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
-      $sharepoint = new PluginGestionSharepoint();
-
-      // Récupérer les lignes de la table où la colonne params est 0 ou 1
-      $query = "SELECT folder_name, params FROM glpi_plugin_gestion_configsfolder WHERE params IN (0, 1)";
-      $result = $DB->query($query); // Utilisation de la classe GLPI pour les requêtes
-   
-      if (!$result) {
-            throw new Exception("Erreur lors de l'exécution de la requête SQL.");
-      }
-   
-      // Initialisation des groupes et vérification des résultats
-      $groups = [];
-      $hasValidParams = false; // Indicateur pour vérifier si des valeurs de params existent
-   
-      while ($row = $DB->fetchAssoc($result)) {
-         $hasValidParams = true; // Une ligne avec params 0 ou 1 a été trouvée
-         $folderPath = $row['folder_name']; // Obtenir le chemin du dossier
-         $params = $row['params']; // Obtenir la valeur de params
-
-         // Exécuter la méthode appropriée en fonction de la valeur de params
-         if ($params == 0) {
-            $contents = $sharepoint->listFolderContents($folderPath);
-         } elseif ($params == 1) {
-            $contents = $sharepoint->listFolderContentsRecursive($folderPath);
-         }
-      }
-   
-      // Si aucune ligne valide n'a été trouvée, utiliser le chemin par défaut
-      if (!$hasValidParams) {
-            $folderPath = ''; // Récupérer le nom par défaut
-            $contents = $sharepoint->listFolderContents($folderPath); // Utiliser listFolderContents
-      }
-
-      return $contents;
-   }*/
-//*--------------------------------------------------------------------------------------------- 
-
    static function showForTicket(Ticket $ticket) { // formulaire sur le ticket
       global $DB, $CFG_GLPI;
 
