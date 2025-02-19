@@ -94,6 +94,12 @@ class PluginGestionConfig extends CommonDBTM
             echo Html::input('ZenDocMail', ['value' => $config->ZenDocMail(), 'size' => 40]);// bouton configuration du bas de page line 1
          echo "</td>";
       echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Conservation du PDF non signé après la signature", "gestion") . "</td><td>";
+            Dropdown::showYesNo('ConfigModes', $config->ConfigModes(), -1);
+         echo "</td>";
+      echo "</tr>";
     
       // -----------------------------------------------------------------------
 
@@ -674,6 +680,10 @@ class PluginGestionConfig extends CommonDBTM
    {
       return ($this->fields['gabarit']);
    }
+   function ConfigModes()
+   {
+      return ($this->fields['ConfigModes']);
+   }
    function gabarit_tracker()
    {
       return ($this->fields['gabarit_tracker']);
@@ -746,6 +756,7 @@ class PluginGestionConfig extends CommonDBTM
                   `NumberViews` INT(10) NOT NULL DEFAULT '800',
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
+                  `ConfigModes` TINYINT NOT NULL DEFAULT '0',
                   `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',
                   `gabarit` INT(10) NOT NULL DEFAULT '0',
                   `SignatureX` FLOAT NOT NULL DEFAULT '36',
@@ -815,16 +826,6 @@ class PluginGestionConfig extends CommonDBTM
       if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.3.1'){
          include(PLUGIN_GESTION_DIR . "/install/update_132_next.php");
          update(); 
-      }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.4.1'){
-         $query = "SHOW COLUMNS FROM `$table` LIKE 'ConfigModes';";
-         $result = $DB->query($query);
-         
-         if ($DB->numrows($result) > 0) {
-               // La colonne existe, on peut la supprimer
-               $query = "ALTER TABLE `$table` DROP COLUMN `ConfigModes`;";
-               $DB->query($query) or die($DB->error());
-         }
       }
    }
 

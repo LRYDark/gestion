@@ -11,34 +11,6 @@ class PluginGestionCri extends CommonDBTM {
       return _n('Rapport / Prise en charge', 'Rapport / Prise en charge', $nb, 'rp');
    }
 
-   function ShareLink($Doc_Name){
-      global $DB;
-      $sharepoint = new PluginGestionSharepoint(); // Initialiser la classe SharePointGraph
-
-      // Requête SQL pour récupérer le folder_name où params = 3
-      $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1";
-      $result = $DB->query($query); // Exécuter la requête avec le gestionnaire de base de données GLPI
-
-      if (!$result) {
-         throw new Exception("Erreur lors de l'exécution de la requête SQL.");
-      }
-
-      // Vérifier si une ligne correspondante existe
-      $folderPath = ""; // Par défaut, $folderPath est vide
-      if ($row = $DB->fetchAssoc($result)) {
-         $folderPath = $row['folder_name']; // Récupérer le folder_name si params = 3
-      }
-
-      if (!empty($folderPath)){
-         $folderPath = $folderPath . "/";
-      }
-      // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-      $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
-
-      // Étape 3 : Obtenez le lien de partage
-      return $sharepoint->createShareLink($itemId);
-   }
-
    function showForm($ID, $options = []) {
       global $DB, $CFG_GLPI;
 
@@ -179,21 +151,18 @@ class PluginGestionCri extends CommonDBTM {
                   if ($config->fields['SharePointLinkDisplay'] == 1){
                      // Utilisation
                      try {
-                        // Vérifier si une ligne correspondante existe
-                        $folderPath = ""; // Par défaut, $folderPath est vide
-                        if (!empty($DOC->url_bl)){
-                           $folderPath = $DOC->url_bl . "/";
-                        }
-                        // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-                        $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
+                        // Construire le chemin complet du fichier
+                        $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
+                        $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
 
-                        // Étape 3 : Obtenez le lien de partage
-                        $shareLink = $sharepoint->createShareLink($itemId);
+                        // Obtenir l'URL de téléchargement direct du fichier
+                        $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
 
                         // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
                         // Affiche le PDF intégré avec une classe CSS pour le responsive
-                        echo "<embed src='$shareLink' type='application/pdf' class='responsive-pdf' />";
+                        echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                              style='width:100%; height:600px;' frameborder='0'></iframe>";
                         echo "</tr>";
 
                         // Bouton pour voir le PDF en plein écran
@@ -273,25 +242,12 @@ class PluginGestionCri extends CommonDBTM {
                   if ($config->fields['SharePointLinkDisplay'] == 1){ 
                      // Utilisation
                      try {
-                        // Vérifier si une ligne correspondante existe
-                        $folderPath = ""; // Par défaut, $folderPath est vide
-                        if (!empty($DOC->url_bl)){
-                           $folderPath = $DOC->url_bl . "/";
-                        }
-                        // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-                        $itemId = $folderPath . $Doc_Name . ".pdf"; // Remplacez par le chemin exact de votre fichier
+                        // Construire le chemin complet du fichier
+                        $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
+                        $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
 
-                        // Étape 3 : Récupérez l'ID du fichier
-                        $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
-
-                        if ($fileId) {
-                           $itemId = $fileId;
-                        } else {
-                           echo "Erreur : Fichier '$itemId' introuvable dans le dossier '$folderPath'.\n";
-                        }
-
-                        // Étape 3 : Obtenez le lien de partage
-                        $shareLink = $sharepoint->createShareLink($itemId);
+                        // Obtenir l'URL de téléchargement direct du fichier
+                        $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);
 
                         // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
@@ -305,7 +261,8 @@ class PluginGestionCri extends CommonDBTM {
                            
                            echo "<td style='width: 80%;'>"; // Augmente la largeur de la colonne droite pour le PDF
                               // Affiche le PDF intégré avec une classe CSS pour le responsive
-                              echo "<embed src='$shareLink' type='application/pdf' class='responsive-pdf' />";
+                              echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                                    style='width:100%; height:600px;' frameborder='0'></iframe>";
                            echo "</td>";
                         echo "</tr>";
 
@@ -425,18 +382,23 @@ class PluginGestionCri extends CommonDBTM {
                   if ($config->fields['SharePointLinkDisplay'] == 1){
                      // Utilisation
                      try {
-                        // Étape 3 : Obtenez le lien de partage
-                        $shareLink = $this->ShareLink($Doc_Name);
+                        // Construire le chemin complet du fichier
+                        $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
+                        $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
+
+                        // Obtenir l'URL de téléchargement direct du fichier
+                        $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
 
                         // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
                         // Affiche le PDF intégré avec une classe CSS pour le responsive
-                        echo "<embed src='$shareLink' type='application/pdf' class='responsive-pdf' />"; // Affiche le PDF intégré avec une classe CSS pour le responsive
+                        echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                              style='width:100%; height:600px;' frameborder='0'></iframe>";
                         echo "</tr>";
 
                         // Bouton pour voir le PDF en plein écran
                         echo "<tr>";
-                        echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>';   // Bouton pour voir le PDF en plein écran
+                        echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>'; //   Bouton pour voir le PDF en plein écran
                         echo "</tr><br><br>";
 
                      } catch (Exception $e) {
@@ -473,14 +435,19 @@ class PluginGestionCri extends CommonDBTM {
                   if ($config->fields['SharePointLinkDisplay'] == 1){
                      // Utilisation
                      try {
-                        // Étape 3 : Obtenez le lien de partage
-                        $shareLink = $this->ShareLink($Doc_Name);
+
+                        // Construire le chemin complet du fichier
+                        $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
+                        $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
+
+                        // Obtenir l'URL de téléchargement direct du fichier
+                        $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);
 
                         // Étape 4 : Affichez le PDF via <embed>
                            echo "<td style='width: 70%;'>"; // Augmente la largeur de la colonne droite pour le PDF
                               // Affiche le PDF intégré avec une classe CSS pour le responsive
-                              echo "<embed src='$shareLink' type='application/pdf' class='responsive-pdf' />"; // Affiche le PDF intégré avec une classe CSS pour le responsive
-                           echo "</td>";
+                              echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                                 style='width:100%; height:600px;' frameborder='0'></iframe>";                           echo "</td>";
                         echo "</tr>";
 
                         // Voir PDF

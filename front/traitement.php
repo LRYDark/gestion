@@ -227,27 +227,17 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){        
         $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL);
     }
-
-    try {
-        $folderPathFile = ""; // Par défaut, $folderPath est vide
-        if (!empty($DOC->url_bl)){
-            $folderPathFile = $DOC->url_bl;
+    
+    if($config->ConfigModes() == 0){
+        try {
+           $folderPathFile = ""; // Par défaut, $folderPath est vide
+           if (!empty($DOC->url_bl)){
+              $folderPathFile = $DOC->url_bl .'/'. $DOC_NAME.".pdf" ;
+           }             
+           $sharepoint->deleteFileByPath($folderPathFile);
+        } catch (Exception $e) {
+           message("Erreur : " . $e->getMessage(), ERROR);
         }
-
-        $folderPath = $folderPathFile;
-        $itemId = $DOC_NAME.".pdf"; // Nom du fichier à rechercher
-
-        // Étape 3 : Récupérez l'ID du fichier
-        $fileId = $sharepoint->getFileIdByName($folderPath, $itemId);
-    } catch (Exception $e) {
-        message("Erreur : " . $e->getMessage(), ERROR);
-    }
-        
-    try {
-        // Étape 3 : Supprimez le fichier
-        $sharepoint->deleteFile($fileId);
-    } catch (Exception $e) {
-        message("Erreur : " . $e->getMessage(), ERROR);
     }
 
     try {
@@ -293,7 +283,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         message("Erreur : " . $e->getMessage(), ERROR);
     }
                 
-    if ($DB->query("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl' WHERE id = $id_document")){
+    if ($DB->query("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath' WHERE id = $id_document")){
         unlink($existingPdfPath);
         unlink($signaturePath);
         unlink($outputPathTemp);

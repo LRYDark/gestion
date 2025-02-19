@@ -427,59 +427,14 @@ class PluginGestionSharepoint extends CommonDBTM {
     }
 
     /**
-     * Fonction pour générer un lien de partage public
+     * Fonction pour obtenir l'URL de téléchargement direct du fichier dans SharePoint
      */
-    public function createShareLink($itemId) {
+    public function getDownloadUrlByPath($filePath) {
         $accessToken = $this->getAccessToken();
         $driveId = $this->GetDriveId();
 
-        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$itemId/createLink";
-
-        $headers = [
-            "Authorization: Bearer $accessToken",
-            "Content-Type: application/json"
-        ];
-
-        $postData = [
-            "type" => "view", // Lien de visualisation
-            "scope" => "anonymous" // Accessible sans authentification
-        ];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-        $response = curl_exec($ch);
-        $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        $responseObj = json_decode($response, true);
-
-        if ($httpStatus === 200 && isset($responseObj['link']['webUrl'])) {
-            return $responseObj['link']['webUrl'];
-        } else {
-            throw new Exception("Erreur : Impossible de générer un lien de partage.");
-        }
-    }
-
-    /**
-     * Fonction pour récupérer l'ID d'un fichier spécifique dans un dossier
-     */
-    public function getFileIdByName($folderPath, $fileName) {
-        $accessToken = $this->getAccessToken();
-        $driveId = $this->GetDriveId();
-
-        // Construire l'URL en fonction de la valeur de $folderPath
-        if (empty($folderPath)) {
-            // Si $folderPath est vide, utiliser l'URL pour le dossier racine
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/children";
-        } else {
-            // Sinon, utiliser l'URL pour le dossier spécifié
-            $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$folderPath:/children";
-        }
+        // Construire l'URL pour récupérer l'URL du fichier
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$filePath";
 
         $headers = [
             "Authorization: Bearer $accessToken",
@@ -496,15 +451,10 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_close($ch);
 
         if ($httpStatus === 200) {
-            $files = json_decode($response, true)['value'];
-            foreach ($files as $file) {
-                if ($file['name'] === $fileName) {
-                    return $file['id']; // Retourne l'ID du fichier si le nom correspond
-                }
-            }
-            return null; // Aucun fichier trouvé avec ce nom
+            $fileData = json_decode($response, true);
+            return $fileData['@microsoft.graph.downloadUrl'] ?? null; // Retourne l'URL de téléchargement
         } else {
-            throw new Exception("Erreur : Impossible de lister les fichiers dans le dossier (HTTP $httpStatus).");
+            return null;
         }
     }
 
@@ -545,13 +495,14 @@ class PluginGestionSharepoint extends CommonDBTM {
     }
 
     /**
-     * Fonction pour supprimer un fichier dans SharePoint
+     * Fonction pour supprimer un fichier en utilisant son chemin complet (sans passer par l'ID)
      */
-    public function deleteFile($itemId) {
+    public function deleteFileByPath($filePath) {
         $accessToken = $this->getAccessToken();
         $driveId = $this->GetDriveId();
 
-        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$itemId";
+        // Construire l'URL pour supprimer le fichier directement via son chemin
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$filePath";
 
         $headers = [
             "Authorization: Bearer $accessToken",
@@ -571,7 +522,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         if ($httpStatus === 204) {
             echo "Fichier supprimé avec succès.\n";
         } elseif ($httpStatus === 404) {
-            echo "Erreur : Fichier introuvable.\n";
+            echo "Erreur : Fichier introuvable à ce chemin : $filePath\n";
         } else {
             throw new Exception("Erreur : Impossible de supprimer le fichier (HTTP $httpStatus).");
         }
