@@ -817,8 +817,14 @@ class PluginGestionConfig extends CommonDBTM
          update(); 
       }
       if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.4.1'){
-         $query = "ALTER TABLE $table DROP COLUMN ConfigModes;";
-         $DB->query($query) or die($DB->error());
+         $query = "SHOW COLUMNS FROM `$table` LIKE 'ConfigModes';";
+         $result = $DB->query($query);
+         
+         if ($DB->numrows($result) > 0) {
+               // La colonne existe, on peut la supprimer
+               $query = "ALTER TABLE `$table` DROP COLUMN `ConfigModes`;";
+               $DB->query($query) or die($DB->error());
+         }
       }
    }
 
