@@ -1005,6 +1005,50 @@ class PluginGestionSharepoint extends CommonDBTM {
             }
         }
 
+        // 5. Vérifier les permissions sur le Drive ("Documents partagés")
+        try {
+            $driveId = $this->GetDriveId();
+            $permissionsUrl = "https://graph.microsoft.com/v1.0/drives/$driveId/root/permissions";
+            $permissionsResponse = $this->apiRequest($permissionsUrl, $headers);
+
+            if (isset($permissionsResponse['value']) && count($permissionsResponse['value']) > 0) {
+                $roles = [];
+
+                foreach ($permissionsResponse['value'] as $perm) {
+                    if (isset($perm['roles']) && isset($perm['grantedToV2']['siteGroup']['displayName'])) {
+                        $roles[$perm['grantedToV2']['siteGroup']['displayName']] = $perm['roles'];
+                    }
+                }
+
+                $results['permissions']['status'] = true;
+                $results['permissions']['message'] = "Permissions récupérées.";
+                $results['permissions']['roles'] = $roles;
+
+                // 6. Vérifier l'accès sur le Drive en fonction des rôles
+                $driveRoles = array_merge(...array_values($roles)); // Fusionner tous les rôles en un seul tableau
+
+                if (in_array("owner", $driveRoles) || in_array("fullControl", $driveRoles)) {
+                    $results['driveAccess']['status'] = true;
+                    $results['driveAccess']['message'] = "L'utilisateur a un contrôle total sur le drive.";
+                } elseif (in_array("write", $driveRoles)) {
+                    $results['driveAccess']['status'] = true;
+                    $results['driveAccess']['message'] = "L'utilisateur peut modifier des fichiers.";
+                } elseif (in_array("read", $driveRoles)) {
+                    $results['driveAccess']['status'] = false;
+                    $results['driveAccess']['message'] = "L'utilisateur peut uniquement lire les fichiers.";
+                } else {
+                    throw new Exception("L'utilisateur n'a pas d'accès spécifique au drive.");
+                }
+
+            } else {
+                throw new Exception("Impossible de récupérer les permissions.");
+            }
+
+        } catch (Exception $e) {
+            $results['permissions']['message'] = $e->getMessage();
+            $results['driveAccess']['message'] = "Erreur lors de la récupération des permissions.";
+        }
+
         return $results;
     }
 

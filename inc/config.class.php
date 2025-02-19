@@ -484,7 +484,7 @@ class PluginGestionConfig extends CommonDBTM
                <div class="modal-dialog modal-lg">
                   <div class="modal-content">
                      <div class="modal-header">
-                           <h5 class="modal-title" id="AddGestionModalLabel">Statut de connexion</h5>
+                           <h5 class="modal-title" id="AddGestionModalLabel">Statut de connexion <i class='fa-solid fa-circle-info text-secondary' data-bs-toggle='tooltip' data-bs-placement='top' title="Pensez à vérifier les droits de suppression, de lecture et d'écriture sur le site SharePoint afin d'assurer son bon fonctionnement et une récupération optimale des métadonnées."></i></h5>
                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                      </div>
                      <div class="modal-body">
@@ -496,34 +496,59 @@ class PluginGestionConfig extends CommonDBTM
                            </li>
             HTML;
                $result = $sharepoint->checkSharePointAccess(); 
-            
+
                $statusIcons = [
                   1 => '<i class="fa fa-check-circle text-success"></i>', // ✅ Succès
                   0 => '<i class="fa fa-times-circle text-danger"></i>'   // ❌ Échec
                ];
-            
+               
                $fields = [
                   'accessToken'      => 'Token d\'accès',
                   'sharePointAccess' => 'Accès SharePoint',
                   'siteID'           => 'Site ID',
-                  'graphQuery'       => 'Microsoft Graph Query'
+                  'graphQuery'       => 'Microsoft Graph Query',
+                  'driveAccess'      => 'Accès au Drive : <br> - '.$config->Global(),
+                  'permissions'      => 'Permissions SharePoint : <br> - '.$config->Global()
                ];
-            
+               
                foreach ($fields as $key => $label) {
                   if (isset($result[$key])) {
-                        $status = $result[$key]['status'] ?? 0;
-                        $message = htmlspecialchars($result[$key]['message'], ENT_QUOTES, 'UTF-8');
-                        $icon = $statusIcons[$status] ?? $statusIcons[0];
-                        $displayMessage = $message;
-                  
-                        echo "<li class='list-group-item d-flex'>";
-                        echo "<div class='col-4'><strong>$label</strong></div>";
-                        echo "<div class='col-6'>$displayMessage</div>";
-                        echo "<div class='col-2 text-center'>$icon</div>";
-                        echo "</li>";
+                     $status = $result[$key]['status'] ?? 0;
+                     $message = htmlspecialchars($result[$key]['message'], ENT_QUOTES, 'UTF-8');
+                     $icon = ($key !== 'permissions') ? ($statusIcons[$status] ?? $statusIcons[0]) : ''; // ❌ Retirer icône pour permissions
+               
+                     echo "<li class='list-group-item d-flex'>";
+                     echo "<div class='col-4'><strong>$label</strong></div>";
+               
+                     // 🔹 Affichage des permissions sous forme de liste (sans icônes)
+                     if ($key === 'permissions' && isset($result[$key]['roles']) && !empty($result[$key]['roles'])) {
+                           echo "<div class='col-6'><ul class='list-unstyled'>";
+                           foreach ($result[$key]['roles'] as $group => $roles) {
+                              $roleList = implode(', ', array_map('htmlspecialchars', $roles));
+                              echo "<li><strong>$group :</strong> $roleList</li>";
+                           }
+                           echo "</ul></div>";
+                     } else {
+                           echo "<div class='col-6'>";
+                           
+                           // 🔹 Ajout d'une icône d'information uniquement pour `driveAccess`
+                           if ($key === 'driveAccess') {
+                              if (strpos($message, 'modifier des fichiers') !== false) {
+                                 $message .= " <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip' 
+                                                data-bs-placement='top' title='Le plugin ne pourra pas supprimer ou télécharger automatiquement les documents après signature, il ne sera pas fonctionnel à 100%'></i>";
+                              } elseif (strpos($message, 'uniquement lire les fichiers') !== false) {
+                                 $message .= " <i class='fa-solid fa-circle-info text-secondary' data-bs-toggle='tooltip' 
+                                                data-bs-placement='top' title='Le plugin ne pourra pas supprimer, télécharger ou modifier automatiquement les documents après signature'></i>";
+                              }
+                           }
+               
+                           echo "$message</div>";
+                     }
+               
+                     echo "<div class='col-2 text-center'>$icon</div>";
+                     echo "</li>";
                   }
-               }
-               echo "<br><br>Pensez à vérifier les droits de suppression, de lecture et d'écriture sur le site SharePoint afin d'assurer son bon fonctionnement et une récupération optimale des métadonnées.";
+               }            
             echo <<<HTML
                         </ul>
                      </div>
