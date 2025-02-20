@@ -297,7 +297,7 @@ class PluginGestionTicket extends CommonDBTM {
                   // Affichage du dropdown
                   Dropdown::showFromArray("groups_id", $groups, [
                      'multiple'     => true,
-                     'width'        => 655,
+                     'width'        => '100%',
                      'values'       => json_decode($selected_values_json, true),
                      'disabled'     => $disabled,
                   ]);
@@ -361,7 +361,7 @@ class PluginGestionTicket extends CommonDBTM {
 
                                     // Réinitialiser Select2
                                     $('[name="groups_id[]"]').select2({
-                                          width: '650',
+                                          //width: '650',
                                           dropdownAutoWidth: true,
                                           dropdownParent: $('[name="groups_id[]"]').closest('div.modal, div.dropdown-menu, body'),
                                           quietMillis: 100,
