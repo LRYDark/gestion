@@ -109,11 +109,11 @@ class PluginGestionReminder extends CommonDBTM {
 
          $endDate = (new DateTime())->format('Y-m-d\TH:i:s\Z');
 
-         // Étape 2 : Récupérer les fichiers récents
-         $recentFiles = $sharepoint->searchSharePointCron($startDate, $endDate);
-
          $lastdate = date('Y-m-d H:i:s');
          $DB->query("UPDATE glpi_plugin_gestion_configs SET LastCronTask = '$lastdate' WHERE id = 1");
+
+         // Étape 2 : Récupérer les fichiers récents
+         $recentFiles = $sharepoint->searchSharePointCron($startDate, $endDate);
 
          $requet2 = $DB->query("SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1")->fetch_object();
          $fileDestination = $requet2->folder_name ?? NULL;
