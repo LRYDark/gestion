@@ -853,8 +853,8 @@ class PluginGestionSharepoint extends CommonDBTM {
 
         $mmail->isHTML(true);
         $mmail->Subject = $remplacerBalises($NotifMailTemplate->subject);
-        $mmail->Body = GLPIMailer::normalizeBreaks($remplacerBalises($NotifMailTemplate->content_html)) . $footer;
-        $mmail->AltBody = GLPIMailer::normalizeBreaks($remplacerBalises($NotifMailTemplate->content_text)) . $footer;
+        $mmail->Body = GLPIMailer::normalizeBreaks($remplacerBalises($BodyHtml)) . $footer;
+        $mmail->AltBody = GLPIMailer::normalizeBreaks($remplacerBalises($BodyText)) . $footer;
     
             // envoie du mail
             if(!$mmail->send()) {
