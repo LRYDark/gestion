@@ -93,7 +93,7 @@ class PluginGestionReminder extends CommonDBTM {
       $config = new PluginGestionConfig();
       $bibliotheque = $config->Global();
       $encodedFilePath = '';
-  
+
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint();
 
@@ -111,6 +111,9 @@ class PluginGestionReminder extends CommonDBTM {
 
          // Étape 2 : Récupérer les fichiers récents
          $recentFiles = $sharepoint->searchSharePointCron($startDate, $endDate);
+
+         $lastdate = date('Y-m-d H:i:s');
+         $DB->query("UPDATE glpi_plugin_gestion_configs SET LastCronTask = '$lastdate' WHERE id = 1");
 
          $requet2 = $DB->query("SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1")->fetch_object();
          $fileDestination = $requet2->folder_name ?? NULL;
@@ -214,10 +217,6 @@ class PluginGestionReminder extends CommonDBTM {
                }
             }
          }
-
-         $lastdate = date('Y-m-d H:i:s');
-         $DB->query("UPDATE glpi_plugin_gestion_configs SET LastCronTask = '$lastdate' WHERE id = 1");
-
       } catch (Exception $e) {
          Session::addMessageAfterRedirect(__($e->getMessage(), 'gestion'), false, ERROR);
       }
