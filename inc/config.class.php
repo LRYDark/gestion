@@ -479,18 +479,19 @@ class PluginGestionConfig extends CommonDBTM
          echo "Filtre de recheche, 500 Documents Max par odre de modifictation et d'ajout. <br> Requête : de la date et heure suivante : ";
             Html::showDateTimeField("LastCronTask", [
                'value'      => $config->LastCronTask(), 
-               //'timestep'   => 0,
-               //'canedit'    => true,
-               //'maybeempty' => true,
+               'canedit'    => true,
+               'maybeempty' => true,
                'mindate'    => '',
-               'maxdate'    => '',
-               'maxdate'    => date('Y-m-d', strtotime('+1 day')),
-               'maxtime'    => date('H:i:s')
+               'mintime'    => '',
+               'maxdate'    => date('Y-m-d'),
+               'maxtime'    => ''
+               //'maxtime'    => date('H:i:s')
             ]);
          echo "-> Jusqu'a la date et heure d'execution de la tâche cron.";
          echo "</td>";
       echo "</tr>";
-
+      echo '<style> button[btn-id="0"] { display: none !important; } </style>';
+      
       echo "<tr><th colspan='2'>" . __("Connexion", 'gestion') . "</th></tr>";
       echo "<tr class='tab_bg_1'>";
          echo "<td>" . __("Statut de connexion", "gestion") . "</td><td>";
