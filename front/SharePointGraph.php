@@ -798,8 +798,11 @@ class PluginGestionSharepoint extends CommonDBTM {
         return $tracker;
     }
 
-    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL){
+    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL){
         global $DB, $CFG_GLPI;
+
+        Session::addMessageAfterRedirect(__('Tracker : '.$tracker, 'gestion'), false, ERROR);
+        Session::addMessageAfterRedirect(__('WebUrl : '.$webUrl, 'gestion'), false, ERROR);
 
         // Validation de l'email
         if (!filter_var($EMAIL, FILTER_VALIDATE_EMAIL)) {
@@ -808,9 +811,9 @@ class PluginGestionSharepoint extends CommonDBTM {
 
         //BALISES
         $Balises = array(
-            array('Balise' => '##gestion.id##'             , 'Value' => sprintf("%07d", $id_survey)),
-            array('Balise' => '##gestion.tracker##'        , 'Value' => sprintf("%07d", $tracker)),
-            array('Balise' => '##gestion.url##'            , 'Value' => sprintf("%07d", $url)),
+            array('Balise' => '##gestion.id##'             , 'Value' => $id_survey),
+            array('Balise' => '##gestion.tracker##'        , 'Value' => $tracker),
+            array('Balise' => '##gestion.url##'            , 'Value' => "<a href='$url'>$fileName</a>"),
         );
 
         // Fonction pour remplacer les balises

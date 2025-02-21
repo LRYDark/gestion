@@ -222,10 +222,10 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     $DB->query("UPDATE glpi_plugin_gestion_surveys SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
 
     if (!empty($config->fields['ZenDocMail'])){ 
-        $sharepoint->MailSend($config->fields['ZenDocMail'], $config->fields['gabarit'], $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL);
+        $sharepoint->MailSend($config->fields['ZenDocMail'], $config->fields['gabarit'], $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
     }  
     if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){        
-        $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL);
+        $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
     }
     
     if($config->ConfigModes() == 0){

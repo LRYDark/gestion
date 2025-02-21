@@ -207,7 +207,7 @@ class PluginGestionReminder extends CommonDBTM {
                      while ($data = $DB->fetchAssoc($result)) {
                         $folder_name = $data['folder_name'];
                         if (strpos($tracker, $folder_name) !== false) { 
-                           $sharepoint->MailSend($config->fields['MailTracker'], $config->fields['gabarit_tracker'], $outputPath = NULL, $message = NULL, $id_survey, $tracker, $webUrl);
+                           $sharepoint->MailSend($config->fields['MailTracker'], $config->fields['gabarit_tracker'], $outputPath = NULL, $message = NULL, $id_survey, $tracker, $webUrl, $fileName);
                         } 
                      }
                   }
