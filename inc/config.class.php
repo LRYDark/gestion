@@ -56,7 +56,7 @@ class PluginGestionConfig extends CommonDBTM
       $sharepoint = new PluginGestionSharepoint();
 
       $config->showFormHeader(['colspan' => 4]);
-      echo "<tr><th colspan='2'>" . __('Gestion', 'rp') . "</th></tr>";
+      echo "<tr><th colspan='2'>" . __('Gestion', 'gestion') . "</th></tr>";
 
       echo "<tr class='tab_bg_1'>";
          echo "<td>" . __("Affichage du PDF après signature", "gestion") . "</td><td>";
@@ -103,7 +103,7 @@ class PluginGestionConfig extends CommonDBTM
     
       // -----------------------------------------------------------------------
 
-      echo "<tr><th colspan='2'>" . __("Positionnement des éléments (0 pour masqué)", 'rp') . "</th></tr>";
+      echo "<tr><th colspan='2'>" . __("Positionnement des éléments (0 pour masqué)", 'gestion') . "</th></tr>";
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Position de la signature sur le PDF", "gestion") . "</td><td>";
                echo '<div style="display: flex; align-items: center; gap: 5px;">';
@@ -160,7 +160,7 @@ class PluginGestionConfig extends CommonDBTM
             echo "</td>";
          echo "</tr>";
 
-      echo "<tr><th colspan='2'>" . __("Configuration de l'affichage et Tâche cron", 'rp') . "</th></tr>";
+      echo "<tr><th colspan='2'>" . __("Configuration de l'affichage et Tâche cron", 'gestion') . "</th></tr>";
       echo "<tr class='tab_bg_1'>";
          echo "<td>" . __("Prévisualisation du PDF avant signature <i class='fa-solid fa-circle-info text-secondary' data-bs-toggle='tooltip' data-bs-placement='top' title=\"(cela peut provoquer des ralentissements). Vérifiez également la configuration de SharePoint pour l'autorisation de partage par lien.\"></i>", "gestion") . "</td><td>";
             Dropdown::showYesNo('SharePointLinkDisplay', $config->SharePointLinkDisplay(), -1);
@@ -235,7 +235,7 @@ class PluginGestionConfig extends CommonDBTM
          }      
       }
 
-      echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph) | '.$checkcon . $errorcon, 'rp') . "</th></tr>";
+      echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph) | '.$checkcon . $errorcon, 'gestion') . "</th></tr>";
 
       echo "<tr class='tab_bg_1'>";
          echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
@@ -269,7 +269,7 @@ class PluginGestionConfig extends CommonDBTM
 
       if(!empty($config->TenantID())){
          if ($result['status'] == true){
-            echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'rp') . "</th></tr>";
+            echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'gestion') . "</th></tr>";
 
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Bibliothèques de recherche : <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip' data-bs-placement='top' title='Attention : toute modification de la bibliothèque après l’utilisation d’une bibliothèque précédent peut entraîner des bugs ou des conflits.'></i>", "gestion") ;
@@ -294,7 +294,7 @@ class PluginGestionConfig extends CommonDBTM
                echo "</td>";
             echo "</tr>";
 
-            echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'rp') . "</th></tr>";
+            echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'gestion') . "</th></tr>";
             
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Ajouter un dossier (Nom du dossier)", "gestion") . "</td><td>";
@@ -387,7 +387,7 @@ class PluginGestionConfig extends CommonDBTM
          }
       }
    
-      echo "<tr><th colspan='2'>" . __("Entités et Tracker", 'rp') . "</th></tr>";
+      echo "<tr><th colspan='2'>" . __("Entités et Tracker", 'gestion') . "</th></tr>";
          //--------------------------------------------
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Extraction d'un tracker dans le PDF", "gestion") . "</td><td>";
@@ -469,8 +469,29 @@ class PluginGestionConfig extends CommonDBTM
             echo "</tr>";
          }
 
-      echo "<tr><th colspan='2'>" . __("Dérnière synchronisation Cron : ".$config->LastCronTask(), 'rp') . "</th></tr>";
+      $lastrun = $DB->query("SELECT lastrun FROM glpi_crontasks WHERE name = 'GestionPdf'")->fetch_object();
+      if($lastrun->lastrun == NULL){
+         $lastrun->lastrun = 'Jamais';
+      }
+      echo "<tr><th colspan='2'>" . __("Dérnière synchronisation Cron : ".$lastrun->lastrun, 'gestion') . "</th></tr>";
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Recheche des nouveaux documents dans le site SharePoint :", "gestion") . "</td><td>";
+         echo "Filtre de recheche, 500 Documents Max par odre de modifictation et d'ajout. <br> Requête : de la date et heure suivante : ";
+            Html::showDateTimeField("LastCronTask", [
+               'value'      => $config->LastCronTask(), 
+               //'timestep'   => 0,
+               //'canedit'    => true,
+               //'maybeempty' => true,
+               'mindate'    => '',
+               'maxdate'    => '',
+               'maxdate'    => date('Y-m-d', strtotime('+1 day')),
+               'maxtime'    => date('H:i:s')
+            ]);
+         echo "-> Jusqu'a la date et heure d'execution de la tâche cron.";
+         echo "</td>";
+      echo "</tr>";
 
+      echo "<tr><th colspan='2'>" . __("Connexion", 'gestion') . "</th></tr>";
       echo "<tr class='tab_bg_1'>";
          echo "<td>" . __("Statut de connexion", "gestion") . "</td><td>";
 
