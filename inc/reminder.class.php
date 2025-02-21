@@ -206,7 +206,7 @@ class PluginGestionReminder extends CommonDBTM {
                      // Vérification des correspondances
                      while ($data = $DB->fetchAssoc($result)) {
                         $folder_name = $data['folder_name'];
-                        if (strpos($tracker, $folder_name) !== false) { 
+                        if (stripos($tracker, $folder_name) !== false && $isSigned != 1) { 
                            $sharepoint->MailSend($config->fields['MailTracker'], $config->fields['gabarit_tracker'], $outputPath = NULL, $message = NULL, $id_survey, $tracker, $webUrl, $fileName);
                         } 
                      }

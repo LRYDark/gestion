@@ -801,9 +801,6 @@ class PluginGestionSharepoint extends CommonDBTM {
     public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL){
         global $DB, $CFG_GLPI;
 
-        Session::addMessageAfterRedirect(__('Tracker : '.$tracker, 'gestion'), false, ERROR);
-        Session::addMessageAfterRedirect(__('WebUrl : '.$webUrl, 'gestion'), false, ERROR);
-
         // Validation de l'email
         if (!filter_var($EMAIL, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException("L'adresse email est invalide : $EMAIL");
