@@ -483,9 +483,8 @@ class PluginGestionConfig extends CommonDBTM
                'maybeempty' => true,
                'mindate'    => '',
                'mintime'    => '',
-               'maxdate'    => date('Y-m-d'),
-               'maxtime'    => ''
-               //'maxtime'    => date('H:i:s')
+               'maxdate'    => date('Y-m-d H:i:s'),
+               //'maxtime'    => date('H:i:s') // non nécessaire
             ]);
          echo "-> Jusqu'a la date et heure d'execution de la tâche cron.";
          echo "</td>";
