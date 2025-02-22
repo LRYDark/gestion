@@ -109,7 +109,7 @@ class PluginGestionReminder extends CommonDBTM {
 
          $endDate = (new DateTime())->format('Y-m-d\TH:i:s\Z');
 
-         $lastdate = date('Y-m-d H:i:s');
+         $lastdate = date('Y-m-d H:i');
          $DB->query("UPDATE glpi_plugin_gestion_configs SET LastCronTask = '$lastdate' WHERE id = 1");
 
          // Étape 2 : Récupérer les fichiers récents
