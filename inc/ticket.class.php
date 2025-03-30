@@ -270,7 +270,7 @@ class PluginGestionTicket extends CommonDBTM {
                       $disabled = false;
                   } else {
                       $disabled = true;
-                  }    
+                  }   
                    
                   // Modal HTML
                   echo <<<HTML
