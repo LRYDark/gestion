@@ -50,10 +50,43 @@ class PluginGestionConfig extends CommonDBTM
 
    static function showConfigForm() //formulaire de configuration du plugin
    {
+      global $DB;
       $config = new self();
       $config->getFromDB(1);
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
       $sharepoint = new PluginGestionSharepoint();
+         $errorcon = "";
+         $checkcon ="";
+         $mode = true;
+
+      if($config->SharePointOn() == 1 && $config->SageOn() == 0){
+         // Met à jour toutes les lignes avec param = 1 => param = 8
+            $update = "UPDATE glpi_plugin_gestion_configs SET mode = 0 WHERE id = 1";
+            $DB->query($update);
+      }
+      if($config->SharePointOn() == 0 && $config->SageOn() == 1){
+         // Met à jour toutes les lignes avec param = 1 => param = 8
+            $update = "UPDATE glpi_plugin_gestion_configs SET mode = 1 WHERE id = 1";
+            $DB->query($update);
+      }
+      if($config->SharePointOn() == 0 && $config->SageOn() == 0){
+         // Met à jour toutes les lignes avec param = 1 => param = 8
+            $update = "UPDATE glpi_plugin_gestion_configs SET mode = 2 WHERE id = 1";
+            $DB->query($update);
+            $mode = false;
+      }
+
+      if($config->mode() == 1){
+         // Vérifie s'il existe au moins une ligne avec param = 1
+         $query = "SELECT id FROM glpi_plugin_gestion_configsfolder WHERE params = 1";
+         $result = $DB->query($query);
+
+         if ($result && $DB->numrows($result) > 0) {
+            // Met à jour toutes les lignes avec param = 1 => param = 8
+            $update = "UPDATE glpi_plugin_gestion_configsfolder SET params = 8 WHERE params = 1";
+            $DB->query($update);
+         }
+      }
 
       $config->showFormHeader(['colspan' => 4]);
       echo "<tr><th colspan='2'>" . __('Gestion', 'gestion') . "</th></tr>";
@@ -100,9 +133,20 @@ class PluginGestionConfig extends CommonDBTM
             Dropdown::showYesNo('ConfigModes', $config->ConfigModes(), -1);
          echo "</td>";
       echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Autorisé la connexion à Sage local", "gestion") . "</td><td>";
+            Dropdown::showYesNo('SageOn', $config->SageOn(), -1);
+         echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Autorisé la connexion à Sharepoint", "gestion") . "</td><td>";
+            Dropdown::showYesNo('SharePointOn', $config->SharePointOn(), -1);
+         echo "</td>";
+      echo "</tr>";
     
       // -----------------------------------------------------------------------
-
       echo "<tr><th colspan='2'>" . __("Positionnement des éléments (0 pour masqué)", 'gestion') . "</th></tr>";
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Position de la signature sur le PDF", "gestion") . "</td><td>";
@@ -212,9 +256,8 @@ class PluginGestionConfig extends CommonDBTM
       }
       
       //--------------------------------------------
-      if(!empty($config->TenantID())){
+      if(!empty($config->TenantID()) && $config->SharePointOn() == 1){
          // Utilisation
-         $errorcon = "";
          try {
             $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
             if ($result['status']) {
@@ -235,44 +278,87 @@ class PluginGestionConfig extends CommonDBTM
          }      
       }
 
-      echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph) | '.$checkcon . $errorcon, 'gestion') . "</th></tr>";
+      if($config->SharePointOn() == 1){
+         echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph) | '.$checkcon . $errorcon, 'gestion') . "</th></tr>";
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
-            echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 80]);// bouton configuration du bas de page line 1
-         echo "</td>";
-      echo "</tr>";
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
+               echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Client ID", "gestion") . "</td><td>";
-            echo Html::input('ClientID', ['value' => $config->ClientID(), 'size' => 80]);// bouton configuration du bas de page line 1
-         echo "</td>";
-      echo "</tr>";
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Client ID", "gestion") . "</td><td>";
+               echo Html::input('ClientID', ['value' => $config->ClientID(), 'size' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Client Secret", "gestion") . "</td><td>";
-            echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'size' => 80]);// bouton configuration du bas de page line 1
-         echo "</td>";
-      echo "</tr>";
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Client Secret", "gestion") . "</td><td>";
+               echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'size' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Nom d’hôte", "gestion") . "</td><td>";
-            echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 80]);// bouton configuration du bas de page line 1
-         echo "</td>";
-      echo "</tr>";
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Nom d’hôte", "gestion") . "</td><td>";
+               echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Chemin du Site (/sites/XXXX)", "gestion") . "</td><td>";
-            echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
-         echo "</td>";
-      echo "</tr>";
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Chemin du Site (/sites/XXXX)", "gestion") . "</td><td>";
+               echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+      }
 
-      if(!empty($config->TenantID())){
-         if ($result['status'] == true){
-            echo "<tr><th colspan='2'>" . __("Bibliothèques principlale du site", 'gestion') . "</th></tr>";
+      if($config->SageOn() == 1){
+         echo "<tr><th colspan='2'>" . __('Connexion Sage Local', 'gestion') . "</th></tr>";
 
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Sage IP", "gestion") . "</td><td>";
+               echo Html::input('SageIp', ['value' => $config->SageIp(), 'size' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Sage ID", "gestion") . "</td><td>";
+               echo Html::input('SageId', ['value' => $config->SageId(), 'size' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Sage Mot de passe", "gestion") . "</td><td>";
+               echo Html::input('SagePwd', ['value' => $config->SagePwd(), 'size' => 80]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+      }
+
+         echo "<tr><th colspan='2'>" . __("Bibliothèques", 'gestion') . "</th></tr>";
+   
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Mode de recheche par defaut :", "gestion") ;
+
+            $values4 = [];
+            if($config->SharePointOn() == 1)  $values4[] = 'Sharepoint';
+            if($config->SageOn() == 1)       $values4[] = 'Sage Local';
+            if($config->mode() == 2)       $values4[] = 'Aucun mode configuré';
+
+            echo  "</td><td>";
+               Dropdown::showFromArray(
+                  'mode',
+                  $values4,
+                  [
+                     'value' => $config->mode(),
+                  ]
+            );
+            echo "</td>";
+         echo "</tr>";
+
+      if($mode == true && !empty($config->TenantID()) || !empty($config->SageId())){
+         if($config->SharePointOn() == 1 && $result['status'] == true){
             echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Bibliothèques de recherche : <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip' data-bs-placement='top' title='Attention : toute modification de la bibliothèque après l’utilisation d’une bibliothèque précédent peut entraîner des bugs ou des conflits.'></i>", "gestion") ;
+               echo "<td>" . __("Bibliothèques SahrePoint : <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip' data-bs-placement='top' title='Attention : toute modification de la bibliothèque après l’utilisation d’une bibliothèque précédent peut entraîner des bugs ou des conflits.'></i>", "gestion") ;
                   //Récupérer les bibliothèques de documents du site
                   $drives = $sharepoint->getDrives($siteId);
                   $values3 = [];
@@ -293,97 +379,131 @@ class PluginGestionConfig extends CommonDBTM
                );
                echo "</td>";
             echo "</tr>";
+         }
 
-            echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'gestion') . "</th></tr>";
-            
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Ajouter un dossier (Nom du dossier)", "gestion") . "</td><td>";
-                  echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
-            
-            global $DB;
-            // Récupération des lignes (params) de la table
-            $queryRows = "SELECT * FROM `glpi_plugin_gestion_configsfolder`;";
+         echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'gestion') . "</th></tr>";
+         
+         echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __("Ajouter un dossier (Nom du dossier)", "gestion") . "</td><td>";
+               echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
+            echo "</td>";
+         echo "</tr>";
+         
+         global $DB;
+         // Récupération des lignes (params) de la table
+         $queryRows = "SELECT * FROM `glpi_plugin_gestion_configsfolder`;";
 
-            $resultRows = $DB->query($queryRows);
+         $resultRows = $DB->query($queryRows);
 
-            if ($resultRows && $DB->numrows($resultRows) > 0) {
-               while ($row = $DB->fetchAssoc($resultRows)) {
-                  $folder_name = $row['folder_name'];
-                  $value = $row['params'];
+         if ($resultRows && $DB->numrows($resultRows) > 0) {
+            while ($row = $DB->fetchAssoc($resultRows)) {
+               $folder_name = $row['folder_name'];
+               $value = $row['params'];
 
-                  // Générer une ligne HTML pour chaque enregistrement
-                  echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __($folder_name, "gestion") . "</td><td>";
+               // Générer une ligne HTML pour chaque enregistrement
+               echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __($folder_name, "gestion") . "</td><td>";
 
+               if($config->SageOn() == 1 && $config->SharePointOn() == 0){
                   // Tableau des options pour le champ déroulant
-                  $values2 = [
-                        1 => __('Dossier de récupération (Recursive)', 'gestion'),
-                        2 => __('Dossier de destination (Dépot Global)', 'gestion'),
+                     $values2 = [
+                        2 => __('Dossier de destination (Dépot Local)', 'gestion'),
                         5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
                         6 => __('Supprimer le dossier', 'gestion'),
                         8 => __('__Non attribué__', 'gestion'),
                         10 => __("Eléments de recheche", 'gestion'),
-                  ];
-
-                  // Générer un champ déroulant avec les options
-                  Dropdown::showFromArray(
-                        $folder_name,
-                        $values2,
-                        [
-                           'value' => $value,
-                           'class' => 'folder-dropdown', // Ajouter une classe CSS
-                           'data-folder' => $folder_name // Ajouter un attribut unique pour JS
-                        ]
-                  );
-                  echo "</td>";
-                  echo "</tr>";
+                     ];
+               }elseif($config->SageOn() == 0 && $config->SharePointOn() == 1){
+                  // Tableau des options pour le champ déroulant
+                     $values2 = [
+                        1 => __('Dossier de récupération (Recursive SharePoint)', 'gestion'),
+                        2 => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
+                        5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
+                        6 => __('Supprimer le dossier', 'gestion'),
+                        8 => __('__Non attribué__', 'gestion'),
+                        10 => __("Eléments de recheche", 'gestion'),
+                     ];
+               }elseif($config->SageOn() == 1 && $config->SharePointOn() == 1){
+                  if($config->mode() == 1){
+                     // Tableau des options pour le champ déroulant
+                     $values2 = [
+                        2 => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
+                        3 => __('Dossier de destination (Dépot Local)', 'gestion'),
+                        5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
+                        6 => __('Supprimer le dossier', 'gestion'),
+                        8 => __('__Non attribué__', 'gestion'),
+                        10 => __("Eléments de recheche", 'gestion'),
+                     ];
+                  }else{
+                     // Tableau des options pour le champ déroulant
+                     $values2 = [
+                        1 => __('Dossier de récupération (Recursive SharePoint)', 'gestion'),
+                        2 => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
+                        3 => __('Dossier de destination (Dépot Local)', 'gestion'),
+                        5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
+                        6 => __('Supprimer le dossier', 'gestion'),
+                        8 => __('__Non attribué__', 'gestion'),
+                        10 => __("Eléments de recheche", 'gestion'),
+                     ];
+                  }
                }
 
-               ?><script defer>
-                  const dropdowns = document.querySelectorAll('.folder-dropdown');
-
-                  // Fonction pour désactiver uniquement l'option avec la valeur `2`
-                  function updateDropdowns() {
-                     // Récupérer toutes les valeurs actuellement sélectionnées
-                     const selectedValues = Array.from(dropdowns).map(dropdown => dropdown.value);
-
-                     // Vérifier si la valeur `2` est sélectionnée
-                     const isOption2Selected = selectedValues.includes("2");
-
-                     // Si l'option 2 est sélectionnée, désactiver uniquement celle-ci dans les autres dropdowns
-                     dropdowns.forEach(dropdown => {
-                        const options = dropdown.querySelectorAll('option'); // Cibler les <option>
-                        const currentValue = dropdown.value;
-
-                        options.forEach(option => {
-                              const value = option.value;
-
-                              if (value === "2" && isOption2Selected && currentValue !== "2") {
-                                 option.disabled = true;
-                              } else {
-                                 option.disabled = false; // Réactiver si elle devient disponible
-                              }
-                        });
-
-                        // Rafraîchir le rendu Select2 après modification des options
-                        $(dropdown).select2();
-                     });
-                  }
-
-                  // Ajouter les événements sur chaque dropdown pour mettre à jour les options dynamiquement
-                  dropdowns.forEach(dropdown => {
-                     $(dropdown).on('select2:select', updateDropdowns); // Lorsqu'une option est sélectionnée
-                     $(dropdown).on('select2:unselect', updateDropdowns); // Si une option est désélectionnée (utile pour multi-sélection)
-                  });
-
-                  // Mise à jour initiale
-                  updateDropdowns();
-               </script><?php
-            } else {
-               echo "<tr><td colspan='2'>Aucun paramètre trouvé ou erreur dans la base de données.</td></tr>";
+               // Générer un champ déroulant avec les options
+               Dropdown::showFromArray(
+                     $folder_name,
+                     $values2,
+                     [
+                        'value' => $value,
+                        'class' => 'folder-dropdown', // Ajouter une classe CSS
+                        'data-folder' => $folder_name // Ajouter un attribut unique pour JS
+                     ]
+               );
+               echo "</td>";
+               echo "</tr>";
             }
+
+            ?><script defer>
+               const dropdowns = document.querySelectorAll('.folder-dropdown');
+
+               // Fonction pour désactiver uniquement l'option avec la valeur `2`
+               function updateDropdowns() {
+                  // Récupérer toutes les valeurs actuellement sélectionnées
+                  const selectedValues = Array.from(dropdowns).map(dropdown => dropdown.value);
+
+                  // Vérifier si la valeur `2` est sélectionnée
+                  const isOption2Selected = selectedValues.includes("2");
+
+                  // Si l'option 2 est sélectionnée, désactiver uniquement celle-ci dans les autres dropdowns
+                  dropdowns.forEach(dropdown => {
+                     const options = dropdown.querySelectorAll('option'); // Cibler les <option>
+                     const currentValue = dropdown.value;
+
+                     options.forEach(option => {
+                           const value = option.value;
+
+                           if (value === "2" && isOption2Selected && currentValue !== "2") {
+                              option.disabled = true;
+                           } else {
+                              option.disabled = false; // Réactiver si elle devient disponible
+                           }
+                     });
+
+                     // Rafraîchir le rendu Select2 après modification des options
+                     $(dropdown).select2();
+                  });
+               }
+
+               // Ajouter les événements sur chaque dropdown pour mettre à jour les options dynamiquement
+               dropdowns.forEach(dropdown => {
+                  $(dropdown).on('select2:select', updateDropdowns); // Lorsqu'une option est sélectionnée
+                  $(dropdown).on('select2:unselect', updateDropdowns); // Si une option est désélectionnée (utile pour multi-sélection)
+               });
+
+               // Mise à jour initiale
+               updateDropdowns();
+            </script><?php
+         } else {
+            echo "<tr><td colspan='2'>Aucun paramètre trouvé ou erreur dans la base de données.</td></tr>";
          }
       }
    
@@ -601,128 +721,127 @@ class PluginGestionConfig extends CommonDBTM
    }
 
    // return fonction (retourn les values enregistrées en bdd)
-   function formulaire()
-   {
+   function formulaire(){
       return ($this->fields['formulaire']);
    }
-   function AddFileSite()
-   {
+   function AddFileSite(){
       if (isset($this->fields['AddFileSite'])) return ($this->fields['AddFileSite']);
    }
-   function Global()
-   {
+   function Global(){
       return ($this->fields['Global']);
    }
-   function LastCronTask()
-   {
+   function LastCronTask(){
       return ($this->fields['LastCronTask']);
    }
-   function SignatureX()
-   {
+   function SignatureX(){
       return ($this->fields['SignatureX']);
    } 
-   function SignatureY()
-   {
+   function SignatureY(){
       return ($this->fields['SignatureY']);
    } 
-   function SignatureSize()
-   {
+   function SignatureSize(){
       return ($this->fields['SignatureSize']);
    } 
-   function ExtractYesNo()
-   {
+   function ExtractYesNo(){
       return ($this->fields['ExtractYesNo']);
    } 
-   function extract()
-   {
+   function extract(){
       return ($this->fields['extract']);
    } 
-   function MailTrackerYesNo()
-   {
+   function MailTrackerYesNo(){
       return ($this->fields['MailTrackerYesNo']);
    } 
-   function MailTracker()
-   {
+   function MailTracker(){
       return ($this->fields['MailTracker']);
    } 
-   function EntitiesExtract()
-   {
+   function EntitiesExtract(){
       return ($this->fields['EntitiesExtract']);
    } 
-   function EntitiesExtractValue()
-   {
+   function EntitiesExtractValue(){
       return ($this->fields['EntitiesExtractValue']);
    } 
-   function SignataireX()
-   {
+   function SignataireX(){
       return ($this->fields['SignataireX']);
    } 
-   function SignataireY()
-   {
+   function SignataireY(){
       return ($this->fields['SignataireY']);
    } 
-   function DateX()
-   {
+   function DateX(){
       return ($this->fields['DateX']);
    } 
-   function DateY()
-   {
+   function DateY(){
       return ($this->fields['DateY']);
    } 
-   function TechX()
-   {
+   function TechX(){
       return ($this->fields['TechX']);
    } 
-   function TechY()
-   {
+   function TechY(){
       return ($this->fields['TechY']);
    }
-   function NumberViews()
-   {
+   function NumberViews(){
       return ($this->fields['NumberViews']);
    }
-   function ZenDocMail()
-   {
+   function ZenDocMail(){
       return ($this->fields['ZenDocMail']);
    }
-   function SharePointLinkDisplay()
-   {
+   function SharePointLinkDisplay(){
       return ($this->fields['SharePointLinkDisplay']);
    }
-   function DisplayPdfEnd()
-   {
+   function DisplayPdfEnd(){
       return ($this->fields['DisplayPdfEnd']);
    }
-   function MailTo()
-   {
+   function MailTo(){
       return ($this->fields['MailTo']);
    }
-   function gabarit()
-   {
+   function gabarit(){
       return ($this->fields['gabarit']);
    }
-   function ConfigModes()
-   {
+   function ConfigModes(){
       return ($this->fields['ConfigModes']);
    }
-   function gabarit_tracker()
-   {
+   function gabarit_tracker(){
       return ($this->fields['gabarit_tracker']);
    }
+   function mode(){
+      return ($this->fields['mode']);
+   }
+   function SharePointOn(){
+      return ($this->fields['SharePointOn']);
+   }
+   function SageOn(){
+      return ($this->fields['SageOn']);
+   }
+   function SageIp(){
+      if(!empty($this->fields['SageIp']))
+         return openssl_decrypt(base64_decode($this->fields['SageIp']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
+   }
+   function SagePwd(){
+      if(!empty($this->fields['SagePwd']))
+         return openssl_decrypt(base64_decode($this->fields['SagePwd']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
+   }
+   function SageId(){
+      if(!empty($this->fields['SageId']))
+         return openssl_decrypt(base64_decode($this->fields['SageId']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
+   }
    function TenantID(){
-      return openssl_decrypt(base64_decode($this->fields['TenantID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
+      if(!empty($this->fields['TenantID']))
+         return openssl_decrypt(base64_decode($this->fields['TenantID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
    }
    function ClientID(){
-      return openssl_decrypt(base64_decode($this->fields['ClientID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
+      if(!empty($this->fields['ClientID']))
+         return openssl_decrypt(base64_decode($this->fields['ClientID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
    }
    function ClientSecret(){
-      return openssl_decrypt(base64_decode($this->fields['ClientSecret']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
+      if(!empty($this->fields['ClientSecret']))
+         return openssl_decrypt(base64_decode($this->fields['ClientSecret']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
    }
    function Hostname(){
-      return openssl_decrypt(base64_decode($this->fields['Hostname']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
+      if(!empty($this->fields['Hostname']))
+         return openssl_decrypt(base64_decode($this->fields['Hostname']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
    }
    function SitePath(){
-      return openssl_decrypt(base64_decode($this->fields['SitePath']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
+      if(!empty($this->fields['SitePath']))
+         return openssl_decrypt(base64_decode($this->fields['SitePath']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
    }
    // return fonction
 
@@ -847,6 +966,10 @@ class PluginGestionConfig extends CommonDBTM
       if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.3.1'){
          include(PLUGIN_GESTION_DIR . "/install/update_132_next.php");
          update(); 
+      }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.4.3'){
+         include(PLUGIN_GESTION_DIR . "/install/update_144_next.php");
+         update_144_next(); 
       }
    }
 
