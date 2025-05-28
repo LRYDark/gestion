@@ -288,19 +288,48 @@ class PluginGestionTicket extends CommonDBTM {
                                           <span class="visually-hidden">Loading...</span>
                                     </div>
                                  </div>
+
                   HTML;
-                  // Fermeture temporaire de HTML pour inclure du PHP
-                  echo '<form method="post" action="' . Toolbox::getItemTypeFormURL('PluginGestionTicket') . '">';
-                  echo '<input type="hidden" name="_glpi_csrf_token" value="' . $csrf_token . '">';
-                  echo '<input type="hidden" name="tickets_id" value="' . $ticketId . '">';
-            
-                  // Affichage du dropdown
-                  Dropdown::showFromArray("groups_id", $groups, [
-                     'multiple'     => true,
-                     'width'        => '100%',
-                     'values'       => json_decode($selected_values_json, true),
-                     'disabled'     => $disabled,
-                  ]);
+                  $connexion = false;
+                  if($config->SageOn() == 1 && $config->SharePointOn() == 0){
+                     if(!empty($config->SageId())){
+                        $connexion = true;
+                     }
+
+                  }
+                  if($config->SageOn() == 0 && $config->SharePointOn() == 1){
+                     $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
+                     if($result['status']){
+                        $connexion = true;
+                     }
+                  }
+                  if($config->SageOn() == 1 && $config->SharePointOn() == 1){
+                     $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
+                     if($result['status'] || !empty($config->SageId())){
+                        $connexion = true;
+                     }
+                  }
+
+                  if ($config->mode() != 2 && !empty($connexion)) {
+                     // Fermeture temporaire de HTML pour inclure du PHP
+                     echo '<form method="post" action="' . Toolbox::getItemTypeFormURL('PluginGestionTicket') . '">';
+                     echo '<input type="hidden" name="_glpi_csrf_token" value="' . $csrf_token . '">';
+                     echo '<input type="hidden" name="tickets_id" value="' . $ticketId . '">';
+               
+                     // Affichage du dropdown
+                     if (empty($groups)) {
+                        echo "<div class='alert alert-warning'>Aucun élément n’est disponible.</div>";
+                     } else {
+                        Dropdown::showFromArray("groups_id", $groups, [
+                           'multiple'     => true,
+                           'width'        => '100%',
+                           'values'       => json_decode($selected_values_json, true),
+                           'disabled'     => $disabled,
+                        ]);
+                     }
+                  }else{
+                     echo "<div class='alert alert-danger'> Une erreur est survenue dans la configuration de la méthode de récupération des documents (Sage local, SharePoint ou dossier local).<br><br> Veuillez contacter votre administrateur afin de vérifier la configuration du plugin. </div>";
+                  }
                   echo <<<HTML
 
                                       <div class="modal-footer" style="margin-top: 55px;">

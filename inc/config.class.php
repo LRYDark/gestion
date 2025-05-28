@@ -256,6 +256,7 @@ class PluginGestionConfig extends CommonDBTM
       }
       
       //--------------------------------------------
+      $result = [];
       if(!empty($config->TenantID()) && $config->SharePointOn() == 1){
          // Utilisation
          try {
@@ -356,7 +357,7 @@ class PluginGestionConfig extends CommonDBTM
          echo "</tr>";
 
       if($mode == true && !empty($config->TenantID()) || !empty($config->SageId())){
-         if($config->SharePointOn() == 1 && $result['status'] == true){
+         if ($config->SharePointOn() == 1 && !empty($result['status'])) {
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Bibliothèques SahrePoint : <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip' data-bs-placement='top' title='Attention : toute modification de la bibliothèque après l’utilisation d’une bibliothèque précédent peut entraîner des bugs ou des conflits.'></i>", "gestion") ;
                   //Récupérer les bibliothèques de documents du site
