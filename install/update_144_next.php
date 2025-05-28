@@ -42,6 +42,7 @@ function update_144_next() {
    // Liste des colonnes à vérifier
    $required_columns = [
       'SageOn',
+      'SharePointOn',
       'SageIp',
       'SageId',
       'SagePwd',
@@ -57,6 +58,7 @@ function update_144_next() {
                ADD COLUMN `SageId` VARCHAR(255) NULL,
                ADD COLUMN `SagePwd` VARCHAR(255) NULL,
                ADD COLUMN `SageOn` TINYINT NOT NULL DEFAULT '0',
+               ADD COLUMN `SharePointOn` TINYINT NOT NULL DEFAULT '0',
                ADD COLUMN `mode` TINYINT NOT NULL DEFAULT '0';";
       $DB->query($query) or die($DB->error());
    }

@@ -16,7 +16,6 @@ class PluginGestionCri extends CommonDBTM {
 
       $id = $_POST["modal"];
       $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$id'")->fetch_object(); // Récupérer les informations du document  
-         
 
       if ($options["root_modal"] == 'ticket-form' && $DOC->signed == 0){
          $querytask = "SELECT id FROM glpi_tickettasks WHERE tickets_id = $ID";
