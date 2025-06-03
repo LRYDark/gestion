@@ -23,8 +23,9 @@ $ticketId = $_GET['ticketId'];
 $groups = [];
 $selected_ids = [];
 
-if(!empty($config->fields['Global'])) {
-    try {
+if ($config->mode() == 0){
+    if(!empty($config->fields['Global'])) {
+        try {
             $contents = $sharepoint->searchSharePoint();            
             // Filtrer et ajouter les fichiers PDF
             foreach ($contents as $item) {
@@ -40,11 +41,24 @@ if(!empty($config->fields['Global'])) {
                     $groups[$relativePath . '/' . $file_name] = $file_name;
                 }
             }
+        } catch (Exception $e) {
+            // Gestion des erreurs SharePoint
+            echo json_encode(['error' => 'Erreur SharePoint: ' . $e->getMessage()]);
+            exit;
+        }
+    }
+}
+if ($config->mode() == 2){
+    $relativePath = '_plugins/gestion/Documents';
+    $dir = GLPI_ROOT . '/files/' . $relativePath;
+    $groups = [];
 
-    } catch (Exception $e) {
-        // Gestion des erreurs SharePoint
-        echo json_encode(['error' => 'Erreur SharePoint: ' . $e->getMessage()]);
-        exit;
+    if (is_dir($dir)) {
+        foreach (scandir($dir) as $file) {
+            if (is_file($dir . '/' . $file) && pathinfo($file, PATHINFO_EXTENSION) === 'pdf') {
+                $groups[$relativePath . '/' . $file] = pathinfo($file, PATHINFO_FILENAME);
+            }
+        }
     }
 }
 
@@ -53,4 +67,6 @@ echo json_encode([
     'data' => $groups, 
     'selected_ids' => $selected_ids
 ]);
+
+
 ?>

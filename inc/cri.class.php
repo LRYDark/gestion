@@ -238,15 +238,21 @@ class PluginGestionCri extends CommonDBTM {
                      echo "</tr>";
                   }
 
-                  if ($config->fields['SharePointLinkDisplay'] == 1){ 
+                  if ($config->fields['SharePointLinkDisplay'] == 1){    
                      // Utilisation
                      try {
                         // Construire le chemin complet du fichier
                         $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
                         $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
 
-                        // Obtenir l'URL de téléchargement direct du fichier
-                        $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);
+      /////////////////////////////// NEWS OK ///////////////////////////////
+                        if ($config->mode() == 0){
+                           // Obtenir l'URL de téléchargement direct du fichier
+                           $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
+                        }
+                        if ($config->mode() == 2){
+                           $fileDownloadUrl = $DOC->doc_id;
+                        }
 
                         // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
@@ -260,10 +266,17 @@ class PluginGestionCri extends CommonDBTM {
                            
                            echo "<td style='width: 80%;'>"; // Augmente la largeur de la colonne droite pour le PDF
                               // Affiche le PDF intégré avec une classe CSS pour le responsive
-                              echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
-                                    style='width:100%; height:600px;' frameborder='0'></iframe>";
+                              if ($config->mode() == 0){
+                                 echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                                       style='width:100%; height:600px;' frameborder='0'></iframe>";
+                              }
+                              if ($config->mode() == 2){
+                                 echo "<iframe src='document.send.php?docid=$fileDownloadUrl'
+                                       style='width:100%; height:600px;' frameborder='0'></iframe>";
+                              }
                            echo "</td>";
                         echo "</tr>";
+      /////////////////////////////// NEWS OK ///////////////////////////////
 
                         // Voir PDF
                         echo "<tr>";

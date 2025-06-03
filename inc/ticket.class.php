@@ -309,24 +309,21 @@ class PluginGestionTicket extends CommonDBTM {
                         $connexion = true;
                      }
                   }
+                  if($config->mode() == 2){
+                     $connexion = true;
+                  }
 
-                  if ($config->mode() != 2 && !empty($connexion)) {
+                  if (!empty($connexion)) {
                      // Fermeture temporaire de HTML pour inclure du PHP
                      echo '<form method="post" action="' . Toolbox::getItemTypeFormURL('PluginGestionTicket') . '">';
                      echo '<input type="hidden" name="_glpi_csrf_token" value="' . $csrf_token . '">';
                      echo '<input type="hidden" name="tickets_id" value="' . $ticketId . '">';
-               
-                     // Affichage du dropdown
-                     if (empty($groups)) {
-                        echo "<div class='alert alert-warning'>Aucun élément n’est disponible.</div>";
-                     } else {
-                        Dropdown::showFromArray("groups_id", $groups, [
-                           'multiple'     => true,
-                           'width'        => '100%',
-                           'values'       => json_decode($selected_values_json, true),
-                           'disabled'     => $disabled,
-                        ]);
-                     }
+                     Dropdown::showFromArray("groups_id", $groups, [
+                        'multiple'     => true,
+                        'width'        => '100%',
+                        'values'       => json_decode($selected_values_json, true),
+                        'disabled'     => $disabled,
+                     ]);
                   }else{
                      echo "<div class='alert alert-danger'> Une erreur est survenue dans la configuration de la méthode de récupération des documents (Sage local, SharePoint ou dossier local).<br><br> Veuillez contacter votre administrateur afin de vérifier la configuration du plugin. </div>";
                   }

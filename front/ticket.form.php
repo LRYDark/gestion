@@ -37,13 +37,26 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
 
     // Ajouter les nouveaux éléments
     foreach ($items_to_add as $item) {
-        // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-        $file_path = $item . ".pdf"; // Remplacez par le chemin exact de votre fichier
-        // Étape 4 : Récupérez l'URL du fichier
-        $fileUrl = $sharepoint->getFileUrl($file_path);
+        $fileExiste = false;
 
-        $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
-        if ($sharepoint->checkFileExists($file_path)) {
+        if ($config->mode() == 0){
+            // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
+            $file_path = $item . ".pdf"; // Remplacez par le chemin exact de votre fichier
+            // Étape 4 : Récupérez l'URL du fichier
+            $fileUrl = $sharepoint->getFileUrl($file_path);
+
+            if ($sharepoint->checkFileExists($file_path)) $fileExiste = true;
+            $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
+        }
+        if ($config->mode() == 2){
+             $file_path = $item;
+             $fileUrl = null;
+
+            if (file_exists($file_path)) $fileExiste = true;
+            $tracker = null;
+        }
+
+        if ($file_path) {
             // Expression régulière pour extraire les deux parties
             $pattern = '#^(.*)/(.*)$#';
 
@@ -55,10 +68,28 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             
             $existedoc = $DB->query("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
             if(empty($existedoc->bl)){
-                // Insérer le ticket et l'ID de document dans glpi_plugin_gestion_surveys
-                if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker')")) {
-                    Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
-                    $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
+                if ($config->mode() == 0){
+                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker')")) {
+                        Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
+                        $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
+                    }
+                }
+                if ($config->mode() == 2){
+                    $input = ['name'        => addslashes(str_replace("?", "°", $item)),
+                            'filename'    => addslashes($item),
+                            'filepath'    => addslashes($itemUrl.'/'. $item),
+                            'mime'        => 'application/pdf',
+                            'users_id'    => Session::getLoginUserID(),
+                            'entities_id' => $entityId,
+                            'tickets_id'  => $ticketId,
+                            'is_recursive'=> 1];
+
+                    if($NewDoc = $doc->add($input)){
+                        if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_id, tracker) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$NewDoc', '$tracker')")) {
+                            Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
+                            $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
+                        }
+                    }
                 }
             }else{
                 if($existedoc->tickets_id == NULL){

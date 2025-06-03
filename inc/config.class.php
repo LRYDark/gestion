@@ -367,8 +367,7 @@ class PluginGestionConfig extends CommonDBTM
             $values4 = [];
             if($config->SharePointOn() == 1)                $values4[0] = 'Sharepoint';
             if($config->SageOn() == 1)                      $values4[1] = 'Sage Local';
-            if($config->mode() == 2 || $mode == false)      $values4[2] = 'Aucun mode configuré';
-            $values4[3] = 'Local';
+            if($config->mode() != 0 || $mode == false)      $values4[2] = 'Local';
 
             echo  "</td><td>";
                Dropdown::showFromArray(
