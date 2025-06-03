@@ -366,10 +366,11 @@ class PluginGestionConfig extends CommonDBTM
             echo "<td>" . __("Mode de recheche par defaut :", "gestion") ;
 
             $values4 = [];
-            if($config->SharePointOn() == 1)                $values4[] = 'Sharepoint';
-            if($config->SageOn() == 1)                      $values4[] = 'Sage Local';
-            if($config->mode() == 2 || $mode == false)      $values4[] = 'Aucun mode configuré';
-
+            if($config->SharePointOn() == 1)                $values4[0] = 'Sharepoint';
+            if($config->SageOn() == 1)                      $values4[1] = 'Sage Local';
+            if($config->mode() == 2 || $mode == false)      $values4[2] = 'Aucun mode configuré';
+            $values4[3] = 'Local';
+            
             echo  "</td><td>";
                Dropdown::showFromArray(
                   'mode',
