@@ -147,7 +147,15 @@ class PluginGestionConfig extends CommonDBTM
       echo "</tr>";
     
       // -----------------------------------------------------------------------
-      echo "<tr><th colspan='2'>" . __("Positionnement des éléments (0 pour masqué)", 'gestion') . "</th></tr>";
+      echo "<tr>";
+         echo "<th colspan='2'>";
+            echo '<button type="button" class="accordion-toggle" onclick="toggleConfigSection(this)">';
+               echo '<span class="arrow">▶</span> ' . __("Positionnement des éléments (Paramétre : 0 pour masqué)", 'gestion');
+            echo '</button>';
+         echo "</th>";
+      echo "</tr>";
+
+      echo "<tbody class='config-section' style='display: none;'>"; // Début de section masquée
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Position de la signature sur le PDF", "gestion") . "</td><td>";
                echo '<div style="display: flex; align-items: center; gap: 5px;">';
@@ -203,6 +211,7 @@ class PluginGestionConfig extends CommonDBTM
                   echo '</div>';
             echo "</td>";
          echo "</tr>";
+      echo "</tbody>"; // Fin de la section masquée
 
       echo "<tr><th colspan='2'>" . __("Configuration de l'affichage et Tâche cron", 'gestion') . "</th></tr>";
       echo "<tr class='tab_bg_1'>";
@@ -280,59 +289,75 @@ class PluginGestionConfig extends CommonDBTM
       }
 
       if($config->SharePointOn() == 1){
-         echo "<tr><th colspan='2'>" . __('Connexion SharePoint (API Graph) | '.$checkcon . $errorcon, 'gestion') . "</th></tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
-               echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
+         echo "<tr>";
+            echo "<th colspan='2'>";
+               echo '<button type="button" class="accordion-toggle" onclick="toggleConfigSection1(this)">';
+                  echo '<span class="arrow">▶</span> ' . __('Connexion SharePoint (API Graph) | '.$checkcon . $errorcon, 'gestion');
+               echo '</button>';
+            echo "</th>";
          echo "</tr>";
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Client ID", "gestion") . "</td><td>";
-               echo Html::input('ClientID', ['value' => $config->ClientID(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
+         echo "<tbody class='config-section1' style='display: none;'>"; // Début de section masquée
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
+                  echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Client Secret", "gestion") . "</td><td>";
-               echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Client ID", "gestion") . "</td><td>";
+                  echo Html::input('ClientID', ['value' => $config->ClientID(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Nom d’hôte", "gestion") . "</td><td>";
-               echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Client Secret", "gestion") . "</td><td>";
+                  echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Chemin du Site (/sites/XXXX)", "gestion") . "</td><td>";
-               echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Nom d’hôte", "gestion") . "</td><td>";
+                  echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Chemin du Site (/sites/XXXX)", "gestion") . "</td><td>";
+                  echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+         echo "</tbody>"; // Fin de la section masquée
       }
 
       if($config->SageOn() == 1){
-         echo "<tr><th colspan='2'>" . __('Connexion Sage Local', 'gestion') . "</th></tr>";
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Sage IP", "gestion") . "</td><td>";
-               echo Html::input('SageIp', ['value' => $config->SageIp(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
+         echo "<tr>";
+            echo "<th colspan='2'>";
+               echo '<button type="button" class="accordion-toggle" onclick="toggleConfigSection2(this)">';
+                  echo '<span class="arrow">▶</span> ' . __('Connexion Sage Local', 'gestion');
+               echo '</button>';
+            echo "</th>";
          echo "</tr>";
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Sage ID", "gestion") . "</td><td>";
-               echo Html::input('SageId', ['value' => $config->SageId(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
+         echo "<tbody class='config-section2' style='display: none;'>"; // Début de section masquée
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Sage IP", "gestion") . "</td><td>";
+                  echo Html::input('SageIp', ['value' => $config->SageIp(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Sage Mot de passe", "gestion") . "</td><td>";
-               echo Html::input('SagePwd', ['value' => $config->SagePwd(), 'size' => 80]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Sage ID", "gestion") . "</td><td>";
+                  echo Html::input('SageId', ['value' => $config->SageId(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Sage Mot de passe", "gestion") . "</td><td>";
+                  echo Html::input('SagePwd', ['value' => $config->SagePwd(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+         echo "</tbody>"; // Fin de la section masquée
       }
 
          echo "<tr><th colspan='2'>" . __("Bibliothèques", 'gestion') . "</th></tr>";
@@ -511,17 +536,19 @@ class PluginGestionConfig extends CommonDBTM
       echo "<tr><th colspan='2'>" . __("Entités et Tracker", 'gestion') . "</th></tr>";
          //--------------------------------------------
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Extraction d'un tracker dans le PDF", "gestion") . "</td><td>";
+            echo "<td>" . __("Extraction d'un tracker", "gestion") . "</td><td>";
                Dropdown::showYesNo('ExtractYesNo', $config->ExtractYesNo(), -1);
             echo "</td>";
          echo "</tr>";
 
          if($config->ExtractYesNo() == 1){
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
-                  echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
+            if ($config->mode() == 0){
+               echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
+                     echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
+                  echo "</td>";
+               echo "</tr>";
+            }
 
             //--------------------------------------------
             echo "<tr class='tab_bg_1'>";
@@ -574,12 +601,12 @@ class PluginGestionConfig extends CommonDBTM
          echo "</tr>";
 
          echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Extraire l'entité du dossier parent du PDF", "gestion") . "</td><td>";
+            echo "<td>" . __("Extraire l'entité du dossier parent", "gestion") . "</td><td>";
                Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
             echo "</td>";
          echo "</tr>";
 
-         if($config->EntitiesExtract() == 1){
+         if($config->EntitiesExtract() == 1 && $config->mode() == 0){
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Séparateurs pour l'extraction de l'entité depuis la Bibliothèques du site", "gestion") . "</td><td>";
                   echo '<div style="display: flex; align-items: center; gap: 5px;">';
@@ -590,30 +617,43 @@ class PluginGestionConfig extends CommonDBTM
             echo "</tr>";
          }
 
-      $lastrun = $DB->query("SELECT lastrun FROM glpi_crontasks WHERE name = 'GestionPdf'")->fetch_object();
-      if($lastrun->lastrun == NULL){
-         $lastrun->lastrun = 'Jamais';
-      }
-      echo "<tr><th colspan='2'>" . __("Dérnière synchronisation Cron : ".$lastrun->lastrun, 'gestion') . "</th></tr>";
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Recheche des nouveaux documents dans le site SharePoint :", "gestion") . "</td><td>";
-         echo "Filtre de recheche, 500 Documents Max par odre de modifictation et d'ajout. <br> Requête : de la date et heure suivante : ";
-            Html::showDateTimeField("LastCronTask", [
-               'value'      => $config->LastCronTask(), 
-               'canedit'    => true,
-               'maybeempty' => true,
-               'mindate'    => '',
-               'mintime'    => '',
-               'maxdate'    => date('Y-m-d H:i:s'),
-               //'maxtime'    => date('H:i:s') // non nécessaire
-            ]);
-         echo "-> Jusqu'a la date et heure d'execution de la tâche cron.";
-         echo "</td>";
-      echo "</tr>";
-      echo '<style> button[btn-id="0"] { display: none !important; } </style>';
-      
-      echo "<tr><th colspan='2'>" . __("Connexion", 'gestion') . "</th></tr>";
-      echo "<tr class='tab_bg_1'>";
+         $lastrun = $DB->query("SELECT lastrun FROM glpi_crontasks WHERE name = 'GestionPdf'")->fetch_object();
+         if($lastrun->lastrun == NULL){
+            $lastrun->lastrun = 'Jamais';
+         }
+
+         echo "<tr>";
+            echo "<th colspan='2'>";
+               echo '<button type="button" class="accordion-toggle" onclick="toggleConfigSection3(this)">';
+                  echo '<span class="arrow">▶</span> ' . __("Dérnière synchronisation Cron : ".$lastrun->lastrun, 'gestion');
+               echo '</button>';
+            echo "</th>";
+         echo "</tr>";
+
+         echo "<tbody class='config-section3' style='display: none;'>"; // Début de section masquée
+         //echo "<tr><th colspan='2'>" . __("Dérnière synchronisation Cron : ".$lastrun->lastrun, 'gestion') . "</th></tr>";
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Recheche des nouveaux documents :", "gestion") . "</td><td>";
+               if ($config->mode() == 0) echo "Filtre de recheche, 500 Documents Max par odre de modifictation et d'ajout. <br>";
+               echo "Requête : de la date et heure suivante : ";
+                  Html::showDateTimeField("LastCronTask", [
+                     'value'      => $config->LastCronTask(), 
+                     'canedit'    => true,
+                     'maybeempty' => true,
+                     'mindate'    => '',
+                     'mintime'    => '',
+                     'maxdate'    => date('Y-m-d H:i:s'),
+                     //'maxtime'    => date('H:i:s') // non nécessaire
+                  ]);
+               echo "-> Jusqu'a la date et heure d'execution de la tâche cron.";
+               echo "</td>";
+            echo "</tr>";
+            echo '<style> button[btn-id="0"] { display: none !important; } </style>';
+         echo "</tbody>"; // Fin de la section masquée
+ 
+         echo "<tr><th colspan='2'>" . __("Connexion", 'gestion') . "</th></tr>";
+         echo "<tr class='tab_bg_1'>";
+
          echo "<td>" . __("Statut de connexion", "gestion") . "</td><td>";
 
             ?><button id="openModalButton" type="button" class="btn btn-primary">Statut de connexion</button>
@@ -709,6 +749,68 @@ class PluginGestionConfig extends CommonDBTM
             HTML; 
          echo "</td>";
       echo "</tr>";
+
+      echo <<<JS
+         <script>
+            function toggleConfigSection(btn) {
+               const section = btn.closest('table').querySelector('.config-section');
+               const arrow = btn.querySelector('.arrow');
+               const isVisible = section.style.display === 'table-row-group';
+               section.style.display = isVisible ? 'none' : 'table-row-group';
+               arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
+            }
+
+            function toggleConfigSection1(btn) {
+               const section = btn.closest('table').querySelector('.config-section1');
+               const arrow = btn.querySelector('.arrow');
+               const isVisible = section.style.display === 'table-row-group';
+               section.style.display = isVisible ? 'none' : 'table-row-group';
+               arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
+            }
+
+            function toggleConfigSection2(btn) {
+               const section = btn.closest('table').querySelector('.config-section2');
+               const arrow = btn.querySelector('.arrow');
+               const isVisible = section.style.display === 'table-row-group';
+               section.style.display = isVisible ? 'none' : 'table-row-group';
+               arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
+            }
+
+            function toggleConfigSection3(btn) {
+               const section = btn.closest('table').querySelector('.config-section3');
+               const arrow = btn.querySelector('.arrow');
+               const isVisible = section.style.display === 'table-row-group';
+               section.style.display = isVisible ? 'none' : 'table-row-group';
+               arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
+            }
+         </script>
+      JS;
+
+      ?><style>
+      .accordion-toggle {
+         all: unset;
+         background-color: #f0f0f0;
+         border: 1px solid #ccc;
+         border-radius: 5px;
+         padding: 8px 12px;
+         font-size: 14px;
+         font-weight: bold;
+         cursor: pointer;
+         display: inline-flex;
+         align-items: center;
+         gap: 8px;
+         transition: background-color 0.3s ease;
+      }
+
+      .accordion-toggle:hover {
+         background-color: #e0e0e0;
+      }
+
+      .accordion-toggle .arrow {
+         display: inline-block;
+         transition: transform 0.2s ease;
+      }
+      </style><?php
 
       $config->showFormButtons(['candel' => false]);
       return false;
