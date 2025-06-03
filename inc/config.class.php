@@ -360,8 +360,7 @@ class PluginGestionConfig extends CommonDBTM
          echo "</tbody>"; // Fin de la section masquée
       }
 
-         echo "<tr><th colspan='2'>" . __("Bibliothèques", 'gestion') . "</th></tr>";
-   
+      echo "<tr><th colspan='2'>" . __("Bibliothèques", 'gestion') . "</th></tr>";
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __("Mode de recheche par defaut :", "gestion") ;
 
@@ -370,7 +369,7 @@ class PluginGestionConfig extends CommonDBTM
             if($config->SageOn() == 1)                      $values4[1] = 'Sage Local';
             if($config->mode() == 2 || $mode == false)      $values4[2] = 'Aucun mode configuré';
             $values4[3] = 'Local';
-            
+
             echo  "</td><td>";
                Dropdown::showFromArray(
                   'mode',
