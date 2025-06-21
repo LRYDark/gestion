@@ -307,14 +307,18 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         }
 
         $folderPath = $folder_name. '/' .$EntitiesName; // Chemin du dossier
+        if($config->mode() == 0){
+            $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement    
+        }
+        if($config->mode() == 2){
+            $fileName = $DOC_NAME; // Nom du fichier après téléversement    
+        }
 
         // Étape 3 : Téléverser le fichier
         if ($FolderDes == 'SharePoint'){
-            $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement    
             $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPathTemp);
         } 
         if ($FolderDes == 'local'){
-            $fileName = $DOC_NAME; // Nom du fichier après téléversement    
             $destDir = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folderPath;
 
             // Crée le dossier s’il n’existe pas
@@ -339,9 +343,11 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         // Étape 4 : Récupérez l'URL du fichier
         if ($FolderDes == 'SharePoint'){
             //Spécifiez le chemin relatif du fichier dans SharePoint
-            $file_path = $folderPath . $DOC_NAME . ".pdf"; // Remplacez par le chemin exact de votre fichier
+            $file_path = $folderPath . $fileName; // Remplacez par le chemin exact de votre fichier
+            echo $file_path;
+
             $fileUrl = $sharepoint->getFileUrl($file_path);
-            $NewDoc = null;
+            $NewDoc = 0;
         }
         if ($FolderDes == 'local'){
             $folderPath = "_plugins/gestion/". $folderPath; // Chemin relatif pour le stockage local
@@ -360,20 +366,22 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
                 $fileUrl = null;
             }
         }
+
+        if ($DB->query("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc WHERE id = $id_document")){
+            //unlink($existingPdfPath);
+            /*unlink($signaturePath);
+            unlink($outputPathTemp);*/
+        }
+
+        message('Documents : '. $DOC_NAME.' signé', INFO);
     } catch (Exception $e) {
-        message("Erreur : " . $e->getMessage(), ERROR);
+        message("Signé avec erreur, voir votre administrateur informatique : " . $e->getMessage(), ERROR);
     }
                 
-    if ($DB->query("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc WHERE id = $id_document")){
-        //unlink($existingPdfPath);
-        /*unlink($signaturePath);
-        unlink($outputPathTemp);*/
-    }
 
-    message('Documents : '. $DOC_NAME.' signé', INFO);
 /*}else{
     message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
 }*/
 
-Html::back();
+//Html::back();
 ?>
