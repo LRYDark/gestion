@@ -29,7 +29,7 @@
  */
 
 /**
- * Update from 2.1.4 to 2.1.5
+ * Update from 1.4.4 to next version
  *
  * @return bool for success (will die for most error)
  * */
@@ -60,6 +60,25 @@ function update_144_next() {
                ADD COLUMN `SageOn` TINYINT NOT NULL DEFAULT '0',
                ADD COLUMN `SharePointOn` TINYINT NOT NULL DEFAULT '0',
                ADD COLUMN `mode` TINYINT NOT NULL DEFAULT '0';";
+      $DB->query($query) or die($DB->error());
+   }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+   // Vérifier si les colonnes existent déjà
+   $columns = $DB->query("SHOW COLUMNS FROM `glpi_plugin_gestion_surveys`")->fetch_all(MYSQLI_ASSOC);
+
+   // Liste des colonnes à vérifier
+   $required_columns = [
+      'save'
+   ];
+
+   // Liste pour les colonnes manquantes
+   $missing_columns = array_diff($required_columns, array_column($columns, 'Field'));
+
+   if (!empty($missing_columns)) {
+      $query= "ALTER TABLE glpi_plugin_gestion_surveys
+               ADD COLUMN `save` VARCHAR(15) NULL;";
       $DB->query($query) or die($DB->error());
    }
 }

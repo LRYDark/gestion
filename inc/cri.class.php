@@ -154,20 +154,49 @@ class PluginGestionCri extends CommonDBTM {
                         $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
                         $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
 
-                        // Obtenir l'URL de téléchargement direct du fichier
-                        $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
+      /////////////////////////////// NEWS OK Non Signer ///////////////////////////////
+                        if ($DOC->save == 'SharePoint'){
+                           // Obtenir l'URL de téléchargement direct du fichier
+                           $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
+                        }
+                        if ($DOC->save == 'Local'){
+                           $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
+                        } 
 
                         // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
-                        // Affiche le PDF intégré avec une classe CSS pour le responsive
-                        echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
-                              style='width:100%; height:600px;' frameborder='0'></iframe>";
-                        echo "</tr>";
+                           if ($DOC->save == 'SharePoint'){
+                              echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                                    style='width:100%; height:600px;' frameborder='0'></iframe>";
+                           }
+                           if ($DOC->save == 'Local'){
+                              echo "
+                                 <style>
+                                 .pdf-container {
+                                 width: 100%;
+                                 max-width: 100vw;
+                                 aspect-ratio: 1 / 1.414; /* Ratio A4 en portrait */
+                                 overflow: hidden;
+                                 }
+                                 .pdf-container embed {
+                                 width: 100%;
+                                 height: 100%;
+                                 object-fit: contain;
+                                 }
+                                 </style>
 
+                                 <div class='pdf-container'>
+                                 <embed 
+                                    src='document.send.php?docid=5#zoom=page-width' 
+                                    type='application/pdf' 
+                                    />
+                                 </div>";
+                           }
                         // Bouton pour voir le PDF en plein écran
                         echo "<tr>";
                         echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>'; //   Bouton pour voir le PDF en plein écran
                         echo "</tr><br><br>";
+      /////////////////////////////// NEWS OK Non Signer ///////////////////////////////
 
                      } catch (Exception $e) {
                         AffichageNoSigneMobile($DocUrlSharePoint);
@@ -245,13 +274,13 @@ class PluginGestionCri extends CommonDBTM {
                         $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
                         $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
 
-      /////////////////////////////// NEWS OK ///////////////////////////////
-                        if ($config->mode() == 0){
+      /////////////////////////////// NEWS OK Non Signer ///////////////////////////////
+                        if ($DOC->save == 'SharePoint'){
                            // Obtenir l'URL de téléchargement direct du fichier
                            $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
                         }
-                        if ($config->mode() == 2){
-                           $fileDownloadUrl = $DOC->doc_id;
+                        if ($DOC->save == 'Local'){
+                           $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
                         }
 
                         // Étape 4 : Affichez le PDF via <embed>
@@ -266,17 +295,16 @@ class PluginGestionCri extends CommonDBTM {
                            
                            echo "<td style='width: 80%;'>"; // Augmente la largeur de la colonne droite pour le PDF
                               // Affiche le PDF intégré avec une classe CSS pour le responsive
-                              if ($config->mode() == 0){
+                              if ($DOC->save == 'SharePoint'){
                                  echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
                                        style='width:100%; height:600px;' frameborder='0'></iframe>";
                               }
-                              if ($config->mode() == 2){
-                                 echo "<iframe src='document.send.php?docid=$fileDownloadUrl'
-                                       style='width:100%; height:600px;' frameborder='0'></iframe>";
+                              if ($DOC->save == 'Local'){
+                                 echo "<iframe src='$fileDownloadUrl' style='width:100%; height:600px;' frameborder='0'></iframe>";
                               }
                            echo "</td>";
                         echo "</tr>";
-      /////////////////////////////// NEWS OK ///////////////////////////////
+      /////////////////////////////// NEWS OK Non Signer ///////////////////////////////
 
                         // Voir PDF
                         echo "<tr>";
@@ -398,14 +426,44 @@ class PluginGestionCri extends CommonDBTM {
                         $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
                         $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
 
-                        // Obtenir l'URL de téléchargement direct du fichier
-                        $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
+                        if ($DOC->save == 'SharePoint'){
+                           // Obtenir l'URL de téléchargement direct du fichier
+                           $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
+                        }
+                        if ($DOC->save == 'Local'){
+                           $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
+                        }
 
                         // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
                         // Affiche le PDF intégré avec une classe CSS pour le responsive
-                        echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
-                              style='width:100%; height:600px;' frameborder='0'></iframe>";
+                           if ($DOC->save == 'SharePoint'){
+                              echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                                    style='width:100%; height:600px;' frameborder='0'></iframe>";
+                           }
+                           if ($DOC->save == 'Local'){
+                              echo "
+                                 <style>
+                                 .pdf-container {
+                                 width: 100%;
+                                 max-width: 100vw;
+                                 aspect-ratio: 1 / 1.414; /* Ratio A4 en portrait */
+                                 overflow: hidden;
+                                 }
+                                 .pdf-container embed {
+                                 width: 100%;
+                                 height: 100%;
+                                 object-fit: contain;
+                                 }
+                                 </style>
+
+                                 <div class='pdf-container'>
+                                 <embed 
+                                    src='document.send.php?docid=5#zoom=page-width' 
+                                    type='application/pdf' 
+                                    />
+                                 </div>";
+                           }
                         echo "</tr>";
 
                         // Bouton pour voir le PDF en plein écran
@@ -452,15 +510,28 @@ class PluginGestionCri extends CommonDBTM {
                         $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
                         $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
 
-                        // Obtenir l'URL de téléchargement direct du fichier
-                        $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);
+      /////////////////////////////// NEWS OK Signer ///////////////////////////////
+                        if ($DOC->save == 'SharePoint'){
+                           // Obtenir l'URL de téléchargement direct du fichier
+                           $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
+                        }
+                        if ($DOC->save == 'Local'){
+                           $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
+                        }
 
                         // Étape 4 : Affichez le PDF via <embed>
                            echo "<td style='width: 70%;'>"; // Augmente la largeur de la colonne droite pour le PDF
                               // Affiche le PDF intégré avec une classe CSS pour le responsive
-                              echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
-                                 style='width:100%; height:600px;' frameborder='0'></iframe>";                           echo "</td>";
+                              if ($DOC->save == 'SharePoint'){
+                                 echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                                       style='width:100%; height:600px;' frameborder='0'></iframe>";
+                              }
+                              if ($DOC->save == 'Local'){
+                                 echo "<iframe src='$fileDownloadUrl' style='width:100%; height:600px;' frameborder='0'></iframe>";
+                              }                        
+                           echo "</td>";
                         echo "</tr>";
+      /////////////////////////////// NEWS OK Signer ///////////////////////////////
 
                         // Voir PDF
                         echo "<tr>";

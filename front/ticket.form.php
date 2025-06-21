@@ -38,8 +38,10 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     // Ajouter les nouveaux éléments
     foreach ($items_to_add as $item) {
         $fileExiste = false;
+        $save = null;
 
         if ($config->mode() == 0){
+            $save = 'SharePoint';
             // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
             $file_path = $item . ".pdf"; // Remplacez par le chemin exact de votre fichier
             // Étape 4 : Récupérez l'URL du fichier
@@ -49,9 +51,9 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
         }
         if ($config->mode() == 2){
-             $file_path = $item;
-             $fileUrl = null;
-
+            $save = 'Local';
+            $file_path = $item;
+             
             if (file_exists($file_path)) $fileExiste = true;
             $tracker = null;
         }
@@ -69,7 +71,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             $existedoc = $DB->query("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
             if(empty($existedoc->bl)){
                 if ($config->mode() == 0){
-                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker')")) {
+                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker, save) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker', '$save')")) {
                         Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
                         $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                     }
@@ -85,7 +87,8 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                             'is_recursive'=> 1];
 
                     if($NewDoc = $doc->add($input)){
-                        if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_id, tracker) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$NewDoc', '$tracker')")) {
+                        $fileUrl = 'document.send.php?docid='.$NewDoc;
+                        if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_id, doc_url, tracker, save) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$NewDoc', '$fileUrl', '$tracker', '$save')")) {
                             Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
                             $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                         }
