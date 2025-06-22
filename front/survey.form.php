@@ -61,12 +61,12 @@ if (isset($_POST["add"])) {
 
    $pdf_filename = $DB->escape($pdf_filename); // sécurise la requête SQL
 
-   $query = "SELECT bl, tickets_id, id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename' LIMIT 1";
+   $query = "SELECT bl, id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename' LIMIT 1";
    $result = $DB->query($query);
 
    if ($result && $result->num_rows > 0) {
       $row = $DB->fetchassoc($result);
-      message('Document déjà ajouté au <a href="ticket.form.php?id='. $row['tickets_id'] .'">Ticket  '.  $row['tickets_id'] .'</a>.', INFO);
+      message('Document déjà ajouté : <a href="survey.form.php?id='. $row['id'] .'">Gestion - ID '.  $row['id'] .'</a>.', INFO);
    }else{
       if ($pdf_save == 'Local'){
          $valid = true;
@@ -92,7 +92,7 @@ if (isset($_POST["add"])) {
       if($DB->doQuery($query)){
          $idsurvey = $DB->query("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename'")->fetch_object();
          $idsurvey = $idsurvey->id;
-         message('Document ajouté : <a href="survey.form.php?id='.$idsurvey.'">N° '.$idsurvey.'</a>.', INFO);
+         message('Document ajouté : <a href="survey.form.php?id='.$idsurvey.'">Gestion - ID '.$idsurvey.'</a>.', INFO);
       }else{
          message("Erreur de l'ajout du document", ERROR);
       }
@@ -117,4 +117,3 @@ if (isset($_POST["add"])) {
    $survey->display(['id' => $_GET['id']]);
    Html::footer();
 }
-

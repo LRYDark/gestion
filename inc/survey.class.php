@@ -190,7 +190,7 @@ class PluginGestionSurvey extends CommonDBTM {
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __('Non du document : ') . "</td>";
                echo "<td>";
-               echo $this->fields['bl'].'.pdf';
+               echo $this->fields['bl'];
                echo "</td>";  
                echo "<td>";
                echo '<a href="' . $this->fields['doc_url'] . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
