@@ -347,11 +347,13 @@ class PluginGestionSurvey extends CommonDBTM {
                const filename = data.filename;
                const folder   = data.folder;
                const save   = data.save; // ici : "Local"
+               const signed   = data.signed; // ici : "Local"
 
                // Exemple : remplir des champs cachés
                $('#pdf_filename').val(filename);
                $('#pdf_folder').val(folder);
                $('#pdf_save').val(save);
+               $('#pdf_signed').val(signed);
             });
          JAVASCRIPT;  
 
@@ -361,6 +363,7 @@ class PluginGestionSurvey extends CommonDBTM {
          echo '<input type="hidden" name="pdf_filename" id="pdf_filename">';
          echo '<input type="hidden" name="pdf_folder" id="pdf_folder">';
          echo '<input type="hidden" name="pdf_save" id="pdf_save">';
+         echo '<input type="hidden" name="pdf_signed" id="pdf_signed">';
 
          echo "<tr class='tab_bg_1'>";
          echo "<td>" . __('Recherche document :') . "</td>";

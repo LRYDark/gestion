@@ -9,16 +9,16 @@ global $DB, $CFG_GLPI;
 $sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 
-if($config->mode() == 0){ //sahrepoint 
-
-}
-if($config->mode() == 2){ // local
     $search = isset($_GET['q']) ? $_GET['q'] : '';
     $search = strtolower(trim($search));
+    $results = [];
 
+if($config->mode() == 0){ //sahrepoint 
+    $results = $sharepoint->searchSharePointGlobal($search);
+}
+if($config->mode() == 2){ // local
     // Ton dossier de recherche
     $folder = GLPI_PLUGIN_DOC_DIR . "/gestion/Documents";
-    $results = [];
 
     if (strlen($search) >= 2 && is_dir($folder)) {
         foreach (scandir($folder) as $file) {

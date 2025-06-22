@@ -49,6 +49,10 @@ function message($msg, $msgtype){
 
 if (isset($_POST["add"])) {
    $survey->check(-1, CREATE, $_POST);
+
+   echo '<pre>';
+   echo print_r($_POST);
+   echo '</pre>';
  
    $valid = false;
    $NewDoc = 0;
@@ -85,6 +89,7 @@ if (isset($_POST["add"])) {
       }
       if ($pdf_save == 'SharePoint'){
          $valid = true;
+          $doc_url = $pdf_folder;
       }
    }
          
@@ -99,7 +104,7 @@ if (isset($_POST["add"])) {
       }
    }
 
-   Html::back();
+   //Html::back();
 
 }else if (isset($_POST["purge"])) {
    $survey->check($_POST['id'], PURGE);
