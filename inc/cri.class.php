@@ -190,7 +190,7 @@ class PluginGestionCri extends CommonDBTM {
 
                                  <div class='pdf-container'>
                                  <embed 
-                                    src='document.send.php?docid=5#zoom=page-width' 
+                                    src='".$fileDownloadUrl."'
                                     type='application/pdf' 
                                     />
                                  </div>";
@@ -468,7 +468,7 @@ class PluginGestionCri extends CommonDBTM {
 
                                  <div class='pdf-container'>
                                  <embed 
-                                    src='document.send.php?docid=5#zoom=page-width' 
+                                    src='".$fileDownloadUrl."' 
                                     type='application/pdf' 
                                     />
                                  </div>";
