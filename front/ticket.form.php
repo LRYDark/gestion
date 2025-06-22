@@ -66,6 +66,10 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             if (preg_match($pattern, $item, $matches)) {
                 $itemUrl = $matches[1]; // xxx/zzzz ou xxx/xxxx/zzzz
                 $item = $matches[2]; // zzzz
+
+                if (!str_ends_with($item, '.pdf')) {
+                    $item .= '.pdf';
+                }
             }    
             
             $existedoc = $DB->query("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document

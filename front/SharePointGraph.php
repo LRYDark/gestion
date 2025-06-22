@@ -488,7 +488,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_close($ch);
 
         if ($httpStatus === 200 || $httpStatus === 201) {
-            echo "Fichier téléversé avec succès dans le dossier cible.\n";
+            
         } else {
             throw new Exception("Erreur lors du téléversement du fichier : HTTP $httpStatus");
         }

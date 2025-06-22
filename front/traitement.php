@@ -39,19 +39,21 @@ $doc = new Document();
         } 
 
         if ($used_param == 3) {
-            $FolderDes = 'local';
+            $FolderDes = 'Local';
             $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folder_name;
 
             // Vérifie si le dossier existe, sinon le crée
             if (!is_dir($destinationPath)) {
                 if (!mkdir($destinationPath, 0755, true)) {
                     // En cas d’échec de création
-                    echo "Erreur : impossible de créer le dossier $destinationPath";
+                    message("Erreur : impossible de créer le dossier $destinationPath", ERROR);
+                    Html::back();
+                    exit;
                 }
             }
         }
     } else {
-        $FolderDes = 'local';
+        $FolderDes = 'Local';
         $folder_name = 'DocumentsSigned';
         $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/DocumentsSigned";
     }
@@ -107,7 +109,7 @@ if ($config->mode() == 0){ //Récup BL depuis sharepoint
             $folderPath = $DOC->url_bl . "/";
         }
         // Étape 3 : Définir le chemin relatif du fichier
-        $filePath = $folderPath.$DOC_NAME.".pdf";
+        $filePath = $folderPath.$DOC_NAME;
 
         // Étape 4 : Obtenir l'URL de téléchargement
         $downloadUrl = $sharepoint->getDownloadUrl($filePath);
@@ -265,7 +267,7 @@ if($config->fields['DisplayPdfEnd'] == 1){
 }
 
 // Sauvegarder Temporaire due PDF modifié avec la signature ajoutée
-$outputPathTemp = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/".$DOC_NAME.".pdf";
+$outputPathTemp = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/".$DOC_NAME;
 
 if ($pdf->Output('F', $outputPathTemp) === '') {
     $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
@@ -284,7 +286,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             try {
                 $folderPathFile = ""; // Par défaut, $folderPath est vide
                 if (!empty($DOC->url_bl)){
-                    $folderPathFile = $DOC->url_bl .'/'. $DOC_NAME.".pdf" ;
+                    $folderPathFile = $DOC->url_bl .'/'. $DOC_NAME;
                 }             
                 $sharepoint->deleteFileByPath($folderPathFile);
             } catch (Exception $e) {
@@ -292,7 +294,14 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             }
         }
         if($config->mode() == 2){
-            unlink($existingPdfPath); // si fichier local alors delete le fichier non signer (configmode = 0 alors suppression du fichier)
+            try {
+                $queryDelete = "DELETE FROM `glpi_documents` WHERE `id` = '$DOC->doc_id';";
+                if ($DB->query($queryDelete)) {
+                    unlink($existingPdfPath); // si fichier local alors delete le fichier non signer (configmode = 0 alors suppression du fichier)
+                }
+            } catch (Exception $e) {
+                message("Erreur de suppression du document non signé : " . $e->getMessage(), ERROR);
+            }
         }
     }
 }
@@ -307,18 +316,13 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         }
 
         $folderPath = $folder_name. '/' .$EntitiesName; // Chemin du dossier
-        if($config->mode() == 0){
-            $fileName = $DOC_NAME.".pdf"; // Nom du fichier après téléversement    
-        }
-        if($config->mode() == 2){
-            $fileName = $DOC_NAME; // Nom du fichier après téléversement    
-        }
+        $fileName = $DOC_NAME; // Nom du fichier après téléversement    
 
         // Étape 3 : Téléverser le fichier
         if ($FolderDes == 'SharePoint'){
             $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPathTemp);
         } 
-        if ($FolderDes == 'local'){
+        if ($FolderDes == 'Local'){
             $destDir = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folderPath;
 
             // Crée le dossier s’il n’existe pas
@@ -344,12 +348,10 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         if ($FolderDes == 'SharePoint'){
             //Spécifiez le chemin relatif du fichier dans SharePoint
             $file_path = $folderPath . $fileName; // Remplacez par le chemin exact de votre fichier
-            echo $file_path;
-
             $fileUrl = $sharepoint->getFileUrl($file_path);
             $NewDoc = 0;
         }
-        if ($FolderDes == 'local'){
+        if ($FolderDes == 'Local'){
             $folderPath = "_plugins/gestion/". $folderPath; // Chemin relatif pour le stockage local
             $input = ['name'        => addslashes(str_replace("?", "°", $DOC_NAME)),
                     'filename'    => addslashes($DOC_NAME),
@@ -367,10 +369,10 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             }
         }
 
-        if ($DB->query("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc WHERE id = $id_document")){
+        if ($DB->query("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc, save = '$FolderDes' WHERE id = $id_document")){
             //unlink($existingPdfPath);
-            /*unlink($signaturePath);
-            unlink($outputPathTemp);*/
+            unlink($signaturePath);
+            unlink($outputPathTemp);
         }
 
         message('Documents : '. $DOC_NAME.' signé', INFO);
@@ -383,5 +385,5 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
 }*/
 
-//Html::back();
+Html::back();
 ?>

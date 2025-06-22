@@ -152,7 +152,10 @@ class PluginGestionCri extends CommonDBTM {
                      try {
                         // Construire le chemin complet du fichier
                         $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
-                        $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
+                        $filePath = $folderPath . $Doc_Name; // Chemin du fichier
+
+                        // Remplacer tous les doubles slashs par un simple slash
+                        $filePath = preg_replace('#/+#', '/', $filePath);
 
       /////////////////////////////// NEWS OK Non Signer ///////////////////////////////
                         if ($DOC->save == 'SharePoint'){
@@ -272,7 +275,10 @@ class PluginGestionCri extends CommonDBTM {
                      try {
                         // Construire le chemin complet du fichier
                         $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
-                        $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
+                        $filePath = $folderPath . $Doc_Name; // Chemin du fichier
+
+                        // Remplacer tous les doubles slashs par un simple slash
+                        $filePath = preg_replace('#/+#', '/', $filePath);
 
       /////////////////////////////// NEWS OK Non Signer ///////////////////////////////
                         if ($DOC->save == 'SharePoint'){
@@ -424,7 +430,10 @@ class PluginGestionCri extends CommonDBTM {
                      try {
                         // Construire le chemin complet du fichier
                         $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
-                        $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
+                        $filePath = $folderPath . $Doc_Name; // Chemin du fichier
+
+                        // Remplacer tous les doubles slashs par un simple slash
+                        $filePath = preg_replace('#/+#', '/', $filePath);
 
                         if ($DOC->save == 'SharePoint'){
                            // Obtenir l'URL de téléchargement direct du fichier
@@ -508,12 +517,15 @@ class PluginGestionCri extends CommonDBTM {
 
                         // Construire le chemin complet du fichier
                         $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
-                        $filePath = $folderPath . $Doc_Name . ".pdf"; // Chemin du fichier
+                        $filePath = $folderPath . $Doc_Name; // Chemin du fichier
+
+                        // Remplacer tous les doubles slashs par un simple slash
+                        $filePath = preg_replace('#/+#', '/', $filePath);
 
       /////////////////////////////// NEWS OK Signer ///////////////////////////////
                         if ($DOC->save == 'SharePoint'){
                            // Obtenir l'URL de téléchargement direct du fichier
-                           $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
+                           $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath); 
                         }
                         if ($DOC->save == 'Local'){
                            $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
