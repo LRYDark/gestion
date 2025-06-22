@@ -302,10 +302,10 @@ class PluginGestionTicket extends CommonDBTM {
 
             // Vérifie si le dossier existe, sinon le crée
             if (!is_dir($destinationPath)) {
-                if (!mkdir($destinationPath, 0755, true)) {
-                    // En cas d’échec de création
-                    echo "Erreur : impossible de créer le dossier $destinationPath";
-                }
+               if (!mkdir($destinationPath, 0755, true)) {
+                  // En cas d’échec de création
+                  echo "Erreur : impossible de créer le dossier $destinationPath";
+               }
             }
         }
     } else {
@@ -362,7 +362,7 @@ class PluginGestionTicket extends CommonDBTM {
                      echo '<input type="hidden" name="tickets_id" value="' . $ticketId . '">';
                      Dropdown::showFromArray("groups_id", $groups, [
                         'multiple'     => true,
-                        'width'        => '100%',
+                        'width'        => '650px',
                         'values'       => json_decode($selected_values_json, true),
                         'disabled'     => $disabled,
                      ]);
@@ -429,7 +429,7 @@ class PluginGestionTicket extends CommonDBTM {
 
                                     // Réinitialiser Select2
                                     $('[name="groups_id[]"]').select2({
-                                          //width: '650',
+                                          width: '650',
                                           dropdownAutoWidth: true,
                                           dropdownParent: $('[name="groups_id[]"]').closest('div.modal, div.dropdown-menu, body'),
                                           quietMillis: 100,
