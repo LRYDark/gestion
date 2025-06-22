@@ -384,22 +384,27 @@ class PluginGestionSurvey extends CommonDBTM {
                   placeholder: "Recherche de fichier PDF...",
                   minimumInputLength: 2,
                   ajax: {
-                        delay: 300,
-                        url: "ajax_search_pdf.php",
-                        dataType: "json",
-                        data: function(params) {
-                           $("#spinner").show();
-                           return {
-                              q: params.term
-                           };
-                        },
-                        processResults: function(data) {
-                           $("#spinner").hide();
-                           return {
-                              results: data
-                           };
-                        },
-                        cache: true
+                     delay: 300,
+                     url: "ajax_search_pdf.php",
+                     dataType: "json",
+                     data: function(params) {
+                        $("#spinner").show();
+                        return { q: params.term };
+                     },
+                     processResults: function(data) {
+                        $("#spinner").hide();
+                        return { results: data };
+                     },
+                     cache: true
+                  },
+                  templateResult: function (data) {
+                     return data.html ? data.html : data.text;
+                  },
+                  templateSelection: function (data) {
+                     return data.text;
+                  },
+                  escapeMarkup: function (markup) {
+                     return markup;
                   }
                });
             });

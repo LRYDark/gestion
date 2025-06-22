@@ -9,38 +9,57 @@ global $DB, $CFG_GLPI;
 $sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 
-    $search = isset($_GET['q']) ? $_GET['q'] : '';
-    $search = strtolower(trim($search));
-    $results = [];
+$search = isset($_GET['q']) ? $_GET['q'] : '';
+$search = strtolower(trim($search));
+$results = [];
 
-if($config->mode() == 0){ //sahrepoint 
-    $results = $sharepoint->searchSharePointGlobal($search);
+// SharePoint
+$sharepoint_results = $sharepoint->searchSharePointGlobal($search);
+if (is_array($sharepoint_results)) {
+    $results = array_merge($results, $sharepoint_results);
 }
-if($config->mode() == 2){ // local
-    // Ton dossier de recherche
-    $folder = GLPI_PLUGIN_DOC_DIR . "/gestion/Documents";
 
-    if (strlen($search) >= 2 && is_dir($folder)) {
-        foreach (scandir($folder) as $file) {
-            $fullpath = $folder . '/' . $file;
+// Local
+$folder = GLPI_PLUGIN_DOC_DIR . "/gestion";
+if (strlen($search) >= 2 && is_dir($folder)) {
 
-            if (stripos($file, $search) !== false && pathinfo($file, PATHINFO_EXTENSION) === 'pdf') {
+    $rii = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($folder, FilesystemIterator::SKIP_DOTS)
+    );
 
-                // Extraire le chemin relatif à partir de "_plugins"
-                $relative_path = strstr($fullpath, '_plugins'); // tout après "_plugins"
-                $filename = basename($file); // juste le nom du fichier
-                $path_only = dirname($relative_path) . '/'; // chemin sans le fichier
+    $DOC = $DB->query("SELECT folder_name FROM `glpi_plugin_gestion_configsfolder` WHERE params = 3")->fetch_object();
 
-                $results[] = [
-                    'id'   => $relative_path,  // facultatif ou complet
-                    'text' => $filename,
-                    'save' => 'Local',
-                    'filename' => $filename,      // valeur 1
-                    'folder'   => $path_only      // valeur 2
-                ];
-            }
+    foreach ($rii as $file) {
+        if (!$file->isFile()) continue;
+
+        if (
+            stripos($file->getFilename(), $search) !== false &&
+            strtolower($file->getExtension()) === 'pdf'
+        ) {
+            $fullpath = $file->getPathname();
+            $relative_path = strstr($fullpath, '_plugins');
+            $filename = $file->getFilename();
+            $path_only = dirname($relative_path) . '/';
+            $webUrl = $path_only;
+
+            $signed = stripos($webUrl, $DOC->folder_name) !== false;
+
+            $badge = $signed
+                ? ' <span style="color:white;background-color:#28a745;padding:2px 6px;border-radius:4px;font-size:11px;">✅ SIGNÉ</span>'
+                : '';
+
+            $results[] = [
+                'id'       => md5($relative_path),
+                'text'     => $filename,
+                'filename' => $filename,
+                'folder'   => $webUrl,
+                'save'     => 'Local',
+                'signed'   => $signed ? 1 : 0,
+                'html'     => $filename . $badge
+            ];
         }
     }
 }
 
+// Sortie JSON finale
 echo json_encode($results);

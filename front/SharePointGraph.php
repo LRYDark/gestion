@@ -290,11 +290,9 @@ class PluginGestionSharepoint extends CommonDBTM {
                         stripos($filename, $query) !== false
                     ) {
                         $results[] = [
-                            'id'       => $item['id'],
-                            'text'     => $filename,
-                            'filename' => $filename,
-                            'folder'   => $item['webUrl'] ?? '',
-                            'save'     => 'SharePoint'
+                            'name'     => $filename,
+                            'lastModifiedDateTime' => $item['lastModifiedDateTime'] ?? 'Non disponible',
+                            'webUrl'   => $item['webUrl'] ?? 'Non disponible'
                         ];
                     }
                 }
@@ -342,10 +340,9 @@ class PluginGestionSharepoint extends CommonDBTM {
                             stripos($filename, $query) !== false
                         ) {
                             $results[] = [
-                                'id'       => $item['id'],
                                 'name'     => $filename,
-                                'lastModifiedDateTime' => $item['lastModifiedDateTime'],
-                                'webUrl'   => $item['webUrl'] ?? '',
+                                'lastModifiedDateTime' => $item['lastModifiedDateTime'] ?? 'Non disponible',
+                                'webUrl'   => $item['webUrl'] ?? 'Non disponible'
                             ];
                         }
                     }
@@ -396,13 +393,20 @@ class PluginGestionSharepoint extends CommonDBTM {
                 stripos($filename, $query) !== false
             ) {
                 $DOC = $DB->query("SELECT folder_name FROM `glpi_plugin_gestion_configsfolder` WHERE params = 3")->fetch_object();
+                $signed = stripos($webUrl, $DOC->folder_name) !== false;
+
+                $badge = $signed
+                    ? ' <span style="color:white;background-color:#28a745;padding:2px 6px;border-radius:4px;font-size:11px;">SIGNÉ</span>'
+                    : '';
+
                 $results[] = [
                     'id'       => $item['id'],
                     'text'     => $filename,
                     'filename' => $filename,
                     'folder'   => $webUrl,
                     'save'     => 'SharePoint',
-                    'signed'   => stripos($webUrl, $DOC->folder_name) !== false ? 1 : 0
+                    'signed'   => $signed ? 1 : 0,
+                    'html'     => $filename . $badge
                 ];
             }
         }

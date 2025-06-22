@@ -85,7 +85,7 @@ if (isset($_POST["add"])) {
       }
       if ($pdf_save == 'SharePoint'){
          $valid = true;
-          $doc_url = $pdf_folder;
+         $doc_url = $pdf_folder;
       }
    }
          
