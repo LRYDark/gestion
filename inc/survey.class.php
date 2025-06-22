@@ -171,7 +171,7 @@ class PluginGestionSurvey extends CommonDBTM {
     * @return bool
     */
    function showForm($ID, $options = []) {
-      global $DB;
+      global $DB, $CFG_GLPI;
       $config = new PluginGestionConfig();
 
       $params = ['job'           => $ID,
@@ -186,95 +186,222 @@ class PluginGestionSurvey extends CommonDBTM {
       $this->initForm($ID, $options);
       $this->showFormHeader($options);
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __('Non du document : ') . "</td>";
-            echo "<td>";
-            echo $this->fields['bl'].'.pdf';
-            echo "</td>";  
-            echo "<td>";
-            echo '<a href="' . $this->fields['doc_url'] . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
-         echo "</td></tr>";
-
-      //----------------------------------------------------------------------------------------------------------------
-      if (Plugin::isPluginActive('formcreator')) {
-         if(empty($this->fields["tickets_id"]) && $config->fields['formulaire'] != 0){
-            $formId = $config->fields['formulaire']; // Exemple d'ID dynamique
-
-            $chemin1 = __DIR__ . "/../../formcreator/front/formdisplay.php";
-            $chemin2 = __DIR__ . "/../../../marketplace/formcreator/front/formdisplay.php";
-
-            if (file_exists($chemin1) && is_file($chemin1)) {
-               $form  = "../../formcreator/front/formdisplay.php?id=$formId";
-               $title = "(Plugin) ";
-            } elseif (file_exists($chemin2) && is_file($chemin2)) {
-               $title = "(Marketplace) ";
-               $form  = "../../../marketplace/formcreator/front/formdisplay.php?id=$formId";
-            } else {
-               $title = null;
-               $form  = null;
-            }
-
-            if($form != null){
-               echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Création d'un formulaire")."</td>";
+      if ($_GET['id'] != null){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Non du document : ') . "</td>";
                echo "<td>";
+               echo $this->fields['bl'].'.pdf';
+               echo "</td>";  
+               echo "<td>";
+               echo '<a href="' . $this->fields['doc_url'] . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
+            echo "</td></tr>";
 
-                  ?>
-                  <!-- Bouton pour ouvrir le modal -->
-                  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#myModal">
-                     <?php echo __('Générer un formulaire'); ?>
-                  </button>
+         //----------------------------------------------------------------------------------------------------------------
+         if (Plugin::isPluginActive('formcreator')) {
+            if(empty($this->fields["tickets_id"]) && $config->fields['formulaire'] != 0){
+               $formId = $config->fields['formulaire']; // Exemple d'ID dynamique
 
-                  <!-- Modal Bootstrap -->
-                  <div class="modal fade" id="myModal" tabindex="-1" aria-labelledby="myModalLabel" aria-hidden="true">
-                     <div class="modal-dialog modal-xl" style="max-width: 50%;">
-                        <div class="modal-content" style="height: 90vh;">
-                              <div class="modal-header">
-                                 <h5 class="modal-title" id="myModalLabel"><?php echo $title.__('Formulaire'); ?></h5>
-                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div class="modal-body p-0" style="height: calc(100% - 56px); overflow: auto;">
-                                 <!-- Iframe -->
-                                 <iframe id="iframe-content" 
-                                          src=<?php echo $form; ?> 
-                                          style="width: 100%; height: 99%; border: none;"></iframe>
-                              </div>
+               $chemin1 = __DIR__ . "/../../formcreator/front/formdisplay.php";
+               $chemin2 = __DIR__ . "/../../../marketplace/formcreator/front/formdisplay.php";
+
+               if (file_exists($chemin1) && is_file($chemin1)) {
+                  $form  = "../../formcreator/front/formdisplay.php?id=$formId";
+                  $title = "(Plugin) ";
+               } elseif (file_exists($chemin2) && is_file($chemin2)) {
+                  $title = "(Marketplace) ";
+                  $form  = "../../../marketplace/formcreator/front/formdisplay.php?id=$formId";
+               } else {
+                  $title = null;
+                  $form  = null;
+               }
+
+               if($form != null){
+                  echo "<tr class='tab_bg_1'>";
+                  echo "<td>" . __("Création d'un formulaire")."</td>";
+                  echo "<td>";
+
+                     ?>
+                     <!-- Bouton pour ouvrir le modal -->
+                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#myModal">
+                        <?php echo __('Générer un formulaire'); ?>
+                     </button>
+
+                     <!-- Modal Bootstrap -->
+                     <div class="modal fade" id="myModal" tabindex="-1" aria-labelledby="myModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-xl" style="max-width: 50%;">
+                           <div class="modal-content" style="height: 90vh;">
+                                 <div class="modal-header">
+                                    <h5 class="modal-title" id="myModalLabel"><?php echo $title.__('Formulaire'); ?></h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                 </div>
+                                 <div class="modal-body p-0" style="height: calc(100% - 56px); overflow: auto;">
+                                    <!-- Iframe -->
+                                    <iframe id="iframe-content" 
+                                             src=<?php echo $form; ?> 
+                                             style="width: 100%; height: 99%; border: none;"></iframe>
+                                 </div>
+                           </div>
                         </div>
                      </div>
-                  </div>
 
-                  <script>
-                     function removeNavbarFromIframe(iframeId) {
-                        const iframe = document.getElementById(iframeId);
-                        if (iframe) {
-                           iframe.onload = function () {
-                              const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                              if (iframeDoc) {
-                                 // Supprimer la barre de navigation (aside)
-                                 const navbar = iframeDoc.querySelector('aside.navbar.navbar-vertical.navbar-expand-lg.sticky-lg-top.sidebar');
-                                 if (navbar) {
-                                    navbar.remove();
-                                 } else {
-                                 }
+                     <script>
+                        function removeNavbarFromIframe(iframeId) {
+                           const iframe = document.getElementById(iframeId);
+                           if (iframe) {
+                              iframe.onload = function () {
+                                 const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                                 if (iframeDoc) {
+                                    // Supprimer la barre de navigation (aside)
+                                    const navbar = iframeDoc.querySelector('aside.navbar.navbar-vertical.navbar-expand-lg.sticky-lg-top.sidebar');
+                                    if (navbar) {
+                                       navbar.remove();
+                                    } else {
+                                    }
 
-                                 // Supprimer l'en-tête (header)
-                                 const header = iframeDoc.querySelector('header.navbar.d-print-none.sticky-lg-top.shadow-sm.navbar-light.navbar-expand-md');
-                                 if (header) {
-                                    header.remove();
-                                 } else {
+                                    // Supprimer l'en-tête (header)
+                                    const header = iframeDoc.querySelector('header.navbar.d-print-none.sticky-lg-top.shadow-sm.navbar-light.navbar-expand-md');
+                                    if (header) {
+                                       header.remove();
+                                    } else {
+                                    }
                                  }
-                              }
-                           };
+                              };
+                           }
                         }
-                     }
-                     // Appel de la fonction
-                     removeNavbarFromIframe('iframe-content');
-                  </script><?php
-               echo "</td></tr>";
+                        // Appel de la fonction
+                        removeNavbarFromIframe('iframe-content');
+                     </script><?php
+                  echo "</td></tr>";
+               }
             }
          }
-      }
-      //----------------------------------------------------------------------------------------------------------------
+         //----------------------------------------------------------------------------------------------------------------
+
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Entity') . "</td>";
+               echo "<td>";
+               Dropdown::show('Entity', [
+                  'name' => 'entities_id',
+                  'value' => $this->fields["entities_id"],
+                  'display_emptychoice' => 1,
+                  'specific_tags' => [],
+                  'itemtype' => 'Entity',
+                  'displaywith' => [],
+                  'emptylabel' => "-----",
+                  'used' => [],
+                  'toadd' => [],
+                  'entity_restrict' => 0,
+               ]); 
+            echo "</td><td colspan='2'></td></tr>";
+
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Ticket') . "</td>";
+               echo "<td>";
+               Dropdown::show('Ticket', [
+                  'name' => 'tickets_id', // Le nom du champ
+                  'value' => $this->fields["tickets_id"], // La valeur sélectionnée par défaut
+                  'display_emptychoice' => 1, // Afficher un choix vide
+                  'specific_tags' => [], // Éventuels attributs HTML supplémentaires
+                  'itemtype' => 'Ticket', // Type d'objet à afficher
+                  'displaywith' => ['id'], // Champs à afficher pour les tickets
+                  'emptylabel' => "-----", // Étiquette pour l'option vide
+                  'used' => [], // Filtrage des tickets déjà utilisés
+                  'toadd' => [], // Liste personnalisée d'objets à ajouter
+                  'entity_restrict' => 0, // Autoriser les tickets de toutes les entités
+               ]);;
+            echo "</td><td colspan='2'></td></tr>";
+
+            echo "<tr class='tab_bg_1'><td></td></tr>";
+            echo "<tr class='tab_bg_1'><td></td></tr>";
+            echo "<tr class='tab_bg_1'><td></td></tr>";
+            echo "<tr class='tab_bg_1'><td></td></tr>";
+            echo "<tr class='tab_bg_1'><td></td></tr>";
+
+         $signed = '';
+         if ($this->fields['signed'] == 1){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Informations sur le document <strong>Signé</strong> :') ."</td>";
+               echo "<td>";
+                  echo Html::submit($this->fields['bl'], [
+                     'name'    => 'showCriForm',
+                     'class'   => 'btn btn-secondary',
+                     'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
+               ]);
+            echo "</td></tr>";
+         }else{
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Informations sur le document <strong>Non signé</strong> ')."</td>";
+               echo "<td>";
+                  echo Html::submit($this->fields['bl'], [
+                     'name'    => 'showCriForm',
+                     'class'   => 'btn btn-primary',
+                     'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
+                  ]);
+            echo "</td></tr>";
+         }
+      }else{
+         $script = <<<JAVASCRIPT
+            $('#search_pdf').on('select2:select', function (e) {
+               const data = e.params.data;
+
+               const filename = data.filename;
+               const folder   = data.folder;
+               const save   = data.save; // ici : "Local"
+
+               // Exemple : remplir des champs cachés
+               $('#pdf_filename').val(filename);
+               $('#pdf_folder').val(folder);
+               $('#pdf_save').val(save);
+            });
+         JAVASCRIPT;  
+
+         // Inclure le script dans la page
+         echo Html::scriptBlock($script);
+
+         echo '<input type="hidden" name="pdf_filename" id="pdf_filename">';
+         echo '<input type="hidden" name="pdf_folder" id="pdf_folder">';
+         echo '<input type="hidden" name="pdf_save" id="pdf_save">';
+
+         echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __('Recherche document :') . "</td>";
+         echo "<td>";
+            echo '
+               <div>
+                  <select id="search_pdf" name="search_pdf" style="width:650px;"></select>
+                  <span id="spinner" style="display:none;">
+                     <img src="' . $CFG_GLPI['root_doc'] . '/pics/spinner.gif" alt="Chargement...">
+                  </span>
+               </div>
+            ';
+         echo "</td><td colspan='2'></td></tr>";
+         echo '
+            <script>
+            $(document).ready(function() {
+               $("#search_pdf").select2({
+                  placeholder: "Recherche de fichier PDF...",
+                  minimumInputLength: 2,
+                  ajax: {
+                        delay: 300,
+                        url: "ajax_search_pdf.php",
+                        dataType: "json",
+                        data: function(params) {
+                           $("#spinner").show();
+                           return {
+                              q: params.term
+                           };
+                        },
+                        processResults: function(data) {
+                           $("#spinner").hide();
+                           return {
+                              results: data
+                           };
+                        },
+                        cache: true
+                  }
+               });
+            });
+            </script>
+         ';
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __('Entity') . "</td>";
@@ -309,34 +436,6 @@ class PluginGestionSurvey extends CommonDBTM {
                'entity_restrict' => 0, // Autoriser les tickets de toutes les entités
             ]);;
          echo "</td><td colspan='2'></td></tr>";
-
-         echo "<tr class='tab_bg_1'><td></td></tr>";
-         echo "<tr class='tab_bg_1'><td></td></tr>";
-         echo "<tr class='tab_bg_1'><td></td></tr>";
-         echo "<tr class='tab_bg_1'><td></td></tr>";
-         echo "<tr class='tab_bg_1'><td></td></tr>";
-
-      $signed = '';
-      if ($this->fields['signed'] == 1){
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __('Informations sur le document <strong>Signé</strong> :') ."</td>";
-            echo "<td>";
-               echo Html::submit($this->fields['bl'], [
-                  'name'    => 'showCriForm',
-                  'class'   => 'btn btn-secondary',
-                  'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
-              ]);
-         echo "</td></tr>";
-      }else{
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __('Informations sur le document <strong>Non signé</strong> ')."</td>";
-            echo "<td>";
-               echo Html::submit($this->fields['bl'], [
-                  'name'    => 'showCriForm',
-                  'class'   => 'btn btn-primary',
-                  'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
-               ]);
-         echo "</td></tr>";
       }
          
       if (Session::haveRight('plugin_gestion_survey', UPDATE)) {
