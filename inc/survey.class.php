@@ -295,7 +295,7 @@ class PluginGestionSurvey extends CommonDBTM {
             echo "</td><td colspan='2'></td></tr>";
 
             echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __('Ticket') . "</td>";
+            echo "<td>" . __('<a href="../../../front/ticket.form.php?id='. $this->fields["tickets_id"] .'">Ticket ID : '. $this->fields["tickets_id"] .'</a>') . "</td>";
                echo "<td>";
                Dropdown::show('Ticket', [
                   'name' => 'tickets_id', // Le nom du champ

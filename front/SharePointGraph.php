@@ -138,7 +138,7 @@ class PluginGestionSharepoint extends CommonDBTM {
     }
 
     // Fonction pour effectuer la requête de recherche
-    public function searchSharePoint() {
+    /*public function searchSharePoint() {
         $accessToken = $this->getAccessToken();
         $config = new PluginGestionConfig();
         $NumberViews = $config->NumberViews();
@@ -249,6 +249,165 @@ class PluginGestionSharepoint extends CommonDBTM {
         }
     
         return $pdfFiles;
+    }*/
+
+    public function searchSharePoint() {
+        $accessToken = $this->getAccessToken();
+        $config = new PluginGestionConfig();
+        $driveId = $this->GetDriveId(); // Doit être implémenté
+        $NumberViews = $config->NumberViews(); // facultatif, si tu veux limiter
+        $keywords = $this->getSearchKeywordsByParams10(); // tableau de mots-clés
+        $folders = $this->getFoldersByParams1(); // tableau de noms de dossiers dans "Clients"
+
+        $results = [];
+
+        // Aucun mot-clé → rien à faire
+        if (empty($keywords)) {
+            return $results;
+        }
+
+        // Aucun dossier → recherche globale sur tous les mots-clés
+        if (empty($folders)) {
+            foreach ($keywords as $query) {
+                $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/search(q='" . urlencode($query) . "')";
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_HTTPHEADER => [
+                        "Authorization: Bearer $accessToken",
+                        "Content-Type: application/json",
+                        "ConsistencyLevel: eventual"
+                    ]
+                ]);
+                $response = curl_exec($ch);
+                curl_close($ch);
+                $data = json_decode($response, true);
+
+                foreach ($data['value'] ?? [] as $item) {
+                    $filename = $item['name'] ?? '';
+                    if (
+                        strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pdf' &&
+                        stripos($filename, $query) !== false
+                    ) {
+                        $results[] = [
+                            'id'       => $item['id'],
+                            'text'     => $filename,
+                            'filename' => $filename,
+                            'folder'   => $item['webUrl'] ?? '',
+                            'save'     => 'SharePoint'
+                        ];
+                    }
+                }
+            }
+        } else {
+            // Pour chaque combinaison dossier + mot-clé
+            foreach ($folders as $folderName) {
+                $encodedPath = rawurlencode($folderName);
+                $urlGetId = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$encodedPath";
+
+                $ch = curl_init($urlGetId);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_HTTPHEADER => [
+                        "Authorization: Bearer $accessToken",
+                        "Content-Type: application/json"
+                    ]
+                ]);
+                $response = curl_exec($ch);
+                curl_close($ch);
+                $data = json_decode($response, true);
+
+                if (!isset($data['id'])) continue;
+                $itemId = $data['id'];
+
+                foreach ($keywords as $query) {
+                    $url = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$itemId/search(q='" . urlencode($query) . "')";
+                    $ch = curl_init($url);
+                    curl_setopt_array($ch, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_HTTPHEADER => [
+                            "Authorization: Bearer $accessToken",
+                            "Content-Type: application/json",
+                            "ConsistencyLevel: eventual"
+                        ]
+                    ]);
+                    $response = curl_exec($ch);
+                    curl_close($ch);
+                    $data = json_decode($response, true);
+
+                    foreach ($data['value'] ?? [] as $item) {
+                        $filename = $item['name'] ?? '';
+                        if (
+                            strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pdf' &&
+                            stripos($filename, $query) !== false
+                        ) {
+                            $results[] = [
+                                'id'       => $item['id'],
+                                'name'     => $filename,
+                                'lastModifiedDateTime' => $item['lastModifiedDateTime'],
+                                'webUrl'   => $item['webUrl'] ?? '',
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        return $results;
+    }
+
+    public function searchSharePointGlobal(string $query): array {
+        global $DB;
+        $accessToken = $this->getAccessToken(); // doit exister dans ta classe
+        $config = new PluginGestionConfig();
+        $driveId = $this->GetDriveId(); // ID du Drive
+
+        $results = [];
+
+        // Construire l’URL de recherche globale
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/search(q='" . urlencode($query) . "')";
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                "Authorization: Bearer $accessToken",
+                "Content-Type: application/json",
+                "ConsistencyLevel: eventual"
+            ]
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            return [['error' => "Erreur HTTP $httpCode"]];
+        }
+
+        $data = json_decode($response, true);
+
+        foreach ($data['value'] ?? [] as $item) {
+            $filename = $item['name'] ?? '';
+            $webUrl = $item['webUrl'] ?? '';
+
+            if (
+                strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pdf' &&
+                stripos($filename, $query) !== false
+            ) {
+                $DOC = $DB->query("SELECT folder_name FROM `glpi_plugin_gestion_configsfolder` WHERE params = 3")->fetch_object();
+                $results[] = [
+                    'id'       => $item['id'],
+                    'text'     => $filename,
+                    'filename' => $filename,
+                    'folder'   => $webUrl,
+                    'save'     => 'SharePoint',
+                    'signed'   => stripos($webUrl, $DOC->folder_name) !== false ? 1 : 0
+                ];
+            }
+        }
+
+        return $results;
     }
       
     /**

@@ -58,6 +58,7 @@ if (isset($_POST["add"])) {
    $pdf_folder = $_POST['pdf_folder'];
    $search_pdf = $_POST['search_pdf'];
    $pdf_save = $_POST['pdf_save'];
+   $pdf_signed = $_POST['pdf_signed'];
 
    $pdf_filename = $DB->escape($pdf_filename); // sécurise la requête SQL
 
@@ -88,7 +89,7 @@ if (isset($_POST["add"])) {
    }
          
    if ($valid == true){
-      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `url_bl`, `bl`, `doc_id`, `doc_url`, `save`) VALUES ($tickets_id, $entities_id, '$pdf_folder', '$pdf_filename', $NewDoc, '$doc_url', '$pdf_save');";
+      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`) VALUES ($tickets_id, $entities_id, '$pdf_folder', '$pdf_filename', $pdf_signed, $NewDoc, '$doc_url', '$pdf_save');";
       if($DB->doQuery($query)){
          $idsurvey = $DB->query("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename'")->fetch_object();
          $idsurvey = $idsurvey->id;

@@ -6,34 +6,39 @@ require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de
 require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
 
 global $DB, $CFG_GLPI;
+$sharepoint = new PluginGestionSharepoint();
+$config = new PluginGestionConfig();
 
-header('Content-Type: application/json');
+if($config->mode() == 0){ //sahrepoint 
 
-$search = isset($_GET['q']) ? $_GET['q'] : '';
-$search = strtolower(trim($search));
+}
+if($config->mode() == 2){ // local
+    $search = isset($_GET['q']) ? $_GET['q'] : '';
+    $search = strtolower(trim($search));
 
-// Ton dossier de recherche
-$folder = GLPI_PLUGIN_DOC_DIR . "/gestion/Documents";
-$results = [];
+    // Ton dossier de recherche
+    $folder = GLPI_PLUGIN_DOC_DIR . "/gestion/Documents";
+    $results = [];
 
-if (strlen($search) >= 2 && is_dir($folder)) {
-    foreach (scandir($folder) as $file) {
-        $fullpath = $folder . '/' . $file;
+    if (strlen($search) >= 2 && is_dir($folder)) {
+        foreach (scandir($folder) as $file) {
+            $fullpath = $folder . '/' . $file;
 
-        if (stripos($file, $search) !== false && pathinfo($file, PATHINFO_EXTENSION) === 'pdf') {
+            if (stripos($file, $search) !== false && pathinfo($file, PATHINFO_EXTENSION) === 'pdf') {
 
-            // Extraire le chemin relatif à partir de "_plugins"
-            $relative_path = strstr($fullpath, '_plugins'); // tout après "_plugins"
-            $filename = basename($file); // juste le nom du fichier
-            $path_only = dirname($relative_path) . '/'; // chemin sans le fichier
+                // Extraire le chemin relatif à partir de "_plugins"
+                $relative_path = strstr($fullpath, '_plugins'); // tout après "_plugins"
+                $filename = basename($file); // juste le nom du fichier
+                $path_only = dirname($relative_path) . '/'; // chemin sans le fichier
 
-            $results[] = [
-                'id'   => $relative_path,  // facultatif ou complet
-                'text' => $filename,
-                'save' => 'Local',
-                'filename' => $filename,      // valeur 1
-                'folder'   => $path_only      // valeur 2
-            ];
+                $results[] = [
+                    'id'   => $relative_path,  // facultatif ou complet
+                    'text' => $filename,
+                    'save' => 'Local',
+                    'filename' => $filename,      // valeur 1
+                    'folder'   => $path_only      // valeur 2
+                ];
+            }
         }
     }
 }
