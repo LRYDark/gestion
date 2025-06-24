@@ -43,9 +43,10 @@ function update_144_next() {
    $required_columns = [
       'SageOn',
       'SharePointOn',
-      'SageIp',
-      'SageId',
-      'SagePwd',
+      'SageToken',
+      'SageSearch',
+      'SharePointSearch',
+      'LocalSearch',
       'mode'
    ];
 
@@ -54,9 +55,10 @@ function update_144_next() {
 
    if (!empty($missing_columns)) {
       $query= "ALTER TABLE glpi_plugin_gestion_configs
-               ADD COLUMN `SageIp` VARCHAR(255) NULL,
-               ADD COLUMN `SageId` VARCHAR(255) NULL,
-               ADD COLUMN `SagePwd` VARCHAR(255) NULL,
+               ADD COLUMN `SageToken` VARCHAR(255) NULL,
+               ADD COLUMN `SageSearch` TINYINT NOT NULL DEFAULT '0',
+               ADD COLUMN `SharePointSearch` TINYINT NOT NULL DEFAULT '0',
+               ADD COLUMN `LocalSearch` TINYINT NOT NULL DEFAULT '0',
                ADD COLUMN `SageOn` TINYINT NOT NULL DEFAULT '0',
                ADD COLUMN `SharePointOn` TINYINT NOT NULL DEFAULT '0',
                ADD COLUMN `mode` TINYINT NOT NULL DEFAULT '0';";

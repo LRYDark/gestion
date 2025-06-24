@@ -50,6 +50,45 @@ class PluginGestionConfig extends CommonDBTM
 
    static function showConfigForm() //formulaire de configuration du plugin
    {
+
+      ?><style>
+         .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+         }
+         .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+         }
+         .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+         }
+         .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px; width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+         }
+         input:checked + .slider {
+            background-color: #2196F3;
+         }
+         input:checked + .slider:before {
+            transform: translateX(26px);
+         }
+      </style><?php
+
       global $DB;
       $config = new self();
       $config->getFromDB(1);
@@ -63,17 +102,29 @@ class PluginGestionConfig extends CommonDBTM
          // Met à jour toutes les lignes avec param = 1 => param = 8
             $update = "UPDATE glpi_plugin_gestion_configs SET mode = 0 WHERE id = 1";
             $DB->query($update);
+            $update = "UPDATE glpi_plugin_gestion_configs SET SageSearch = 0 WHERE id = 1";
+            $DB->query($update);
       }
       if($config->SharePointOn() == 0 && $config->SageOn() == 1){
          // Met à jour toutes les lignes avec param = 1 => param = 8
             $update = "UPDATE glpi_plugin_gestion_configs SET mode = 1 WHERE id = 1";
+            $DB->query($update);
+            $update = "UPDATE glpi_plugin_gestion_configs SET SharePointSearch = 0 WHERE id = 1";
             $DB->query($update);
       }
       if($config->SharePointOn() == 0 && $config->SageOn() == 0){
          // Met à jour toutes les lignes avec param = 1 => param = 8
             $update = "UPDATE glpi_plugin_gestion_configs SET mode = 2 WHERE id = 1";
             $DB->query($update);
+            $update = "UPDATE glpi_plugin_gestion_configs SET SageSearch = 0 WHERE id = 1";
+            $DB->query($update);
+            $update = "UPDATE glpi_plugin_gestion_configs SET SharePointSearch = 0 WHERE id = 1";
+            $DB->query($update);
             $mode = false;
+      }
+      if($config->SageSearch() == 0 && $config->SharePointSearch() == 0){
+            $update = "UPDATE glpi_plugin_gestion_configs SET LocalSearch = 1 WHERE id = 1";
+            $DB->query($update);
       }
 
       if($config->mode() == 1){
@@ -145,6 +196,17 @@ class PluginGestionConfig extends CommonDBTM
             Dropdown::showYesNo('SharePointOn', $config->SharePointOn(), -1);
          echo "</td>";
       echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Recherche de documents dans le dossier local GLPI", "gestion") . "</td><td>";
+         $current_value = $config->LocalSearch(); // Valeur réelle depuis la base (0 ou 1)
+         // Champ caché pour garantir la soumission de 0 si décoché
+         echo '<input type="hidden" name="LocalSearch" value="0">';
+         echo '<label class="switch">';
+            echo '<input type="checkbox" id="LocalSearch_switch" name="LocalSearch" value="1" ' . ($current_value == 1 ? 'checked' : '') . '>';
+            echo '<span class="slider round"></span>';
+         echo '</label>';
+      echo "</td></tr>";
     
       // -----------------------------------------------------------------------
       echo "<tr>";
@@ -327,6 +389,17 @@ class PluginGestionConfig extends CommonDBTM
                   echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
                echo "</td>";
             echo "</tr>";
+
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Recherche de documents dans SharePoint", "gestion") . "</td><td>";
+               $current_value = $config->SharePointSearch(); // Valeur réelle depuis la base (0 ou 1)
+               // Champ caché pour garantir la soumission de 0 si décoché
+               echo '<input type="hidden" name="SharePointSearch" value="0">';
+               echo '<label class="switch">';
+                  echo '<input type="checkbox" id="SharePointSearch_switch" name="SharePointSearch" value="1" ' . ($current_value == 1 ? 'checked' : '') . '>';
+                  echo '<span class="slider round"></span>';
+               echo '</label>';
+            echo "</td></tr>";
          echo "</tbody>"; // Fin de la section masquée
       }
 
@@ -341,22 +414,22 @@ class PluginGestionConfig extends CommonDBTM
 
          echo "<tbody class='config-section2' style='display: none;'>"; // Début de section masquée
             echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Sage IP", "gestion") . "</td><td>";
-                  echo Html::input('SageIp', ['value' => $config->SageIp(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "<td>" . __("Sage Token", "gestion") . "</td><td>";
+                  echo Html::input('SageToken', ['value' => $config->SageToken(), 'size' => 80]);// bouton configuration du bas de page line 1
                echo "</td>";
             echo "</tr>";
 
             echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Sage ID", "gestion") . "</td><td>";
-                  echo Html::input('SageId', ['value' => $config->SageId(), 'size' => 80]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
+               echo "<td>" . __("Recherche de documents dans Sage", "gestion") . "</td><td>";
+               $current_value = $config->SageSearch(); // Valeur réelle depuis la base (0 ou 1)
+               // Champ caché pour garantir la soumission de 0 si décoché
+               echo '<input type="hidden" name="SageSearch" value="0">';
+               echo '<label class="switch">';
+                  echo '<input type="checkbox" id="SageSearch_switch" name="SageSearch" value="1" ' . ($current_value == 1 ? 'checked' : '') . '>';
+                  echo '<span class="slider round"></span>';
+               echo '</label>';
+            echo "</td></tr>";
 
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Sage Mot de passe", "gestion") . "</td><td>";
-                  echo Html::input('SagePwd', ['value' => $config->SagePwd(), 'size' => 80]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
          echo "</tbody>"; // Fin de la section masquée
       }
 
@@ -380,7 +453,7 @@ class PluginGestionConfig extends CommonDBTM
             echo "</td>";
          echo "</tr>";
 
-      if($mode == true && !empty($config->TenantID()) || !empty($config->SageId())){
+      if($mode == true && !empty($config->TenantID()) || !empty($config->SageToken())){
          if ($config->SharePointOn() == 1 && !empty($result['status'])) {
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Bibliothèques SahrePoint : <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip' data-bs-placement='top' title='Attention : toute modification de la bibliothèque après l’utilisation d’une bibliothèque précédent peut entraîner des bugs ou des conflits.'></i>", "gestion") ;
@@ -913,17 +986,18 @@ class PluginGestionConfig extends CommonDBTM
    function SageOn(){
       return ($this->fields['SageOn']);
    }
-   function SageIp(){
-      if(!empty($this->fields['SageIp']))
-         return openssl_decrypt(base64_decode($this->fields['SageIp']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
+   function SageSearch(){
+      return ($this->fields['SageSearch']);
    }
-   function SagePwd(){
-      if(!empty($this->fields['SagePwd']))
-         return openssl_decrypt(base64_decode($this->fields['SagePwd']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
+   function SharePointSearch(){
+      return ($this->fields['SharePointSearch']);
    }
-   function SageId(){
-      if(!empty($this->fields['SageId']))
-         return openssl_decrypt(base64_decode($this->fields['SageId']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
+   function LocalSearch(){
+      return ($this->fields['LocalSearch']);
+   }
+   function SageToken(){
+      if(!empty($this->fields['SageToken']))
+         return openssl_decrypt(base64_decode($this->fields['SageToken']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
    }
    function TenantID(){
       if(!empty($this->fields['TenantID']))

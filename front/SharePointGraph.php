@@ -383,17 +383,40 @@ class PluginGestionSharepoint extends CommonDBTM {
         }
 
         $data = json_decode($response, true);
+                        
+        $folders = [];
+        // On récupère tous les folder_name avec params = 3 ou 2
+        $res = $DB->query("SELECT folder_name FROM `glpi_plugin_gestion_configsfolder` WHERE params IN (2,3)");
 
         foreach ($data['value'] ?? [] as $item) {
             $filename = $item['name'] ?? '';
             $webUrl = $item['webUrl'] ?? '';
 
-            if (
-                strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pdf' &&
-                stripos($filename, $query) !== false
-            ) {
-                $DOC = $DB->query("SELECT folder_name FROM `glpi_plugin_gestion_configsfolder` WHERE params = 3")->fetch_object();
-                $signed = stripos($webUrl, $DOC->folder_name) !== false;
+                if (
+                    strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pdf' &&
+                    stripos($filename, $query) !== false
+                ) {
+                if ($res) {
+                    while ($row = $res->fetch_object()) {
+                        if (!empty($row->folder_name)) {
+                            $folders[] = $row->folder_name;
+                        }
+                    }
+                }
+
+                // Si aucun résultat, on ajoute le nom par défaut
+                if (empty($folders)) {
+                    $folders[] = "DocumentsSigned";
+                }
+
+                // Vérification dans $webUrl
+                $signed = false;
+                foreach ($folders as $folder) {
+                    if (stripos($webUrl, $folder) !== false) {
+                        $signed = true;
+                        break;
+                    }
+                }
 
                 $badge = $signed
                     ? ' <span style="color:white;background-color:#28a745;padding:2px 6px;border-radius:4px;font-size:11px;">SIGNÉ</span>'
