@@ -3,6 +3,7 @@ include ('../../../inc/includes.php'); // Inclure les fichiers nécessaires de G
 require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
 
 require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
+require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
 
 global $DB, $CFG_GLPI;
 
@@ -135,6 +136,10 @@ if ($config->mode() == 0){ //Récup BL depuis sharepoint
 if ($config->mode() == 2){ //Récup BL depuis local
     // Vérifiez que le PDF source existe
     $existingPdfPath = GLPI_PLUGIN_DOC_DIR . "/gestion/Documents/" . $DOC->bl;
+}
+if ($config->mode() == 1){ //Récup BL depuis local
+    // Vérifiez que le PDF source existe
+    $existingPdfPath = downloadDocument($DOC->url_bl, GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/Sage_Temp_".$nombreAleatoire.".pdf");
 }
 
     if (!file_exists($existingPdfPath)) {
@@ -302,6 +307,9 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             } catch (Exception $e) {
                 message("Erreur de suppression du document non signé : " . $e->getMessage(), ERROR);
             }
+        }
+        if ($config->mode() == 1){ //Récup BL depuis local
+            unlink($existingPdfPath);
         }
     }
 }

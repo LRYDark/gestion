@@ -195,6 +195,9 @@ class PluginGestionCri extends CommonDBTM {
                                     />
                                  </div>";
                            }
+                           if ($DOC->save == 'Sage'){
+                              streamDocument('BL196299');
+                           }
                         // Bouton pour voir le PDF en plein écran
                         echo "<tr>";
                         echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>'; //   Bouton pour voir le PDF en plein écran
@@ -288,6 +291,9 @@ class PluginGestionCri extends CommonDBTM {
                         if ($DOC->save == 'Local'){
                            $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
                         }
+                        if ($DOC->save == 'Sage'){
+                           $fileDownloadUrl = '../plugins/gestion/ajax/view_pdf.php?id='.$DOC->url_bl;
+                        }
 
                         // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
@@ -307,6 +313,9 @@ class PluginGestionCri extends CommonDBTM {
                               }
                               if ($DOC->save == 'Local'){
                                  echo "<iframe src='$fileDownloadUrl' style='width:100%; height:600px;' frameborder='0'></iframe>";
+                              }
+                              if ($DOC->save == 'Sage'){
+                                 echo "<iframe src='$fileDownloadUrl' width='100%' height='600px' style='border:none;'></iframe>";
                               }
                            echo "</td>";
                         echo "</tr>";
