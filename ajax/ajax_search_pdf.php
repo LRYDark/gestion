@@ -61,7 +61,7 @@ if ($config->SageSearch() == 1 && $config->SageOn() == 1){
                     'id'       => $searchTerm,
                     'text'     => $searchTerm,
                     'filename' => $searchTerm . '.pdf',
-                    'folder'   => 'API Sage',
+                    'folder'   => $searchTerm,
                     'save'     => 'Sage',
                     'source'   => 'sage',
                     'signed'   => 0, // Non signé par défaut pour les documents Sage
