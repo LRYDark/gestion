@@ -414,6 +414,12 @@ class PluginGestionConfig extends CommonDBTM
 
          echo "<tbody class='config-section2' style='display: none;'>"; // Début de section masquée
             echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Url Api Sage", "gestion") . "</td><td>";
+                  echo Html::input('SageUrlApi', ['value' => $config->SageUrlApi(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+
+            echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Sage Token", "gestion") . "</td><td>";
                   echo Html::input('SageToken', ['value' => $config->SageToken(), 'size' => 80]);// bouton configuration du bas de page line 1
                echo "</td>";
@@ -994,6 +1000,9 @@ class PluginGestionConfig extends CommonDBTM
    }
    function LocalSearch(){
       return ($this->fields['LocalSearch']);
+   }
+   function SageUrlApi(){
+      return ($this->fields['SageUrlApi']);
    }
    function SageToken(){
       if(!empty($this->fields['SageToken']))

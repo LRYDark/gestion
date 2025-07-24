@@ -42,6 +42,7 @@ function update_144_next() {
    // Liste des colonnes à vérifier
    $required_columns = [
       'SageOn',
+      'SageUrlApi',
       'SharePointOn',
       'SageToken',
       'SageSearch',
@@ -56,6 +57,7 @@ function update_144_next() {
    if (!empty($missing_columns)) {
       $query= "ALTER TABLE glpi_plugin_gestion_configs
                ADD COLUMN `SageToken` VARCHAR(255) NULL,
+               ADD COLUMN `SageUrlApi` VARCHAR(255) NULL,
                ADD COLUMN `SageSearch` TINYINT NOT NULL DEFAULT '0',
                ADD COLUMN `SharePointSearch` TINYINT NOT NULL DEFAULT '0',
                ADD COLUMN `LocalSearch` TINYINT NOT NULL DEFAULT '0',

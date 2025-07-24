@@ -8,9 +8,10 @@ use Smalot\PdfParser\Parser;
  */
 function parseDocument(string $docId): array
 {
-    $config         = new PluginGestionConfig();
-    $apiKey       = $config->SageToken();
-    $url = "https://sageapi.jcd-groupe.fr/api/v1/document/$docId";
+    $config     = new PluginGestionConfig();
+    $apiKey     = $config->SageToken();
+    $apiUrl     = $config->SageUrlApi();
+    $url        = $apiUrl.$docId;
 
     // --- Download PDF (en mémoire)
     $ch = curl_init($url);
@@ -108,9 +109,10 @@ function parseDocument(string $docId): array
  */
 function downloadDocument(string $docId, string $destinationFile): string
 {
-    $config         = new PluginGestionConfig();
-    $apiKey       = $config->SageToken();
-    $url = "https://sageapi.jcd-groupe.fr/api/v1/document/$docId";
+    $config     = new PluginGestionConfig();
+    $apiKey     = $config->SageToken();
+    $apiUrl     = $config->SageUrlApi();
+    $url        = $apiUrl.$docId;
 
     $fp = fopen($destinationFile, 'wb');
     if ($fp === false) {
@@ -155,9 +157,10 @@ function downloadDocument(string $docId, string $destinationFile): string
  */
 function streamDocument(string $docId, string $filename = null): void
 {
-    $config         = new PluginGestionConfig();
-    $apiKey       = $config->SageToken();
-    $url = "https://sageapi.jcd-groupe.fr/api/v1/document/$docId";
+    $config     = new PluginGestionConfig();
+    $apiKey     = $config->SageToken();
+    $apiUrl     = $config->SageUrlApi();
+    $url        = $apiUrl.$docId;
 
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -206,9 +209,10 @@ function streamDocument(string $docId, string $filename = null): void
 
 function documentExiste(string $docId, ?int &$httpStatus = null): bool
 {
-    $config         = new PluginGestionConfig();
-    $apiKey       = $config->SageToken();
-    $url = "https://sageapi.jcd-groupe.fr/api/v1/document/$docId";
+    $config     = new PluginGestionConfig();
+    $apiKey     = $config->SageToken();
+    $apiUrl     = $config->SageUrlApi();
+    $url        = $apiUrl.$docId;
 
     $ch = curl_init($url);
     curl_setopt_array($ch, [
