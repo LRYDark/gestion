@@ -24,7 +24,7 @@ function encryptData($data) {
 }
 
 function encryptArray($array) {
-   $include_keys = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageIp', 'SageId'];
+   $include_keys = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken'];
    $encrypted_array = [];
 
    foreach ($array as $key => $value) {
