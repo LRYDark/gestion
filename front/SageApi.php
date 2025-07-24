@@ -1,5 +1,8 @@
 <?php
-include ('../../../inc/includes.php');
+if (!defined('GLPI_ROOT')) {
+    die("Sorry. You can't access directly to this file");
+}
+
 require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
 
 use Smalot\PdfParser\Parser;
@@ -241,7 +244,7 @@ function documentExiste(string $docId, ?int &$httpStatus = null): bool
 
 
 // ---- Exemple d’utilisation ----
-try {
+/*try {
     $status = null;
     if (documentExiste('BL196299', $status)) {
         echo "OK (HTTP $status)";
@@ -254,9 +257,9 @@ try {
 
 
 // ---------------------- Exemple d’utilisation ----------------------
-/*try {
- // idéalement: getenv('SAGE_API_KEY');
-$docId    = 'BL196299';
+try {
+    // idéalement: getenv('SAGE_API_KEY');
+    $docId    = 'BL196299';
 
     // 1) Parser les infos
     $fields = parseDocument($docId);
@@ -267,8 +270,8 @@ $docId    = 'BL196299';
     //echo "PDF sauvegardé dans : $savedPath\n";
 
     // 2) Afficher le PDF
-    streamDocument('BL196299');
+    //streamDocument('BL196299');
 
-} catch (Throwable $e) 
-    echo "Erreur : " . $e->getMessage();
+} catch (Throwable $e) {
+    echo "Erreur: " . $e->getMessage();
 }*/
