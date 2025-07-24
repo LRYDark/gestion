@@ -440,7 +440,6 @@ class PluginGestionTicket extends CommonDBTM {
                                  dataType: 'json',
                                  timeout: 10000, // Timeout de 10 secondes
                                  success: function(response) {
-                                    console.log('Réponse reçue:', response); // Debug
 
                                     if (response.error) {
                                        console.error('Erreur dans la réponse:', response.error);
@@ -451,11 +450,9 @@ class PluginGestionTicket extends CommonDBTM {
 
                                     // Stocker le mode actuel
                                     currentMode = response.mode || 0;
-                                    console.log('Mode détecté:', currentMode); // Debug
 
                                     // Récupérer les valeurs actuellement sélectionnées avant de vider
                                     var currentSelectedValues = $('[name="groups_id[]"]').val() || [];
-                                    console.log('Valeurs actuellement sélectionnées:', currentSelectedValues); // Debug
 
                                     // Vider le dropdown avant de le remplir
                                     $('[name="groups_id[]"]').empty();
@@ -492,14 +489,12 @@ class PluginGestionTicket extends CommonDBTM {
                                           if (term === '') {
                                              return null;
                                           }
-                                          console.log('Création du tag:', term); // Debug
                                           return {
                                              id: term,
                                              text: term,
                                              newTag: true
                                           };
                                        };
-                                       console.log('Configuration tags activée pour mode 1'); // Debug
                                     }
 
                                     // Détruire l'instance Select2 existante si elle existe
@@ -512,7 +507,6 @@ class PluginGestionTicket extends CommonDBTM {
 
                                     // Restaurer les valeurs sélectionnées après l'initialisation de Select2
                                     if (currentSelectedValues.length > 0) {
-                                       console.log('Restauration des valeurs sélectionnées:', currentSelectedValues); // Debug
                                        
                                        // Pour chaque valeur sélectionnée, vérifier si elle existe dans les nouvelles options, sinon l'ajouter
                                        $.each(currentSelectedValues, function(index, selectedValue) {
@@ -535,12 +529,10 @@ class PluginGestionTicket extends CommonDBTM {
                                     if (currentMode == 1) {
                                        $('[name="groups_id[]"]').off('select2:select.custom').on('select2:select.custom', function (e) {
                                           var data = e.params.data;
-                                          console.log('Élément sélectionné:', data); // Debug
                                           
                                           // Si c'est un nouveau tag, vérifier s'il existe dans l'API
                                           if (data.newTag) {
                                              var docId = data.id;
-                                             console.log('Vérification du document:', docId); // Debug
                                              
                                              // Masquer les messages précédents et afficher le rond de chargement
                                              hideModalMessage();
@@ -557,7 +549,6 @@ class PluginGestionTicket extends CommonDBTM {
                                                 dataType: 'json',
                                                 timeout: 5000,
                                                 success: function(verifyResponse) {
-                                                   console.log('Réponse vérification:', verifyResponse); // Debug
                                                    
                                                    // Masquer le rond de chargement
                                                    $('#loading-spinner').hide();
@@ -580,7 +571,6 @@ class PluginGestionTicket extends CommonDBTM {
                                                       // Document trouvé, mettre à jour l'option et afficher un message de succès
                                                       $('[name="groups_id[]"] option[value="' + docId + '"]').removeAttr('data-select2-tag');
                                                       showModalMessage('Document "' + docId + '" vérifié et ajouté avec succès.', 'success');
-                                                      console.log('Document "' + docId + '" vérifié et ajouté avec succès.');
                                                    }
                                                 },
                                                 error: function(xhr, status, error) {
