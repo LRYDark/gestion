@@ -165,6 +165,9 @@ class PluginGestionCri extends CommonDBTM {
                         if ($DOC->save == 'Local'){
                            $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
                         } 
+                        if ($DOC->save == 'Sage'){
+                           $fileDownloadUrl = $DOC->doc_url;
+                        }
 
                         // Étape 4 : Affichez le PDF via <embed>
                         echo "<tr>";
@@ -196,7 +199,27 @@ class PluginGestionCri extends CommonDBTM {
                                  </div>";
                            }
                            if ($DOC->save == 'Sage'){
-                              streamDocument('BL196299');
+                              echo "
+                                 <style>
+                                 .pdf-container {
+                                 width: 100%;
+                                 max-width: 100vw;
+                                 aspect-ratio: 1 / 1.414; /* Ratio A4 en portrait */
+                                 overflow: hidden;
+                                 }
+                                 .pdf-container embed {
+                                 width: 100%;
+                                 height: 100%;
+                                 object-fit: contain;
+                                 }
+                                 </style>
+
+                                 <div class='pdf-container'>
+                                 <embed 
+                                    src='".$fileDownloadUrl."'
+                                    type='application/pdf' 
+                                    />
+                                 </div>";
                            }
                         // Bouton pour voir le PDF en plein écran
                         echo "<tr>";
@@ -292,7 +315,7 @@ class PluginGestionCri extends CommonDBTM {
                            $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
                         }
                         if ($DOC->save == 'Sage'){
-                           $fileDownloadUrl = '../plugins/gestion/ajax/view_pdf.php?id='.$DOC->url_bl;
+                           $fileDownloadUrl = $DOC->doc_url;
                         }
 
                         // Étape 4 : Affichez le PDF via <embed>

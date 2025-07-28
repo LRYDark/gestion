@@ -97,7 +97,11 @@ if (isset($_POST["add"])) {
       if ($pdf_save == 'Sage'){
          $tracker = $fields['tracker'];
          $valid = true;
-         $doc_url = 'https://sageapi.jcd-groupe.fr/api/v1/document/'.$search_pdf;
+         if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            $doc_url = "https://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/ajax/view_pdf.php?id=$search_pdf";
+         } else {
+            $doc_url = "http://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/ajax/view_pdf.php?id=$search_pdf";
+         }
       }
    }
          

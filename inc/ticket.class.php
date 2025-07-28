@@ -272,47 +272,47 @@ class PluginGestionTicket extends CommonDBTM {
                       $disabled = true;
                   }   
 
-///////////////// NEW TEST ////////////////////
-    $query = "
-        SELECT folder_name, params
-        FROM glpi_plugin_gestion_configsfolder
-        WHERE params IN (2, 3)
-        ORDER BY 
-            CASE params 
-                WHEN 2 THEN 0 
-                WHEN 3 THEN 1 
-            END
-        LIMIT 1
-    ";
+                  ///////////////// NEW TEST ////////////////////
+                     $query = "
+                        SELECT folder_name, params
+                        FROM glpi_plugin_gestion_configsfolder
+                        WHERE params IN (2, 3)
+                        ORDER BY 
+                              CASE params 
+                                 WHEN 2 THEN 0 
+                                 WHEN 3 THEN 1 
+                              END
+                        LIMIT 1
+                     ";
 
-    $result = $DB->query($query);
+                     $result = $DB->query($query);
 
-    if ($result && $DB->numrows($result) > 0) {
-        $data = $DB->fetchassoc($result);
-        $folder_name = $data['folder_name'];
-        $used_param = $data['params'];
+                     if ($result && $DB->numrows($result) > 0) {
+                        $data = $DB->fetchassoc($result);
+                        $folder_name = $data['folder_name'];
+                        $used_param = $data['params'];
 
-        if ($used_param == 2) {
-            $FolderDes = 'SharePoint';
-        } 
+                        if ($used_param == 2) {
+                              $FolderDes = 'SharePoint';
+                        } 
 
-        if ($used_param == 3) {
-            $FolderDes = 'local';
-            $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folder_name;
+                        if ($used_param == 3) {
+                              $FolderDes = 'local';
+                              $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folder_name;
 
-            // Vérifie si le dossier existe, sinon le crée
-            if (!is_dir($destinationPath)) {
-               if (!mkdir($destinationPath, 0755, true)) {
-                  // En cas d’échec de création
-                  echo "Erreur : impossible de créer le dossier $destinationPath";
-               }
-            }
-        }
-    } else {
-        $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/DocumentsSigned";
-    }
+                              // Vérifie si le dossier existe, sinon le crée
+                              if (!is_dir($destinationPath)) {
+                                 if (!mkdir($destinationPath, 0755, true)) {
+                                    // En cas d’échec de création
+                                    echo "Erreur : impossible de créer le dossier $destinationPath";
+                                 }
+                              }
+                        }
+                     } else {
+                        $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/DocumentsSigned";
+                     }
 
-///////////////// NEW TEST ////////////////////
+                  ///////////////// NEW TEST ////////////////////
                    
                   // Modal HTML
                   echo <<<HTML

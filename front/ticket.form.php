@@ -56,7 +56,11 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             $save = 'Sage';
             $fields = parseDocument($item);
             $file_path = $item.'_'.str_replace(' ', '_', $fields['client']);
-            $fileUrl = "https://sageapi.jcd-groupe.fr/api/v1/document/$item";
+            if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+                $fileUrl = "https://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/ajax/view_pdf.php?id=$item";
+            } else {
+                $fileUrl = "http://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/ajax/view_pdf.php?id=$item";
+            }
             $itemUrl = $item;
             $tracker = $fields['tracker'];
         }
