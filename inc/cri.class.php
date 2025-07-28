@@ -77,110 +77,149 @@ class PluginGestionCri extends CommonDBTM {
                   'form'       => 'formReport',
                   'root_doc'   => PLUGIN_GESTION_WEBDIR];
 
-      ?><style> /*Style du modale et du tableau */
-         /* Classe pour désactiver le défilement sur le body */
-         .no-scroll {
-            overflow: hidden !important;
-            position: fixed !important;
-            width: 100vw !important;
-            height: 100vh !important;
-         }
-
-         /* MODAL */
-         .modal-dialog { 
+      ?>   <style>
+                  /* Styles existants pour desktop */
+        .modal-dialog { 
             max-width: 1050px; 
             margin: 1.75rem auto; 
-         }
-         .table td, .table td { 
+        }
+        .table td, .table td { 
             border: none !important;
-         }
-         .responsive-pdf {
-            width: 100%;
-            height: 90vh; /* Ajuste la hauteur à 90% de la hauteur de la fenêtre */
-         }
-
-         @media (max-width: 768px) {
-            .responsive-pdf {
-               width: 100%;
-               height: 70vh; /* Réduit la hauteur sur mobile pour éviter l'étirement */
+        }
+        
+        /* Styles pour mobile */
+        @media (max-width: 768px) {
+            .mobile-form-row {
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 5px;
+                margin-bottom: 15px;
+                padding: 15px;
             }
-         }
-
-         @media (max-width: 480px) {
-            .responsive-pdf {
-               width: 100%;
-               height: 60vh; /* Encore moins de hauteur sur les très petits écrans */
+            
+            .mobile-form-label {
+                font-weight: bold;
+                color: #495057;
+                margin-bottom: 8px;
+                display: block;
+                font-size: 14px;
             }
-         }
+            
+            .mobile-form-content {
+                width: 100%;
+            }
+            
+            .mobile-form-content input,
+            .mobile-form-content textarea,
+            .mobile-form-content select {
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #ced4da;
+                border-radius: 4px;
+                font-size: 16px; /* Évite le zoom sur iOS */
+            }
+            
+            .mobile-signature-section {
+                background: #e9ecef;
+                border-radius: 5px;
+                padding: 15px;
+                margin: 15px 0;
+            }
+            
+            .mobile-checkbox-group {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin: 10px 0;
+            }
+            
+            .mobile-radio-group {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .mobile-radio-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+        }
+        
+        /* Vos styles de signature existants... */
+        #<?= $uniq ?> .canvas.sig-base { image-rendering: auto; }
 
-         .button-container-right {
-            text-align: right;
-            margin-top: 10px; /* Optionnel */
-         }
+               .modal-dialog { 
+                  max-width: 1050px; 
+                  margin: 1.75rem auto; 
+               }
+               .table td, .table td { 
+                  border: none !important;
+               }
+               
+               /* ou 'pixelated' si tu préfères des bords plus francs */
+               #<?= $uniq ?> .canvas.sig-base { image-rendering: auto; }
+               /* Container & bouton zoom (inchangé) */
+               #<?= $uniq ?> .signature-container{position:relative;display:inline-block}
+               #<?= $uniq ?> .zoom-btn{position:absolute;top:-28px;right:0;background:#007bff;color:#fff;border:0;padding:5px 10px;border-radius:3px;cursor:pointer;font-size:12px;z-index:1}
+               #<?= $uniq ?> .zoom-btn:hover{background:#0056b3}
 
-         /* ou 'pixelated' si tu préfères des bords plus francs */
-         #<?= $uniq ?> .canvas.sig-base { image-rendering: auto; }
-         /* Container & bouton zoom (inchangé) */
-         #<?= $uniq ?> .signature-container{position:relative;display:inline-block}
-         #<?= $uniq ?> .zoom-btn{position:absolute;top:-28px;right:0;background:#007bff;color:#fff;border:0;padding:5px 10px;border-radius:3px;cursor:pointer;font-size:12px;z-index:1}
-         #<?= $uniq ?> .zoom-btn:hover{background:#0056b3}
+               /* Overlay plein écran */
+               #<?= $uniq ?> .signature-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200000}
+               #<?= $uniq ?> .signature-modal.active{display:block}
+               #<?= $uniq ?> .modal-wrapper{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:10px}
 
-         /* Overlay plein écran */
-         #<?= $uniq ?> .signature-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200000}
-         #<?= $uniq ?> .signature-modal.active{display:block}
-         #<?= $uniq ?> .modal-wrapper{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:10px}
+               /* >>> Renommées pour éviter Bootstrap <<< */
+               #<?= $uniq ?> .cri-modal-content{
+               background:#fff;border-radius:10px;position:relative;
+               width:100%;height:100%;max-width:1200px;max-height:600px;
+               display:flex !important;                 /* évite la pile verticale bootstrap */
+               flex-direction:row !important;           /* canvas + panneau côte à côte */
+               overflow:hidden;
+               }
 
-         /* >>> Renommées pour éviter Bootstrap <<< */
-         #<?= $uniq ?> .cri-modal-content{
-         background:#fff;border-radius:10px;position:relative;
-         width:100%;height:100%;max-width:1200px;max-height:600px;
-         display:flex !important;                 /* évite la pile verticale bootstrap */
-         flex-direction:row !important;           /* canvas + panneau côte à côte */
-         overflow:hidden;
-         }
+               #<?= $uniq ?> .cri-canvas-wrapper{
+               flex:1 1 auto;display:flex;align-items:center;justify-content:center;
+               padding:20px;background:#f8f9fa;min-width:0;
+               }
 
-         #<?= $uniq ?> .cri-canvas-wrapper{
-         flex:1 1 auto;display:flex;align-items:center;justify-content:center;
-         padding:20px;background:#f8f9fa;min-width:0;
-         }
+               #<?= $uniq ?> .modal-canvas{border:2px solid #333;background:#fff;touch-action:none;max-width:100%;max-height:100%;cursor:crosshair}
 
-         #<?= $uniq ?> .modal-canvas{border:2px solid #333;background:#fff;touch-action:none;max-width:100%;max-height:100%;cursor:crosshair}
+               #<?= $uniq ?> .cri-controls-panel{
+               flex:0 0 150px;background:#e9ecef;display:flex;flex-direction:column;
+               justify-content:center;padding:20px;border-left:1px solid #dee2e6
+               }
+               #<?= $uniq ?> .cri-controls-panel button{margin:10px 0;padding:12px 20px;border:0;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;transition:.2s}
+               #<?= $uniq ?> .btn-validate{background:#28a745;color:#fff}
+               #<?= $uniq ?> .btn-validate:hover{background:#218838}
+               #<?= $uniq ?> .btn-cancel{background:#dc3545;color:#fff}
+               #<?= $uniq ?> .btn-cancel:hover{background:#c82333}
+               #<?= $uniq ?> .btn-clear{background:#ffc107;color:#000}
+               #<?= $uniq ?> .btn-clear:hover{background:#e0a800}
 
-         #<?= $uniq ?> .cri-controls-panel{
-         flex:0 0 150px;background:#e9ecef;display:flex;flex-direction:column;
-         justify-content:center;padding:20px;border-left:1px solid #dee2e6
-         }
-         #<?= $uniq ?> .cri-controls-panel button{margin:10px 0;padding:12px 20px;border:0;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;transition:.2s}
-         #<?= $uniq ?> .btn-validate{background:#28a745;color:#fff}
-         #<?= $uniq ?> .btn-validate:hover{background:#218838}
-         #<?= $uniq ?> .btn-cancel{background:#dc3545;color:#fff}
-         #<?= $uniq ?> .btn-cancel:hover{background:#c82333}
-         #<?= $uniq ?> .btn-clear{background:#ffc107;color:#000}
-         #<?= $uniq ?> .btn-clear:hover{background:#e0a800}
+               /* Mobile uniquement */
+               @media (max-width: 1024px) {
+               #<?= $uniq ?> .signature-modal.active { inset: 0; }
+               #<?= $uniq ?> .cri-modal-content{
+                  width: 100svw;   /* sinon 100vw si svw non supporté */
+                  height: 100svh;  /* sinon 100vh */
+                  max-width: none;
+                  max-height: none;
+                  border-radius: 0;
+               }
+               #<?= $uniq ?> .cri-canvas-wrapper{ padding: max(12px, env(safe-area-inset-left)); }
+               #<?= $uniq ?> .cri-controls-panel{ flex-basis: 110px; padding: 10px; }
+               }
 
-         /* Mobile uniquement */
-         @media (max-width: 1024px) {
-         #<?= $uniq ?> .signature-modal.active { inset: 0; }
-         #<?= $uniq ?> .cri-modal-content{
-            width: 100svw;   /* sinon 100vw si svw non supporté */
-            height: 100svh;  /* sinon 100vh */
-            max-width: none;
-            max-height: none;
-            border-radius: 0;
-         }
-         #<?= $uniq ?> .cri-canvas-wrapper{ padding: max(12px, env(safe-area-inset-left)); }
-         #<?= $uniq ?> .cri-controls-panel{ flex-basis: 110px; padding: 10px; }
-         }
+               /* corrige le sélecteur */
+               #<?= $uniq ?> canvas.sig-base { image-rendering: auto; }
 
-         /* corrige le sélecteur */
-         #<?= $uniq ?> canvas.sig-base { image-rendering: auto; }
-
-         /* overlay “tournez l’écran” */
-         #<?= $uniq ?> .rotate-gate{ position:absolute; inset:0; display:none;
-         align-items:center; justify-content:center; background:rgba(0,0,0,.65);
-         color:#fff; z-index: 1000; text-align:center; padding: 24px; }
-         #<?= $uniq ?> .rotate-gate.show{ display:flex; }
-      </style>      
+               /* overlay “tournez l’écran” */
+               #<?= $uniq ?> .rotate-gate{ position:absolute; inset:0; display:none;
+               align-items:center; justify-content:center; background:rgba(0,0,0,.65);
+               color:#fff; z-index: 1000; text-align:center; padding: 24px; }
+               #<?= $uniq ?> .rotate-gate.show{ display:flex; }
+    </style>     
       <?php
          function isMobile() {
             return preg_match('/(android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)/i', $_SERVER['HTTP_USER_AGENT']); // Vérifie si l'utilisateur est sur un appareil mobile
@@ -194,179 +233,174 @@ class PluginGestionCri extends CommonDBTM {
          if($DOC->signed == 0){ // ----------------------------------- NON SIGNE -----------------------------------
             // tableau bootstrap -> glpi | Mobile ou Ordinateur
             if (isMobile()) { // ----------------------------------- MOBILE -----------------------------------
-               echo '<div class="table-responsive" >';
-               echo "<table class='table'>"; 
-
-               echo 'Document : <strong>'.$Doc_Name.'</strong>';
-               echo '<br><br>';
-               echo "<strong><u>STATUS</u></strong>";
-               echo '<br>';
-               echo 'Non Signé';
-               echo '<br><br>';
+               // Document
+               echo '<div class="mobile-form-row">';
+                     echo '<div class="mobile-form-label">Document :</div>';
+                     echo '<strong>'.$Doc_Name.'</strong><br><br>';
+                     echo '<strong><u>STATUS</u></strong><br>';
+                     echo 'Non Signé';
+               echo '</div>';
                
-                  $DocUrlSharePoint  = $DOC->doc_url;
-                  function AffichageNoSigneMobile($DocUrlSharePoint){
-                     // Bouton pour voir le PDF en plein écran
-                     echo "<tr>";
-                        echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>'; // Bouton pour voir le PDF en plein écran
-                     echo "</tr><br><br>";
-                  }
+               // Section PDF
+               echo '<div class="mobile-form-row">';
+                     echo '<div class="mobile-form-label">Visualisation du document</div>';
+                     
+                     $DocUrlSharePoint = $DOC->doc_url;
+                     
+                     if ($config->fields['SharePointLinkDisplay'] == 1){
+                        try {
+                           $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
+                           $filePath = $folderPath . $Doc_Name;
+                           $filePath = preg_replace('#/+#', '/', $filePath);
 
-                  if ($config->fields['SharePointLinkDisplay'] == 1){
-                     // Utilisation
-                     try {
-                        // Construire le chemin complet du fichier
-                        $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
-                        $filePath = $folderPath . $Doc_Name; // Chemin du fichier
-
-                        // Remplacer tous les doubles slashs par un simple slash
-                        $filePath = preg_replace('#/+#', '/', $filePath);
-
-      /////////////////////////////// NEWS OK Non Signer ///////////////////////////////
-                        if ($DOC->save == 'SharePoint'){
-                           // Obtenir l'URL de téléchargement direct du fichier
-                           $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
-                        }
-                        if ($DOC->save == 'Local'){
-                           $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
-                        } 
-                        if ($DOC->save == 'Sage'){
-                           $fileDownloadUrl = $DOC->doc_url;
-                        }
-
-                        // Étape 4 : Affichez le PDF via <embed>
-                        echo "<tr>";
                            if ($DOC->save == 'SharePoint'){
-                              echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
-                                    style='width:100%; height:600px;' frameborder='0'></iframe>";
+                                 $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
                            }
                            if ($DOC->save == 'Local'){
-                              echo "
-                                 <style>
-                                 .pdf-container {
-                                 width: 100%;
-                                 max-width: 100vw;
-                                 aspect-ratio: 1 / 1.414; /* Ratio A4 en portrait */
-                                 overflow: hidden;
-                                 }
-                                 .pdf-container embed {
-                                 width: 100%;
-                                 height: 100%;
-                                 object-fit: contain;
-                                 }
-                                 </style>
+                                 $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
+                           } 
+                           if ($DOC->save == 'Sage'){
+                                 $fileDownloadUrl = $DOC->doc_url;
+                           }
 
-                                 <div class='pdf-container'>
-                                 <embed 
-                                    src='".$fileDownloadUrl."'
-                                    type='application/pdf' 
-                                    />
-                                 </div>";
+                           // PDF intégré
+                           if ($DOC->save == 'SharePoint'){
+                                 echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                                       style='width:100%; height:400px; border:1px solid #ccc;' frameborder='0'></iframe>";
+                           }
+                           if ($DOC->save == 'Local'){
+                                 echo "
+                                    <style>
+                                    .pdf-container {
+                                       width: 100%;
+                                       max-width: 100vw;
+                                       aspect-ratio: 1 / 1.414;
+                                       overflow: hidden;
+                                    }
+                                    .pdf-container embed {
+                                       width: 100%;
+                                       height: 100%;
+                                       object-fit: contain;
+                                    }
+                                    </style>
+                                    <div class='pdf-container'>
+                                       <embed src='".$fileDownloadUrl."' type='application/pdf' />
+                                    </div>";
                            }
                            if ($DOC->save == 'Sage'){
-                              echo "
-                                 <style>
-                                 .pdf-container {
-                                 width: 100%;
-                                 max-width: 100vw;
-                                 aspect-ratio: 1 / 1.414; /* Ratio A4 en portrait */
-                                 overflow: hidden;
-                                 }
-                                 .pdf-container embed {
-                                 width: 100%;
-                                 height: 100%;
-                                 object-fit: contain;
-                                 }
-                                 </style>
-
-                                 <div class='pdf-container'>
-                                 <embed 
-                                    src='".$fileDownloadUrl."'
-                                    type='application/pdf' 
-                                    />
-                                 </div>";
+                                 echo "
+                                    <style>
+                                    .pdf-container {
+                                       width: 100%;
+                                       max-width: 100vw;
+                                       aspect-ratio: 1 / 1.414;
+                                       overflow: hidden;
+                                    }
+                                    .pdf-container embed {
+                                       width: 100%;
+                                       height: 100%;
+                                       object-fit: contain;
+                                    }
+                                    </style>
+                                    <div class='pdf-container'>
+                                       <embed src='".$fileDownloadUrl."' type='application/pdf' />
+                                    </div>";
                            }
-                        // Bouton pour voir le PDF en plein écran
-                        echo "<tr>";
-                        echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>'; //   Bouton pour voir le PDF en plein écran
-                        echo "</tr><br><br>";
-      /////////////////////////////// NEWS OK Non Signer ///////////////////////////////
-
-                     } catch (Exception $e) {
-                        AffichageNoSigneMobile($DocUrlSharePoint);
+                           
+                        } catch (Exception $e) {
+                           // Fallback si erreur
+                        }
                      }
-                  }else{
-                     AffichageNoSigneMobile($DocUrlSharePoint);
-                  }
+                     
+                     echo '<br><a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>';
+                     
+               echo '</div>';
 
-                  echo "<tr>";   
-                     // Bouton de capture photo -->
-                     echo '<label for="capture-photo">Prendre une photo</label><br>';
-                     echo '<input type="file" id="capture-photo" accept="image/*" capture="environment">';// Bouton de capture photo
-                     echo '<br>';
-                     echo '<textarea name="photo_base64" id="photo-base64" style="display: none;"></textarea>';// Champ caché pour stocker la photo
-                  echo "</tr><br>";
+               // Section capture photo
+               echo '<div class="mobile-form-row">';
+                     echo '<div class="mobile-form-label">Ajouter un fichier / image</div>';
+                     echo '<div class="mobile-form-content">';
+                        echo '<input type="file" id="capture-photo" accept="image/*" capture="environment">';
+                        echo '<textarea name="photo_base64" id="photo-base64" style="display: none;"></textarea>';
+                     echo '</div>';
+               echo '</div>';
+               
+               echo '<div class="mobile-signature-section">';
+                  echo '<div class="mobile-form-label">SIGNATURE CLIENT</div>';
                   
-                  echo "<tr>";
-
-                        echo '<label for="name">Non / Prénom</label><br>';
-                        echo "<input type='text' id='name' name='name' placeholder='Nom / Prenom du client' required=''>";
-
-                  echo "</tr><br>";
-
-                  // TABLEAU 3 : Canvas pour signature et bouton de suppression
-                  echo "<tr><br>";
-                        echo '<label for="name">Signature</label><br>';
-                         echo "<div id='".$uniq."' class='cri-signature-root' style='position:relative'>";
-                           // petit canvas + bouton zoom + bouton effacer
-                           echo "  <div class='signature-container'>";
-                           echo "    <button type='button' class='zoom-btn'>Agrandir <i class='fa-solid fa-up-right-and-down-left-from-center'></i></button>";
-                           echo "    <canvas id='sig-canvas-".$uniq."' width='320' height='80' class='sig-base' style='border:1px solid #ccc;'></canvas>";
-                           echo "  </div>";
-                           echo "  <br>";
-                           echo "  <button type='button' id='sig-clearBtn-".$uniq."' class='resetButton' style='margin:5px 0 0 0; padding:5px 10px;'>Supprimer la signature</button>";
-
-                           // modal interne pour le zoom (overlay)
-                           echo "  <div class='signature-modal' aria-hidden='true'>";
-                           echo "    <div class='modal-wrapper'>";                       // <- on garde
-                           echo "      <div class='cri-modal-content'>";                 // <- renommé
-                           echo "      <div class='rotate-gate'>\n";
-                           echo "        <div>\n";
-                           echo "          <div style='font-size:18px;font-weight:700;margin-bottom:8px'>\n";
-                           echo "            Tournez votre téléphone en mode paysage\n";
-                           echo "          </div>\n";
-                           echo "          <div style='opacity:0.9'>La zone de signature va s’agrandir automatiquement.</div>\n";
-                           echo "        </div>\n";
-                           echo "      </div>\n";
-                           echo "        <div class='cri-canvas-wrapper'>";              // <- renommé
-                           echo "          <canvas id='modal-canvas-".$uniq."' class='modal-canvas'></canvas>";
-                           echo "        </div>";
-                           echo "        <div class='cri-controls-panel'>";              // <- renommé
-                           echo "          <button type='button' class='btn-validate'>Valider</button>";
-                           echo "          <button type='button' class='btn-clear'>Effacer</button>";
-                           echo "          <button type='button' class='btn-cancel'>Annuler</button>";
-                           echo "        </div>";
-                           echo "      </div>";
-                           echo "    </div>";
-                           echo "  </div>";
-                        echo "</div>";
-
-                  echo "</tr><br>";
+                  echo '<div class="mobile-form-row">';
+                     echo '<div class="mobile-form-label">Nom / Prénom du client</div>';
+                     echo '<div class="mobile-form-content">';
+                           echo '<input type="text" id="name" name="name" placeholder="Nom / Prénom du client" required>';
+                     echo '</div>';
+                  echo '</div>';
                   
-                  if ($config->fields['MailTo'] == 1){
-                     // Mail
-                     echo "<tr><br>";
-                           echo 'Mail client';
-                              echo'<br><h5 style="font-weight: normal; margin-top: -0px;"> Cocher pour envoyer le PDF par email. </h5>';
+                  echo '<div class="mobile-form-row">';
+                     echo '<div class="mobile-form-label">Signature client</div>';
+                     echo '<div class="mobile-form-content">';
+                           // Votre code de signature existant
+                           echo "<div id='".$uniq."' class='cri-signature-root' style='position:relative'>";
+                              echo "<tr><br>";
+                                 echo "<div id='".$uniq."' class='cri-signature-root' style='position:relative'>";
+                                    // petit canvas + bouton zoom + bouton effacer
+                                    echo "  <div class='signature-container'>";
+                                    echo "    <button type='button' class='zoom-btn'>Agrandir <i class='fa-solid fa-up-right-and-down-left-from-center'></i></button>";
+                                    echo "    <canvas id='sig-canvas-".$uniq."' width='320' height='80' class='sig-base' style='border:1px solid #ccc;'></canvas>";
+                                    echo "  </div>";
+                                    echo "  <br>";
+                                    echo "  <button type='button' id='sig-clearBtn-".$uniq."' class='resetButton' style='margin:5px 0 0 0; padding:5px 10px;'>Supprimer la signature</button>";
 
-                              echo '<input type="checkbox" name="mailtoclient" value="1">&emsp;';
-                           echo "<input type='mail' id='mail' name='email' value='".$email."' style='widtd: 250px;'>";
-                     echo "</tr><br>";
-                  }
-            
-               echo "</table>"; 
-               echo "</div>";
-               //----------------------------------- FIN MOBILE -----------------------------------
+                                    // modal interne pour le zoom (overlay)
+                                    echo "  <div class='signature-modal' aria-hidden='true'>";
+                                    echo "    <div class='modal-wrapper'>";                       // <- on garde
+                                    echo "      <div class='cri-modal-content'>";                 // <- renommé
+                                    echo "      <div class='rotate-gate'>\n";
+                                    echo "        <div>\n";
+                                    echo "          <div style='font-size:18px;font-weight:700;margin-bottom:8px'>\n";
+                                    echo "            Tournez votre téléphone en mode paysage\n";
+                                    echo "          </div>\n";
+                                    echo "          <div style='opacity:0.9'>La zone de signature va s’agrandir automatiquement.</div>\n";
+                                    echo "        </div>\n";
+                                    echo "      </div>\n";
+                                    echo "        <div class='cri-canvas-wrapper'>";              // <- renommé
+                                    echo "          <canvas id='modal-canvas-".$uniq."' class='modal-canvas'></canvas>";
+                                    echo "        </div>";
+                                    echo "        <div class='cri-controls-panel'>";              // <- renommé
+                                    echo "          <button type='button' class='btn-validate'>Valider</button>";
+                                    echo "          <button type='button' class='btn-clear'>Effacer</button>";
+                                    echo "          <button type='button' class='btn-cancel'>Annuler</button>";
+                                    echo "        </div>";
+                                    echo "      </div>";
+                                    echo "    </div>";
+                                    echo "  </div>";
+                                 echo "</div>";
+                              echo "</tr><br>";
+                           echo "</div>";
+                     echo '</div>';
+                  echo '</div>';
+               echo '</div>';
+               
+               // Section email (si activée)
+               if ($config->fields['MailTo'] == 1){
+                     echo '<div class="mobile-form-row">';
+                        echo '<div class="mobile-form-label">Mail client</div>';
+                        echo 'Cocher pour envoyer le PDF par email.<br>';
+                        echo '<div class="mobile-checkbox-group">';
+                           echo '<input type="checkbox" name="mailtoclient" value="1">';
+                           echo '<input type="email" id="mail" name="email" value="'.$email.'" style="margin-left: 10px;">';
+                        echo '</div>';
+                     echo '</div>';
+               }
+               
+               // Bouton de soumission (si droits suffisants)
+               if(Session::haveRight("plugin_gestion_sign", CREATE)){
+                     echo '<div class="mobile-form-row" style="text-align: center;">';
+                        echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signé" class="submit">';
+                     echo '</div>';
+                     
+                     echo '<textarea readonly name="url" id="sig-dataUrl" class="form-control" rows="0" cols="150" style="display: none;"></textarea>';
+               }
+               
             } else { // ----------------------------------- ORDINATEUR -----------------------------------
                echo '<div class="table-responsive">';
                echo "<table class='table'>"; 
@@ -546,100 +580,82 @@ class PluginGestionCri extends CommonDBTM {
             
                echo "</table>"; 
                echo "</div>";
-            } // ----------------------------------- FIN ORDINATEUR -----------------------------------
-            if(Session::haveRight("plugin_gestion_sign", CREATE)){
-               echo '<div class="button-container-right" style="text-align: right;">';
-                  echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signé" class="submit">'; // Bouton pour signer
-               echo '</div>';
+               if(Session::haveRight("plugin_gestion_sign", CREATE)){
+                  echo '<div class="button-container-right" style="text-align: right;">';
+                     echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signé" class="submit">'; // Bouton pour signer
+                  echo '</div>';
 
-               echo '<textarea readonly name="url" id="sig-dataUrl" class="form-control" rows="0" cols="150" style="display: none;"></textarea>';  // Champ caché pour stocker la signature
-            }
+                  echo '<textarea readonly name="url" id="sig-dataUrl" class="form-control" rows="0" cols="150" style="display: none;"></textarea>';  // Champ caché pour stocker la signature
+               }
+            } // ----------------------------------- FIN ORDINATEUR -----------------------------------
+
          }else{ // ----------------------------------- SIGNE -----------------------------------
             echo '<div class="table-responsive">';
             echo "<table class='table'>"; 
 
             if (isMobile()) { // -------------------------------------------------------------------------------- MOBILE ----------------------------------------------------------------
-               echo 'Document : <strong>'.$Doc_Name.'</strong>';
-               echo '<br><br>';
-               echo "<strong><u>STATUS</u></strong>";
-               echo '<br>';
-               echo 'Signé le : '.$DOC->date_creation.' ';
-               echo '<br>';
-               echo 'Par : '.$DOC->users_ext.' ';
-               echo '<br><br>';
-               echo 'Livré par : '.getUserName($DOC->users_id).' ';
-               echo '<br><br>';
+               echo '<div class="mobile-form-row">';
+                     echo '<div class="mobile-form-label">Document :</div>';
+                     echo '<strong>'.$Doc_Name.'</strong><br><br>';
+                     echo '<strong><u>STATUS</u></strong><br>';
+                     echo 'Signé le : '.$DOC->date_creation.'<br>';
+                     echo 'Par : '.$DOC->users_ext.'<br><br>';
+                     echo 'Livré par : '.getUserName($DOC->users_id);
+               echo '</div>';
+               
+               // Section PDF signé
+               echo '<div class="mobile-form-row">';
+                     echo '<div class="mobile-form-label">Document signé</div>';
+                     
+                     $DocUrlSharePoint = $DOC->doc_url;
+                     
+                     if ($config->fields['SharePointLinkDisplay'] == 1){
+                        try {
+                           $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
+                           $filePath = $folderPath . $Doc_Name;
+                           $filePath = preg_replace('#/+#', '/', $filePath);
 
-                  $DocUrlSharePoint  = $DOC->doc_url;
-                  function AffichageSigneMobile($DocUrlSharePoint){
-                     // Bouton pour voir le PDF en plein écran
-                     echo "<tr>";
-                        echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>';   // Bouton pour voir le PDF en plein écran
-                     echo "</tr><br><br>";
-                  }
-
-                  if ($config->fields['SharePointLinkDisplay'] == 1){
-                     // Utilisation
-                     try {
-                        // Construire le chemin complet du fichier
-                        $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
-                        $filePath = $folderPath . $Doc_Name; // Chemin du fichier
-
-                        // Remplacer tous les doubles slashs par un simple slash
-                        $filePath = preg_replace('#/+#', '/', $filePath);
-
-                        if ($DOC->save == 'SharePoint'){
-                           // Obtenir l'URL de téléchargement direct du fichier
-                           $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
-                        }
-                        if ($DOC->save == 'Local'){
-                           $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
-                        }
-
-                        // Étape 4 : Affichez le PDF via <embed>
-                        echo "<tr>";
-                        // Affiche le PDF intégré avec une classe CSS pour le responsive
                            if ($DOC->save == 'SharePoint'){
-                              echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
-                                    style='width:100%; height:600px;' frameborder='0'></iframe>";
+                                 $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
                            }
                            if ($DOC->save == 'Local'){
-                              echo "
-                                 <style>
-                                 .pdf-container {
-                                 width: 100%;
-                                 max-width: 100vw;
-                                 aspect-ratio: 1 / 1.414; /* Ratio A4 en portrait */
-                                 overflow: hidden;
-                                 }
-                                 .pdf-container embed {
-                                 width: 100%;
-                                 height: 100%;
-                                 object-fit: contain;
-                                 }
-                                 </style>
-
-                                 <div class='pdf-container'>
-                                 <embed 
-                                    src='".$fileDownloadUrl."' 
-                                    type='application/pdf' 
-                                    />
-                                 </div>";
+                                 $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
                            }
-                        echo "</tr>";
 
-                        // Bouton pour voir le PDF en plein écran
-                        echo "<tr>";
-                        echo '<a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>'; //   Bouton pour voir le PDF en plein écran
-                        echo "</tr><br><br>";
+                           // PDF intégré signé
+                           if ($DOC->save == 'SharePoint'){
+                                 echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                                       style='width:100%; height:400px; border:1px solid #ccc;' frameborder='0'></iframe>";
+                           }
+                           if ($DOC->save == 'Local'){
+                                 echo "
+                                    <style>
+                                    .pdf-container-signed {
+                                       width: 100%;
+                                       max-width: 100vw;
+                                       aspect-ratio: 1 / 1.414;
+                                       overflow: hidden;
+                                    }
+                                    .pdf-container-signed embed {
+                                       width: 100%;
+                                       height: 100%;
+                                       object-fit: contain;
+                                    }
+                                    </style>
+                                    <div class='pdf-container-signed'>
+                                       <embed src='".$fileDownloadUrl."' type='application/pdf' />
+                                    </div>";
+                           }
 
-                     } catch (Exception $e) {
-                        AffichageSigneMobile($DocUrlSharePoint);
+                        } catch (Exception $e) {
+                           // Fallback si erreur
+                        }
                      }
-                  }else{
-                     AffichageSigneMobile($DocUrlSharePoint);
-                  }
-                           // ----------------------------------- FIN MOBILE -----------------------------------
+                     
+                     echo '<br><a href="' . $DocUrlSharePoint . '" target="_blank">Voir le PDF en plein écran</a>';
+                     
+               echo '</div>';
+            
             }else{// -------------------------------------------------------------------------------- ORDINATEUR----------------------------------------------------------------
                // Affichage du PDF en mode image
                echo "<tr>";
