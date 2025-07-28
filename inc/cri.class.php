@@ -327,7 +327,7 @@ class PluginGestionCri extends CommonDBTM {
                          echo "<div id='".$uniq."' class='cri-signature-root' style='position:relative'>";
                            // petit canvas + bouton zoom + bouton effacer
                            echo "  <div class='signature-container'>";
-                           echo "    <button type='button' class='zoom-btn'>🔍 Agrandir</button>";
+                           echo "    <button type='button' class='zoom-btn'>Agrandir <i class='fa-solid fa-up-right-and-down-left-from-center'></i></button>";
                            echo "    <canvas id='sig-canvas-".$uniq."' width='320' height='80' class='sig-base' style='border:1px solid #ccc;'></canvas>";
                            echo "  </div>";
                            echo "  <br>";
@@ -503,7 +503,7 @@ class PluginGestionCri extends CommonDBTM {
                         echo "<div id='".$uniq."' class='cri-signature-root' style='position:relative'>";
                            // petit canvas + bouton zoom + bouton effacer
                            echo "  <div class='signature-container'>";
-                           echo "    <button type='button' class='zoom-btn'>🔍 Agrandir</button>";
+                           echo "    <button type='button' class='zoom-btn'>Agrandir <i class='fa-solid fa-up-right-and-down-left-from-center'></i></button>";
                            echo "    <canvas id='sig-canvas-".$uniq."' width='320' height='80' class='sig-base' style='border:1px solid #ccc;'></canvas>";
                            echo "  </div>";
                            echo "  <br>";
