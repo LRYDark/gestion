@@ -13,6 +13,7 @@ class PluginGestionCri extends CommonDBTM {
 
    function showForm($ID, $options = []) {
       global $DB, $CFG_GLPI;
+      $uniq = 'cri'.mt_rand(10000,99999);
 
       $id = $_POST["modal"];
       $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$id'")->fetch_object(); // Récupérer les informations du document  
@@ -116,7 +117,78 @@ class PluginGestionCri extends CommonDBTM {
             text-align: right;
             margin-top: 10px; /* Optionnel */
          }
-      </style><?php
+      </style>
+      <style>
+
+/* ou 'pixelated' si tu préfères des bords plus francs */
+#<?= $uniq ?> .canvas.sig-base { image-rendering: auto; }
+/* Container & bouton zoom (inchangé) */
+#<?= $uniq ?> .signature-container{position:relative;display:inline-block}
+#<?= $uniq ?> .zoom-btn{position:absolute;top:-28px;right:0;background:#007bff;color:#fff;border:0;padding:5px 10px;border-radius:3px;cursor:pointer;font-size:12px;z-index:1}
+#<?= $uniq ?> .zoom-btn:hover{background:#0056b3}
+
+/* Overlay plein écran */
+#<?= $uniq ?> .signature-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200000}
+#<?= $uniq ?> .signature-modal.active{display:block}
+#<?= $uniq ?> .modal-wrapper{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:10px}
+
+/* >>> Renommées pour éviter Bootstrap <<< */
+#<?= $uniq ?> .cri-modal-content{
+  background:#fff;border-radius:10px;position:relative;
+  width:100%;height:100%;max-width:1200px;max-height:600px;
+  display:flex !important;                 /* évite la pile verticale bootstrap */
+  flex-direction:row !important;           /* canvas + panneau côte à côte */
+  overflow:hidden;
+}
+
+#<?= $uniq ?> .cri-canvas-wrapper{
+  flex:1 1 auto;display:flex;align-items:center;justify-content:center;
+  padding:20px;background:#f8f9fa;min-width:0;
+}
+
+#<?= $uniq ?> .modal-canvas{border:2px solid #333;background:#fff;touch-action:none;max-width:100%;max-height:100%;cursor:crosshair}
+
+#<?= $uniq ?> .cri-controls-panel{
+  flex:0 0 150px;background:#e9ecef;display:flex;flex-direction:column;
+  justify-content:center;padding:20px;border-left:1px solid #dee2e6
+}
+#<?= $uniq ?> .cri-controls-panel button{margin:10px 0;padding:12px 20px;border:0;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;transition:.2s}
+#<?= $uniq ?> .btn-validate{background:#28a745;color:#fff}
+#<?= $uniq ?> .btn-validate:hover{background:#218838}
+#<?= $uniq ?> .btn-cancel{background:#dc3545;color:#fff}
+#<?= $uniq ?> .btn-cancel:hover{background:#c82333}
+#<?= $uniq ?> .btn-clear{background:#ffc107;color:#000}
+#<?= $uniq ?> .btn-clear:hover{background:#e0a800}
+
+/* Mobile uniquement */
+@media (max-width: 1024px) {
+  #<?= $uniq ?> .signature-modal.active { inset: 0; }
+  #<?= $uniq ?> .cri-modal-content{
+    width: 100svw;   /* sinon 100vw si svw non supporté */
+    height: 100svh;  /* sinon 100vh */
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+  }
+  #<?= $uniq ?> .cri-canvas-wrapper{ padding: max(12px, env(safe-area-inset-left)); }
+  #<?= $uniq ?> .cri-controls-panel{ flex-basis: 110px; padding: 10px; }
+}
+
+/* corrige le sélecteur */
+#<?= $uniq ?> canvas.sig-base { image-rendering: auto; }
+
+/* overlay “tournez l’écran” */
+#<?= $uniq ?> .rotate-gate{ position:absolute; inset:0; display:none;
+  align-items:center; justify-content:center; background:rgba(0,0,0,.65);
+  color:#fff; z-index: 1000; text-align:center; padding: 24px; }
+#<?= $uniq ?> .rotate-gate.show{ display:flex; }
+
+
+
+</style>
+
+      
+      <?php
          function isMobile() {
             return preg_match('/(android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)/i', $_SERVER['HTTP_USER_AGENT']); // Vérifie si l'utilisateur est sur un appareil mobile
          }
@@ -252,11 +324,39 @@ class PluginGestionCri extends CommonDBTM {
                   // TABLEAU 3 : Canvas pour signature et bouton de suppression
                   echo "<tr><br>";
                         echo '<label for="name">Signature</label><br>';
-                        // Canvas aligné à gauche
-                        echo "<canvas id='sig-canvas' class='sig' width='320' height='80' style='border: 1px solid #ccc;'></canvas><br>"; // Canvas pour signature
-                        // Ajout d'un bouton strictement sous le canvas sans espacement inutile
+                         echo "<div id='".$uniq."' class='cri-signature-root' style='position:relative'>";
+                           // petit canvas + bouton zoom + bouton effacer
+                           echo "  <div class='signature-container'>";
+                           echo "    <button type='button' class='zoom-btn'>🔍 Agrandir</button>";
+                           echo "    <canvas id='sig-canvas-".$uniq."' width='320' height='80' class='sig-base' style='border:1px solid #ccc;'></canvas>";
+                           echo "  </div>";
+                           echo "  <br>";
+                           echo "  <button type='button' id='sig-clearBtn-".$uniq."' class='resetButton' style='margin:5px 0 0 0; padding:5px 10px;'>Supprimer la signature</button>";
 
-                        echo "<button type='button' id='sig-clearBtn' class='resetButton' style='margin: 5px 0 0 0; padding: 5px 10px;'>Supprimer la signature</button>"; // Bouton pour supprimer la signature
+                           // modal interne pour le zoom (overlay)
+                           echo "  <div class='signature-modal' aria-hidden='true'>";
+                           echo "    <div class='modal-wrapper'>";                       // <- on garde
+                           echo "      <div class='cri-modal-content'>";                 // <- renommé
+                           echo "      <div class='rotate-gate'>\n";
+                           echo "        <div>\n";
+                           echo "          <div style='font-size:18px;font-weight:700;margin-bottom:8px'>\n";
+                           echo "            Tournez votre téléphone en mode paysage\n";
+                           echo "          </div>\n";
+                           echo "          <div style='opacity:0.9'>La zone de signature va s’agrandir automatiquement.</div>\n";
+                           echo "        </div>\n";
+                           echo "      </div>\n";
+                           echo "        <div class='cri-canvas-wrapper'>";              // <- renommé
+                           echo "          <canvas id='modal-canvas-".$uniq."' class='modal-canvas'></canvas>";
+                           echo "        </div>";
+                           echo "        <div class='cri-controls-panel'>";              // <- renommé
+                           echo "          <button type='button' class='btn-validate'>Valider</button>";
+                           echo "          <button type='button' class='btn-clear'>Effacer</button>";
+                           echo "          <button type='button' class='btn-cancel'>Annuler</button>";
+                           echo "        </div>";
+                           echo "      </div>";
+                           echo "    </div>";
+                           echo "  </div>";
+                        echo "</div>";
 
                   echo "</tr><br>";
                   
@@ -400,14 +500,42 @@ class PluginGestionCri extends CommonDBTM {
                      echo "</td>";
 
                      echo "<td>";
-                        // Canvas aligné à gauche
-                        echo "<canvas id='sig-canvas' class='sig' width='320' height='80' style='border: 1px solid #ccc;'></canvas>";
-                        // Ajout d'un bouton strictement sous le canvas sans espacement inutile
-                        echo "<br>";
-                        echo "<button type='button' id='sig-clearBtn' class='resetButton' style='margin: 5px 0 0 0; padding: 5px 10px;'>Supprimer la signature</button>";  // Bouton pour supprimer la signature
+                        echo "<div id='".$uniq."' class='cri-signature-root' style='position:relative'>";
+                           // petit canvas + bouton zoom + bouton effacer
+                           echo "  <div class='signature-container'>";
+                           echo "    <button type='button' class='zoom-btn'>🔍 Agrandir</button>";
+                           echo "    <canvas id='sig-canvas-".$uniq."' width='320' height='80' class='sig-base' style='border:1px solid #ccc;'></canvas>";
+                           echo "  </div>";
+                           echo "  <br>";
+                           echo "  <button type='button' id='sig-clearBtn-".$uniq."' class='resetButton' style='margin:5px 0 0 0; padding:5px 10px;'>Supprimer la signature</button>";
+
+                           // modal interne pour le zoom (overlay)
+                           echo "  <div class='signature-modal' aria-hidden='true'>";
+                           echo "    <div class='modal-wrapper'>";                       // <- on garde
+                           echo "      <div class='cri-modal-content'>";                 // <- renommé
+                           echo "      <div class='rotate-gate'>\n";
+                           echo "        <div>\n";
+                           echo "          <div style='font-size:18px;font-weight:700;margin-bottom:8px'>\n";
+                           echo "            Tournez votre téléphone en mode paysage\n";
+                           echo "          </div>\n";
+                           echo "          <div style='opacity:0.9'>La zone de signature va s’agrandir automatiquement.</div>\n";
+                           echo "        </div>\n";
+                           echo "      </div>\n";
+                           echo "        <div class='cri-canvas-wrapper'>";              // <- renommé
+                           echo "          <canvas id='modal-canvas-".$uniq."' class='modal-canvas'></canvas>";
+                           echo "        </div>";
+                           echo "        <div class='cri-controls-panel'>";              // <- renommé
+                           echo "          <button type='button' class='btn-validate'>Valider</button>";
+                           echo "          <button type='button' class='btn-clear'>Effacer</button>";
+                           echo "          <button type='button' class='btn-cancel'>Annuler</button>";
+                           echo "        </div>";
+                           echo "      </div>";
+                           echo "    </div>";
+                           echo "  </div>";
+                        echo "</div>";
                      echo "</td>";
                   echo "</tr>";
-                  
+
                   if ($config->fields['MailTo'] == 1){
                      // Mail
                      echo "<tr>";
@@ -622,121 +750,272 @@ class PluginGestionCri extends CommonDBTM {
                   reader.readAsDataURL(file);
                }
             });
+
             //--------------------------------------------------- signature
-               window.requestAnimFrame = (function(callback) { // Fonction pour animer le canvas
-                  return window.requestAnimationFrame ||    // Demande d'animation pour les navigateurs
-                     window.webkitRequestAnimationFrame ||  // Demande d'animation pour les navigateurs WebKit
-                     window.mozRequestAnimationFrame ||     // Demande d'animation pour les navigateurs Mozilla
-                     window.oRequestAnimationFrame ||       // Demande d'animation pour les navigateurs Opera
-                     window.msRequestAnimaitonFrame ||      // Demande d'animation pour les navigateurs Microsoft
-                     function(callback) {
-                     window.setTimeout(callback, 1000 / 60);   // Demande d'animation pour les navigateurs anciens
-                     };
-               })();
+            (function(){
+               const root = document.getElementById('<?= $uniq ?>');
+               if (!root) return;
 
-               var canvas = document.getElementById("sig-canvas");   // Récupère l'élément canvas
-               var ctx = canvas.getContext("2d");                    // Récupère le contexte du canvas
-               ctx.strokeStyle = "#222222";                          // Couleur du trait
-               ctx.lineWidtd = 1;                                    // Largeur du trait
+               // Elements
+               const originalCanvas = root.querySelector('#sig-canvas-<?= $uniq ?>');
+               const modalCanvas    = root.querySelector('#modal-canvas-<?= $uniq ?>');
+               const modalOverlay   = root.querySelector('.signature-modal');
+               const btnZoom        = root.querySelector('.zoom-btn');
+               const btnClearBase   = root.querySelector('#sig-clearBtn-<?= $uniq ?>');
+               const btnValidate    = root.querySelector('.btn-validate');
+               const btnClearModal  = root.querySelector('.btn-clear');
+               const btnCancel      = root.querySelector('.btn-cancel');
 
-               var drawing = false;                               // Variable pour dessiner                                 
-               var mousePos = {                                   // Position de la souris                       
-                  x: 0,                                           // Position x
-                  y: 0                                            // Position y                            
-               };
-               var lastPos = mousePos;                            // Dernière position de la souris                      
+               // Contexts
+               const originalCtx = originalCanvas.getContext('2d');
+               const modalCtx    = modalCanvas.getContext('2d');
 
-               canvas.addEventListener("mousedown", function(e) { // Ajoute un événement de clic de souris
-                  drawing = true;                                 // Passe la variable drawing à true
-                  lastPos = getMousePos(canvas, e);               // Récupère la position de la souris
-               }, false);                                         // Fin de l'événement de clic de souris
+               // Canvas/calque d'export (non affiché)
+               const modalExportCanvas = document.createElement('canvas');
+               const modalExportCtx    = modalExportCanvas.getContext('2d');
 
-               canvas.addEventListener("mouseup", function(e) {   // Ajoute un événement de relâchement de souris
+               // ---- constantes d'épaisseur (en pixels CSS) ----
+               const TARGET_BASE_LINE   = 1.8; // épaisseur VISIBLE voulue dans le petit canvas
+               const VISUAL_MODAL_LINE  = 1.6; // un poil plus fin visuellement dans le modal
+
+               // ---- setup générique d'un ctx ----
+               function setup(ctx, lw){
+                  ctx.strokeStyle = '#000';
+                  ctx.lineWidth   = lw;
+                  ctx.lineCap     = 'round';
+                  ctx.lineJoin    = 'round';
+               }
+
+               // ---- prise en compte du DPR (HiDPI) ----
+               function fixDPR(canvas, ctx, cssW, cssH){
+                  const dpr = window.devicePixelRatio || 1;
+                  canvas.style.width  = cssW + 'px';
+                  canvas.style.height = cssH + 'px';
+                  canvas.width  = Math.round(cssW * dpr);
+                  canvas.height = Math.round(cssH * dpr);
+                  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 1 unité = 1 px CSS
+               }
+
+               // ---- petit canvas (base) ----
+               const baseCSSW = originalCanvas.clientWidth  || 320;
+               const baseCSSH = originalCanvas.clientHeight || 80;
+               const DPR_BASE = fixDPR(originalCanvas, originalCtx, baseCSSW, baseCSSH);
+               // épaisseur visible voulue * DPR
+               setup(originalCtx, TARGET_BASE_LINE);
+
+               // ---- modal : applique styles après avoir fixé taille & DPR ----
+               function applyModalStyle(){
+                  const ratio = modalExportCanvas.width / originalCanvas.width; // deux tailles *internes* (DPR inclus)
+                  const exportLine = Math.max(1, TARGET_BASE_LINE * ratio);     // pour conserver l’épaisseur après réduction
+                  setup(modalCtx,       VISUAL_MODAL_LINE);                     // visuel modal
+                  setup(modalExportCtx, exportLine);                            // calque d’export (épais)
+                  }
+
+                  // Dessin (Pointer Events)
+                  let currentCanvas = originalCanvas;
+                  let currentCtx    = originalCtx;
+                  let drawing = false;
+                  let lastPos = {x:0,y:0};
+
+                  function getPos(e, canvas){
+                  const rect = canvas.getBoundingClientRect();
+                  const t = e.touches?.[0] || e.changedTouches?.[0] || e;
+                  return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+               }
+
+               function start(e, canvas){
+                  e.preventDefault();
+                  currentCanvas = canvas;
+                  currentCtx    = canvas.getContext('2d');
+                  drawing = true;
+                  lastPos = getPos(e, canvas);
+                  if (e.pointerId != null) canvas.setPointerCapture(e.pointerId);
+               }
+
+               // ---- dessin : si on dessine dans le modal, doubler sur le calque export ----
+               function move(e){
+                  if (!drawing) return;
+                  const p = getPos(e, currentCanvas);
+                  currentCtx.beginPath();
+                  currentCtx.moveTo(lastPos.x, lastPos.y);
+                  currentCtx.lineTo(p.x, p.y);
+                  currentCtx.stroke();
+
+                  if (currentCanvas === modalCanvas) {
+                     modalExportCtx.beginPath();
+                     modalExportCtx.moveTo(lastPos.x, lastPos.y);
+                     modalExportCtx.lineTo(p.x, p.y);
+                     modalExportCtx.stroke();
+                  }
+                  lastPos = p;
+               }
+
+               function end(e){
+                  if (!drawing) return;
                   drawing = false;
-               }, false);
+                  currentCtx.beginPath();
+                  if (e && e.pointerId != null) { try { currentCanvas.releasePointerCapture(e.pointerId); } catch{} }
+               }
 
-               canvas.addEventListener("mousemove", function(e) { // Ajoute un événement de déplacement de souris
-                  mousePos = getMousePos(canvas, e);              // Récupère la position de la souris
-               }, false);
+               function bindCanvas(canvas){
+                  canvas.addEventListener('pointerdown', (e)=>start(e, canvas));
+                  canvas.addEventListener('pointermove', move);
+                  canvas.addEventListener('pointerup', end);
+                  canvas.addEventListener('pointercancel', end);
+                  // éviter zoom iOS/scroll pendant dessin
+                  canvas.addEventListener('touchstart', (e)=>e.preventDefault(), {passive:false});
+                  canvas.addEventListener('touchmove',  (e)=>e.preventDefault(), {passive:false});
+               }
 
-               // Add touch event support for mobile
-               canvas.addEventListener("touchmove", function(e) { // Ajoute un événement de déplacement tactile
-                  var touch = e.touches[0];
-                  e.preventDefault(); 
-                  var me = new MouseEvent("mousemove", {          // Crée un nouvel événement de souris
-                     clientX: touch.clientX,                         
-                     clientY: touch.clientY
+               bindCanvas(originalCanvas);
+               bindCanvas(modalCanvas);
+
+               // Effacer base
+               btnClearBase.addEventListener('click', ()=>{
+                  originalCtx.clearRect(0,0,originalCanvas.width, originalCanvas.height);
+                  setup(originalCtx, TARGET_BASE_LINE);
+               });
+               btnClearModal.addEventListener('click', ()=>{
+                  modalCtx.clearRect(0,0,modalCanvas.width, modalCanvas.height);
+                  modalExportCtx.clearRect(0,0,modalExportCanvas.width, modalExportCanvas.height);
+                  applyModalStyle();
+               });
+
+               // --- helpers ---
+               const isMobileScreen = () => window.innerWidth <= 1024;
+               const isLandscape    = () => window.matchMedia("(orientation: landscape)").matches;
+               const rotateGate     = root.querySelector('.rotate-gate');
+
+               // Taille “desktop” (modal d’origine) : on cale sur l’espace dispo du wrapper
+               function sizeModalCanvasDesktop(){
+               const wrapper = root.querySelector('.cri-canvas-wrapper');
+               const r = wrapper.getBoundingClientRect();
+               // on garde ton ratio ~3:1, SANS toucher au layout du modal
+               const pad = 20, aspect = 3;
+               let w = Math.max(360, Math.floor(r.width  - pad*2));
+               let h = Math.max(120, Math.floor(r.height - pad*2));
+               if (w / h > aspect) { w = Math.floor(h * aspect); } else { h = Math.floor(w / aspect); }
+
+               fixDPR(modalCanvas, modalCtx, w, h);
+                  modalExportCanvas.width  = modalCanvas.width;
+                  modalExportCanvas.height = modalCanvas.height;
+                  applyModalStyle();
+               }
+
+               // Taille “mobile paysage” : plein écran (moins le panneau de boutons)
+               function sizeModalCanvasMobile(){
+                  const panelW = Math.max(100, root.querySelector('.cri-controls-panel').getBoundingClientRect().width || 120);
+                  const pad = 20, aspect = 3;
+                  let availW = Math.max(320, window.innerWidth  - panelW - pad*2);
+                  let availH = Math.max(160, window.innerHeight - pad*2);
+                  let w = availW, h = availH;
+                  if (w / h > aspect) { w = Math.floor(h * aspect); } else { h = Math.floor(w / aspect); }
+
+                  fixDPR(modalCanvas, modalCtx, w, h);
+                  modalExportCanvas.width  = modalCanvas.width;
+                  modalExportCanvas.height = modalCanvas.height;
+                  applyModalStyle();
+               }
+
+               // Affiche/masque l’overlay “tournez” et redimensionne en mobile
+               function updateOrientationGate(){
+               if (!isMobileScreen()) return; // ne rien faire sur desktop
+               if (isLandscape()) {
+                  rotateGate.classList.remove('show');
+                  sizeModalCanvasMobile();
+               } else {
+                  rotateGate.classList.add('show');
+               }
+               }
+
+               // ---- ouverture du modal ----
+               btnZoom.addEventListener('click', ()=>{
+               document.documentElement.classList.add('no-scroll');
+               modalOverlay.classList.add('active');
+
+               if (isMobileScreen()) {
+                  // mobile : impose paysage
+                  updateOrientationGate();
+                  if (isLandscape()) {
+                     modalCtx.clearRect(0,0,modalCanvas.width, modalCanvas.height);
+                     modalExportCtx.clearRect(0,0,modalExportCanvas.width, modalExportCanvas.height);
+                     modalCtx.drawImage(originalCanvas, 0, 0, modalCanvas.width, modalCanvas.height);
+                     modalExportCtx.drawImage(originalCanvas, 0, 0, modalExportCanvas.width, modalExportCanvas.height);
+                  }
+               } else {
+                  // desktop : garder la taille du modal d’origine
+                  sizeModalCanvasDesktop();
+                  modalCtx.clearRect(0,0,modalCanvas.width, modalCanvas.height);
+                  modalExportCtx.clearRect(0,0,modalExportCanvas.width, modalExportCanvas.height);
+                  modalCtx.drawImage(originalCanvas, 0, 0, modalCanvas.width, modalCanvas.height);
+                  modalExportCtx.drawImage(originalCanvas, 0, 0, modalExportCanvas.width, modalExportCanvas.height);
+               }
+               });
+
+               // Recalcule seulement en mobile
+               window.addEventListener('orientationchange', updateOrientationGate);
+               window.addEventListener('resize', updateOrientationGate);
+
+               // Fermer modal = retirer no-scroll
+               btnCancel.addEventListener('click', ()=>{
+                  modalOverlay.classList.remove('active');
+                  document.documentElement.classList.remove('no-scroll');
+               });
+               btnValidate.addEventListener('click', ()=>{
+                  const tw = originalCanvas.width, th = originalCanvas.height;
+                  originalCtx.clearRect(0,0,tw,th);
+                  originalCtx.save();
+                  originalCtx.imageSmoothingEnabled = true;
+                  originalCtx.imageSmoothingQuality = 'high';
+                  originalCtx.drawImage(modalExportCanvas, 0, 0, tw, th);
+                  originalCtx.restore();
+
+                  modalOverlay.classList.remove('active');
+                  document.documentElement.classList.remove('no-scroll');
+               });
+
+               // ---- valider : copie sans lissage depuis le calque d’export ----
+               btnValidate.addEventListener('click', ()=>{
+                  const tw = originalCanvas.width;
+                  const th = originalCanvas.height;
+
+                  originalCtx.clearRect(0,0,tw,th);
+                  originalCtx.save();
+                  originalCtx.imageSmoothingEnabled = true;       // <= activer
+                  originalCtx.imageSmoothingQuality = 'high';     // 'low' | 'medium' | 'high'
+                  originalCtx.drawImage(modalExportCanvas, 0, 0, tw, th);
+                  originalCtx.restore();
+
+                  modalOverlay.classList.remove('active');
+               });
+
+               // Annuler
+               btnCancel.addEventListener('click', ()=>{
+                  modalOverlay.classList.remove('active');
+                  end({});
+               });
+
+               // Remplir le champ caché à l'envoi
+               const submitBtn  = document.getElementById('sig-submitBtn');
+               const hiddenArea = document.getElementById('sig-dataUrl');
+               if (submitBtn && hiddenArea && !submitBtn.dataset.sigInit) {
+                  submitBtn.dataset.sigInit = '1';
+                  submitBtn.addEventListener('click', function(){
+                  hiddenArea.value = originalCanvas.toDataURL();
                   });
-                  canvas.dispatchEvent(me);
-               }, false);
-
-               canvas.addEventListener("touchstart", function(e) {   // Ajoute un événement de toucher
-                  mousePos = getTouchPos(canvas, e);                 // Récupère la position du toucher
-                  e.preventDefault(); 
-                  var touch = e.touches[0];
-                  var me = new MouseEvent("mousedown", {             // Crée un nouvel événement de clic de souris
-                     clientX: touch.clientX,
-                     clientY: touch.clientY
-                  });
-                  canvas.dispatchEvent(me);                          // Envoie l'événement de clic de souris
-               }, false);
-
-               canvas.addEventListener("touchend", function(e) {   // Ajoute un événement de relâchement tactile
-                  e.preventDefault(); 
-                  var me = new MouseEvent("mouseup", {});            // Crée un nouvel événement de relâchement de souris
-                  canvas.dispatchEvent(me);
-               }, false);
-
-               function getMousePos(canvasDom, mouseEvent) {         // Fonction pour récupérer la position de la souris
-                  var rect = canvasDom.getBoundingClientRect();      // Récupère les dimensions du canvas
-                  return {
-                     x: mouseEvent.clientX - rect.left,
-                     y: mouseEvent.clientY - rect.top
-                  }
                }
 
-               function getTouchPos(canvasDom, touchEvent) {         // Fonction pour récupérer la position du toucher
-                  var rect = canvasDom.getBoundingClientRect();      // Récupère les dimensions du canvas
-                  return {
-                     x: touchEvent.touches[0].clientX - rect.left,
-                     y: touchEvent.touches[0].clientY - rect.top
-                  }
-               }
+               // anti double-tap zoom iOS
+               document.addEventListener('touchend', (function(){
+                  let last = 0;
+                  return function(e){
+                  const now = Date.now();
+                  if (now - last < 300) e.preventDefault();
+                  last = now;
+                  };
+               })(), {passive:false});
 
-               function renderCanvas() {        // Fonction pour dessiner sur le canvas
-                  if (drawing) {
-                     ctx.moveTo(lastPos.x, lastPos.y);
-                     ctx.lineTo(mousePos.x, mousePos.y);
-                     ctx.stroke();
-                     lastPos = mousePos;
-                  }
-               }
-
-               // Prevent scrolling when touching tde canvas
-               document.body.addEventListener("touchstart", function(e) {     // Empêche le défilement lors du toucher du canvas
-                  if (e.target == canvas) {
-                     e.preventDefault();
-                  }
-               }, false);
-               document.body.addEventListener("touchend", function(e) {       // Empêche le défilement lors du toucher du canvas
-                  if (e.target == canvas) {
-                     e.preventDefault();
-                  }
-               }, false);
-               document.body.addEventListener("touchmove", function(e) {         // Empêche le défilement lors du toucher du canvas
-                  if (e.target == canvas) {
-                     e.preventDefault();
-                  }
-               }, false);
-
-               (function drawLoop() {     // Fonction pour dessiner en boucle
-                  requestAnimFrame(drawLoop);
-                  renderCanvas();
-               })();
-
-               function clearCanvas() {      // Fonction pour effacer le canvas
-                  canvas.widtd = canvas.widtd;
-               }
+            })();
 
             // Set up tde UI
                var sigText = document.getElementById("sig-dataUrl");    // Récupère l'élément sig-dataUrl
