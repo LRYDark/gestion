@@ -117,77 +117,70 @@ class PluginGestionCri extends CommonDBTM {
             text-align: right;
             margin-top: 10px; /* Optionnel */
          }
-      </style>
-      <style>
 
-/* ou 'pixelated' si tu préfères des bords plus francs */
-#<?= $uniq ?> .canvas.sig-base { image-rendering: auto; }
-/* Container & bouton zoom (inchangé) */
-#<?= $uniq ?> .signature-container{position:relative;display:inline-block}
-#<?= $uniq ?> .zoom-btn{position:absolute;top:-28px;right:0;background:#007bff;color:#fff;border:0;padding:5px 10px;border-radius:3px;cursor:pointer;font-size:12px;z-index:1}
-#<?= $uniq ?> .zoom-btn:hover{background:#0056b3}
+         /* ou 'pixelated' si tu préfères des bords plus francs */
+         #<?= $uniq ?> .canvas.sig-base { image-rendering: auto; }
+         /* Container & bouton zoom (inchangé) */
+         #<?= $uniq ?> .signature-container{position:relative;display:inline-block}
+         #<?= $uniq ?> .zoom-btn{position:absolute;top:-28px;right:0;background:#007bff;color:#fff;border:0;padding:5px 10px;border-radius:3px;cursor:pointer;font-size:12px;z-index:1}
+         #<?= $uniq ?> .zoom-btn:hover{background:#0056b3}
 
-/* Overlay plein écran */
-#<?= $uniq ?> .signature-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200000}
-#<?= $uniq ?> .signature-modal.active{display:block}
-#<?= $uniq ?> .modal-wrapper{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:10px}
+         /* Overlay plein écran */
+         #<?= $uniq ?> .signature-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200000}
+         #<?= $uniq ?> .signature-modal.active{display:block}
+         #<?= $uniq ?> .modal-wrapper{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:10px}
 
-/* >>> Renommées pour éviter Bootstrap <<< */
-#<?= $uniq ?> .cri-modal-content{
-  background:#fff;border-radius:10px;position:relative;
-  width:100%;height:100%;max-width:1200px;max-height:600px;
-  display:flex !important;                 /* évite la pile verticale bootstrap */
-  flex-direction:row !important;           /* canvas + panneau côte à côte */
-  overflow:hidden;
-}
+         /* >>> Renommées pour éviter Bootstrap <<< */
+         #<?= $uniq ?> .cri-modal-content{
+         background:#fff;border-radius:10px;position:relative;
+         width:100%;height:100%;max-width:1200px;max-height:600px;
+         display:flex !important;                 /* évite la pile verticale bootstrap */
+         flex-direction:row !important;           /* canvas + panneau côte à côte */
+         overflow:hidden;
+         }
 
-#<?= $uniq ?> .cri-canvas-wrapper{
-  flex:1 1 auto;display:flex;align-items:center;justify-content:center;
-  padding:20px;background:#f8f9fa;min-width:0;
-}
+         #<?= $uniq ?> .cri-canvas-wrapper{
+         flex:1 1 auto;display:flex;align-items:center;justify-content:center;
+         padding:20px;background:#f8f9fa;min-width:0;
+         }
 
-#<?= $uniq ?> .modal-canvas{border:2px solid #333;background:#fff;touch-action:none;max-width:100%;max-height:100%;cursor:crosshair}
+         #<?= $uniq ?> .modal-canvas{border:2px solid #333;background:#fff;touch-action:none;max-width:100%;max-height:100%;cursor:crosshair}
 
-#<?= $uniq ?> .cri-controls-panel{
-  flex:0 0 150px;background:#e9ecef;display:flex;flex-direction:column;
-  justify-content:center;padding:20px;border-left:1px solid #dee2e6
-}
-#<?= $uniq ?> .cri-controls-panel button{margin:10px 0;padding:12px 20px;border:0;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;transition:.2s}
-#<?= $uniq ?> .btn-validate{background:#28a745;color:#fff}
-#<?= $uniq ?> .btn-validate:hover{background:#218838}
-#<?= $uniq ?> .btn-cancel{background:#dc3545;color:#fff}
-#<?= $uniq ?> .btn-cancel:hover{background:#c82333}
-#<?= $uniq ?> .btn-clear{background:#ffc107;color:#000}
-#<?= $uniq ?> .btn-clear:hover{background:#e0a800}
+         #<?= $uniq ?> .cri-controls-panel{
+         flex:0 0 150px;background:#e9ecef;display:flex;flex-direction:column;
+         justify-content:center;padding:20px;border-left:1px solid #dee2e6
+         }
+         #<?= $uniq ?> .cri-controls-panel button{margin:10px 0;padding:12px 20px;border:0;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;transition:.2s}
+         #<?= $uniq ?> .btn-validate{background:#28a745;color:#fff}
+         #<?= $uniq ?> .btn-validate:hover{background:#218838}
+         #<?= $uniq ?> .btn-cancel{background:#dc3545;color:#fff}
+         #<?= $uniq ?> .btn-cancel:hover{background:#c82333}
+         #<?= $uniq ?> .btn-clear{background:#ffc107;color:#000}
+         #<?= $uniq ?> .btn-clear:hover{background:#e0a800}
 
-/* Mobile uniquement */
-@media (max-width: 1024px) {
-  #<?= $uniq ?> .signature-modal.active { inset: 0; }
-  #<?= $uniq ?> .cri-modal-content{
-    width: 100svw;   /* sinon 100vw si svw non supporté */
-    height: 100svh;  /* sinon 100vh */
-    max-width: none;
-    max-height: none;
-    border-radius: 0;
-  }
-  #<?= $uniq ?> .cri-canvas-wrapper{ padding: max(12px, env(safe-area-inset-left)); }
-  #<?= $uniq ?> .cri-controls-panel{ flex-basis: 110px; padding: 10px; }
-}
+         /* Mobile uniquement */
+         @media (max-width: 1024px) {
+         #<?= $uniq ?> .signature-modal.active { inset: 0; }
+         #<?= $uniq ?> .cri-modal-content{
+            width: 100svw;   /* sinon 100vw si svw non supporté */
+            height: 100svh;  /* sinon 100vh */
+            max-width: none;
+            max-height: none;
+            border-radius: 0;
+         }
+         #<?= $uniq ?> .cri-canvas-wrapper{ padding: max(12px, env(safe-area-inset-left)); }
+         #<?= $uniq ?> .cri-controls-panel{ flex-basis: 110px; padding: 10px; }
+         }
 
-/* corrige le sélecteur */
-#<?= $uniq ?> canvas.sig-base { image-rendering: auto; }
+         /* corrige le sélecteur */
+         #<?= $uniq ?> canvas.sig-base { image-rendering: auto; }
 
-/* overlay “tournez l’écran” */
-#<?= $uniq ?> .rotate-gate{ position:absolute; inset:0; display:none;
-  align-items:center; justify-content:center; background:rgba(0,0,0,.65);
-  color:#fff; z-index: 1000; text-align:center; padding: 24px; }
-#<?= $uniq ?> .rotate-gate.show{ display:flex; }
-
-
-
-</style>
-
-      
+         /* overlay “tournez l’écran” */
+         #<?= $uniq ?> .rotate-gate{ position:absolute; inset:0; display:none;
+         align-items:center; justify-content:center; background:rgba(0,0,0,.65);
+         color:#fff; z-index: 1000; text-align:center; padding: 24px; }
+         #<?= $uniq ?> .rotate-gate.show{ display:flex; }
+      </style>      
       <?php
          function isMobile() {
             return preg_match('/(android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)/i', $_SERVER['HTTP_USER_AGENT']); // Vérifie si l'utilisateur est sur un appareil mobile
