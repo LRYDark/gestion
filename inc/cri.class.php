@@ -219,7 +219,32 @@ class PluginGestionCri extends CommonDBTM {
                align-items:center; justify-content:center; background:rgba(0,0,0,.65);
                color:#fff; z-index: 1000; text-align:center; padding: 24px; }
                #<?= $uniq ?> .rotate-gate.show{ display:flex; }
-    </style>     
+
+
+               /* Bouton de fermeture pour le message rotation */
+               #<?= $uniq ?> .rotate-close-btn {
+                  position: absolute;
+                  top: 20px;
+                  right: 20px;
+                  background: rgba(255,255,255,0.2);
+                  border: 2px solid rgba(255,255,255,0.5);
+                  color: #fff;
+                  width: 40px;
+                  height: 40px;
+                  border-radius: 50%;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 20px;
+                  font-weight: bold;
+                  transition: all 0.3s ease;
+               }
+               #<?= $uniq ?> .rotate-close-btn:hover {
+                  background: rgba(255,255,255,0.3);
+                  border-color: rgba(255,255,255,0.8);
+               }
+      </style>     
       <?php
          function isMobile() {
             return preg_match('/(android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)/i', $_SERVER['HTTP_USER_AGENT']); // Vérifie si l'utilisateur est sur un appareil mobile
@@ -355,11 +380,12 @@ class PluginGestionCri extends CommonDBTM {
                                     echo "    <div class='modal-wrapper'>";                       // <- on garde
                                     echo "      <div class='cri-modal-content'>";                 // <- renommé
                                     echo "      <div class='rotate-gate'>\n";
+                                    echo "        <button type='button' class='rotate-close-btn' aria-label='Fermer'>&times;</button>\n";
                                     echo "        <div>\n";
                                     echo "          <div style='font-size:18px;font-weight:700;margin-bottom:8px'>\n";
                                     echo "            Tournez votre téléphone en mode paysage\n";
                                     echo "          </div>\n";
-                                    echo "          <div style='opacity:0.9'>La zone de signature va s’agrandir automatiquement.</div>\n";
+                                    echo "          <div style='opacity:0.9'>La zone de signature va s'agrandir automatiquement.</div>\n";
                                     echo "        </div>\n";
                                     echo "      </div>\n";
                                     echo "        <div class='cri-canvas-wrapper'>";              // <- renommé
@@ -382,20 +408,22 @@ class PluginGestionCri extends CommonDBTM {
                
                // Section email (si activée)
                if ($config->fields['MailTo'] == 1){
-                     echo '<div class="mobile-form-row">';
-                        echo '<div class="mobile-form-label">Mail client</div>';
-                        echo 'Cocher pour envoyer le PDF par email.<br>';
+                  echo '<div class="mobile-form-row">';
+                     echo '<div class="mobile-form-label">Mail client</div>';
                         echo '<div class="mobile-checkbox-group">';
-                           echo '<input type="checkbox" name="mailtoclient" value="1">';
-                           echo '<input type="email" id="mail" name="email" value="'.$email.'" style="margin-left: 10px;">';
+                           echo '<input type="checkbox" name="mailtoclient" value="1" id="send_email">';
+                           echo '<label for="send_email">Envoyer le PDF par email</label>';
                         echo '</div>';
+                     echo '<div class="mobile-form-content">';
+                        echo '<input type="email" id="mail" name="email" value="'.$email.'" placeholder="Email du client">';
                      echo '</div>';
+                  echo '</div>';
                }
-               
+
                // Bouton de soumission (si droits suffisants)
                if(Session::haveRight("plugin_gestion_sign", CREATE)){
                      echo '<div class="mobile-form-row" style="text-align: center;">';
-                        echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signé" class="submit">';
+                        echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signer le PDF" class="submit" style="width: 100%; padding: 15px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 5px;">';
                      echo '</div>';
                      
                      echo '<textarea readonly name="url" id="sig-dataUrl" class="form-control" rows="0" cols="150" style="display: none;"></textarea>';
@@ -541,11 +569,12 @@ class PluginGestionCri extends CommonDBTM {
                            echo "    <div class='modal-wrapper'>";                       // <- on garde
                            echo "      <div class='cri-modal-content'>";                 // <- renommé
                            echo "      <div class='rotate-gate'>\n";
+                           echo "        <button type='button' class='rotate-close-btn' aria-label='Fermer'>&times;</button>\n";
                            echo "        <div>\n";
                            echo "          <div style='font-size:18px;font-weight:700;margin-bottom:8px'>\n";
                            echo "            Tournez votre téléphone en mode paysage\n";
                            echo "          </div>\n";
-                           echo "          <div style='opacity:0.9'>La zone de signature va s’agrandir automatiquement.</div>\n";
+                           echo "          <div style='opacity:0.9'>La zone de signature va s'agrandir automatiquement.</div>\n";
                            echo "        </div>\n";
                            echo "      </div>\n";
                            echo "        <div class='cri-canvas-wrapper'>";              // <- renommé
@@ -582,7 +611,7 @@ class PluginGestionCri extends CommonDBTM {
                echo "</div>";
                if(Session::haveRight("plugin_gestion_sign", CREATE)){
                   echo '<div class="button-container-right" style="text-align: right;">';
-                     echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signé" class="submit">'; // Bouton pour signer
+                     echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signer le PDF" class="submit">'; // Bouton pour signer
                   echo '</div>';
 
                   echo '<textarea readonly name="url" id="sig-dataUrl" class="form-control" rows="0" cols="150" style="display: none;"></textarea>';  // Champ caché pour stocker la signature
@@ -774,6 +803,8 @@ class PluginGestionCri extends CommonDBTM {
                const btnValidate    = root.querySelector('.btn-validate');
                const btnClearModal  = root.querySelector('.btn-clear');
                const btnCancel      = root.querySelector('.btn-cancel');
+               const rotateGate     = root.querySelector('.rotate-gate');
+               const rotateCloseBtn = root.querySelector('.rotate-close-btn');
 
                // Contexts
                const originalCtx = originalCanvas.getContext('2d');
@@ -783,9 +814,13 @@ class PluginGestionCri extends CommonDBTM {
                const modalExportCanvas = document.createElement('canvas');
                const modalExportCtx    = modalExportCanvas.getContext('2d');
 
+               // Variables de contrôle
+               let modalIsOpen = false;
+               let orientationCheckAllowed = false;
+
                // ---- constantes d'épaisseur (en pixels CSS) ----
-               const TARGET_BASE_LINE   = 1.8; // épaisseur VISIBLE voulue dans le petit canvas
-               const VISUAL_MODAL_LINE  = 1.6; // un poil plus fin visuellement dans le modal
+               const TARGET_BASE_LINE   = 1.8;
+               const VISUAL_MODAL_LINE  = 1.6;
 
                // ---- setup générique d'un ctx ----
                function setup(ctx, lw){
@@ -802,31 +837,30 @@ class PluginGestionCri extends CommonDBTM {
                   canvas.style.height = cssH + 'px';
                   canvas.width  = Math.round(cssW * dpr);
                   canvas.height = Math.round(cssH * dpr);
-                  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // 1 unité = 1 px CSS
+                  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                }
 
                // ---- petit canvas (base) ----
                const baseCSSW = originalCanvas.clientWidth  || 320;
                const baseCSSH = originalCanvas.clientHeight || 80;
-               const DPR_BASE = fixDPR(originalCanvas, originalCtx, baseCSSW, baseCSSH);
-               // épaisseur visible voulue * DPR
+               fixDPR(originalCanvas, originalCtx, baseCSSW, baseCSSH);
                setup(originalCtx, TARGET_BASE_LINE);
 
                // ---- modal : applique styles après avoir fixé taille & DPR ----
                function applyModalStyle(){
-                  const ratio = modalExportCanvas.width / originalCanvas.width; // deux tailles *internes* (DPR inclus)
-                  const exportLine = Math.max(1, TARGET_BASE_LINE * ratio);     // pour conserver l’épaisseur après réduction
-                  setup(modalCtx,       VISUAL_MODAL_LINE);                     // visuel modal
-                  setup(modalExportCtx, exportLine);                            // calque d’export (épais)
-                  }
+                  const ratio = modalExportCanvas.width / originalCanvas.width;
+                  const exportLine = Math.max(1, TARGET_BASE_LINE * ratio);
+                  setup(modalCtx, VISUAL_MODAL_LINE);
+                  setup(modalExportCtx, exportLine);
+               }
 
-                  // Dessin (Pointer Events)
-                  let currentCanvas = originalCanvas;
-                  let currentCtx    = originalCtx;
-                  let drawing = false;
-                  let lastPos = {x:0,y:0};
+               // Dessin (Pointer Events)
+               let currentCanvas = originalCanvas;
+               let currentCtx    = originalCtx;
+               let drawing = false;
+               let lastPos = {x:0,y:0};
 
-                  function getPos(e, canvas){
+               function getPos(e, canvas){
                   const rect = canvas.getBoundingClientRect();
                   const t = e.touches?.[0] || e.changedTouches?.[0] || e;
                   return { x: t.clientX - rect.left, y: t.clientY - rect.top };
@@ -841,7 +875,6 @@ class PluginGestionCri extends CommonDBTM {
                   if (e.pointerId != null) canvas.setPointerCapture(e.pointerId);
                }
 
-               // ---- dessin : si on dessine dans le modal, doubler sur le calque export ----
                function move(e){
                   if (!drawing) return;
                   const p = getPos(e, currentCanvas);
@@ -851,10 +884,10 @@ class PluginGestionCri extends CommonDBTM {
                   currentCtx.stroke();
 
                   if (currentCanvas === modalCanvas) {
-                     modalExportCtx.beginPath();
-                     modalExportCtx.moveTo(lastPos.x, lastPos.y);
-                     modalExportCtx.lineTo(p.x, p.y);
-                     modalExportCtx.stroke();
+                        modalExportCtx.beginPath();
+                        modalExportCtx.moveTo(lastPos.x, lastPos.y);
+                        modalExportCtx.lineTo(p.x, p.y);
+                        modalExportCtx.stroke();
                   }
                   lastPos = p;
                }
@@ -863,7 +896,9 @@ class PluginGestionCri extends CommonDBTM {
                   if (!drawing) return;
                   drawing = false;
                   currentCtx.beginPath();
-                  if (e && e.pointerId != null) { try { currentCanvas.releasePointerCapture(e.pointerId); } catch{} }
+                  if (e && e.pointerId != null) { 
+                        try { currentCanvas.releasePointerCapture(e.pointerId); } catch{} 
+                  }
                }
 
                function bindCanvas(canvas){
@@ -871,7 +906,6 @@ class PluginGestionCri extends CommonDBTM {
                   canvas.addEventListener('pointermove', move);
                   canvas.addEventListener('pointerup', end);
                   canvas.addEventListener('pointercancel', end);
-                  // éviter zoom iOS/scroll pendant dessin
                   canvas.addEventListener('touchstart', (e)=>e.preventDefault(), {passive:false});
                   canvas.addEventListener('touchmove',  (e)=>e.preventDefault(), {passive:false});
                }
@@ -884,6 +918,7 @@ class PluginGestionCri extends CommonDBTM {
                   originalCtx.clearRect(0,0,originalCanvas.width, originalCanvas.height);
                   setup(originalCtx, TARGET_BASE_LINE);
                });
+               
                btnClearModal.addEventListener('click', ()=>{
                   modalCtx.clearRect(0,0,modalCanvas.width, modalCanvas.height);
                   modalExportCtx.clearRect(0,0,modalExportCanvas.width, modalExportCanvas.height);
@@ -891,29 +926,36 @@ class PluginGestionCri extends CommonDBTM {
                });
 
                // --- helpers ---
-               const isMobileScreen = () => window.innerWidth <= 1024;
-               const isLandscape    = () => window.matchMedia("(orientation: landscape)").matches;
-               const rotateGate     = root.querySelector('.rotate-gate');
+               const isMobilePhone = () => window.innerWidth <= 768;
+               const isTablet = () => window.innerWidth > 768 && window.innerWidth <= 1024;
+               const isLandscape = () => window.innerWidth > window.innerHeight;
 
-               // Taille “desktop” (modal d’origine) : on cale sur l’espace dispo du wrapper
+               // Fonction pour copier le canvas original vers le modal
+               function copyToModal() {
+                  modalCtx.clearRect(0,0,modalCanvas.width, modalCanvas.height);
+                  modalExportCtx.clearRect(0,0,modalExportCanvas.width, modalExportCanvas.height);
+                  modalCtx.drawImage(originalCanvas, 0, 0, modalCanvas.width, modalCanvas.height);
+                  modalExportCtx.drawImage(originalCanvas, 0, 0, modalExportCanvas.width, modalExportCanvas.height);
+               }
+
+               // Taille modal desktop/tablette
                function sizeModalCanvasDesktop(){
-               const wrapper = root.querySelector('.cri-canvas-wrapper');
-               const r = wrapper.getBoundingClientRect();
-               // on garde ton ratio ~3:1, SANS toucher au layout du modal
-               const pad = 20, aspect = 3;
-               let w = Math.max(360, Math.floor(r.width  - pad*2));
-               let h = Math.max(120, Math.floor(r.height - pad*2));
-               if (w / h > aspect) { w = Math.floor(h * aspect); } else { h = Math.floor(w / aspect); }
+                  const wrapper = root.querySelector('.cri-canvas-wrapper');
+                  const r = wrapper.getBoundingClientRect();
+                  const pad = 20, aspect = 3;
+                  let w = Math.max(360, Math.floor(r.width  - pad*2));
+                  let h = Math.max(120, Math.floor(r.height - pad*2));
+                  if (w / h > aspect) { w = Math.floor(h * aspect); } else { h = Math.floor(w / aspect); }
 
-               fixDPR(modalCanvas, modalCtx, w, h);
+                  fixDPR(modalCanvas, modalCtx, w, h);
                   modalExportCanvas.width  = modalCanvas.width;
                   modalExportCanvas.height = modalCanvas.height;
                   applyModalStyle();
                }
 
-               // Taille “mobile paysage” : plein écran (moins le panneau de boutons)
+               // Taille modal mobile
                function sizeModalCanvasMobile(){
-                  const panelW = Math.max(100, root.querySelector('.cri-controls-panel').getBoundingClientRect().width || 120);
+                  const panelW = Math.max(100, root.querySelector('.cri-controls-panel')?.getBoundingClientRect().width || 120);
                   const pad = 20, aspect = 3;
                   let availW = Math.max(320, window.innerWidth  - panelW - pad*2);
                   let availH = Math.max(160, window.innerHeight - pad*2);
@@ -926,50 +968,60 @@ class PluginGestionCri extends CommonDBTM {
                   applyModalStyle();
                }
 
-               // Affiche/masque l’overlay “tournez” et redimensionne en mobile
-               function updateOrientationGate(){
-               if (!isMobileScreen()) return; // ne rien faire sur desktop
-               if (isLandscape()) {
-                  rotateGate.classList.remove('show');
-                  sizeModalCanvasMobile();
-               } else {
-                  rotateGate.classList.add('show');
+               // Gestion de l'orientation et du redimensionnement
+               function handleOrientationAndResize(){
+                  if (!modalIsOpen) return;
+
+                  if (isMobilePhone()) {
+                        if (isLandscape()) {
+                           // Mobile en paysage : masquer le message et redimensionner
+                           rotateGate.classList.remove('show');
+                           sizeModalCanvasMobile();
+                           copyToModal();
+                        } else {
+                           // Mobile en portrait : afficher le message
+                           rotateGate.classList.add('show');
+                        }
+                  } else {
+                        // Desktop/tablette : pas de message, mode desktop
+                        rotateGate.classList.remove('show');
+                        sizeModalCanvasDesktop();
+                        copyToModal();
+                  }
                }
+
+               // Bouton de fermeture du message de rotation
+               if (rotateCloseBtn) {
+                  rotateCloseBtn.addEventListener('click', () => {
+                        rotateGate.classList.remove('show');
+                        // Redimensionner même en portrait si l'utilisateur ferme manuellement
+                        if (isMobilePhone()) {
+                           sizeModalCanvasMobile();
+                           copyToModal();
+                        }
+                  });
                }
 
                // ---- ouverture du modal ----
                btnZoom.addEventListener('click', ()=>{
-               document.documentElement.classList.add('no-scroll');
-               modalOverlay.classList.add('active');
-
-               if (isMobileScreen()) {
-                  // mobile : impose paysage
-                  updateOrientationGate();
-                  if (isLandscape()) {
-                     modalCtx.clearRect(0,0,modalCanvas.width, modalCanvas.height);
-                     modalExportCtx.clearRect(0,0,modalExportCanvas.width, modalExportCanvas.height);
-                     modalCtx.drawImage(originalCanvas, 0, 0, modalCanvas.width, modalCanvas.height);
-                     modalExportCtx.drawImage(originalCanvas, 0, 0, modalExportCanvas.width, modalExportCanvas.height);
-                  }
-               } else {
-                  // desktop : garder la taille du modal d’origine
-                  sizeModalCanvasDesktop();
-                  modalCtx.clearRect(0,0,modalCanvas.width, modalCanvas.height);
-                  modalExportCtx.clearRect(0,0,modalExportCanvas.width, modalExportCanvas.height);
-                  modalCtx.drawImage(originalCanvas, 0, 0, modalCanvas.width, modalCanvas.height);
-                  modalExportCtx.drawImage(originalCanvas, 0, 0, modalExportCanvas.width, modalExportCanvas.height);
-               }
+                  modalIsOpen = true;
+                  document.documentElement.classList.add('no-scroll');
+                  modalOverlay.classList.add('active');
+                  
+                  // Initialiser la taille et l'orientation
+                  handleOrientationAndResize();
                });
 
-               // Recalcule seulement en mobile
-               window.addEventListener('orientationchange', updateOrientationGate);
-               window.addEventListener('resize', updateOrientationGate);
-
-               // Fermer modal = retirer no-scroll
-               btnCancel.addEventListener('click', ()=>{
+               // ---- fermeture du modal ----
+               function closeModal() {
+                  modalIsOpen = false;
                   modalOverlay.classList.remove('active');
+                  rotateGate.classList.remove('show');
                   document.documentElement.classList.remove('no-scroll');
-               });
+               }
+
+               btnCancel.addEventListener('click', closeModal);
+
                btnValidate.addEventListener('click', ()=>{
                   const tw = originalCanvas.width, th = originalCanvas.height;
                   originalCtx.clearRect(0,0,tw,th);
@@ -978,31 +1030,15 @@ class PluginGestionCri extends CommonDBTM {
                   originalCtx.imageSmoothingQuality = 'high';
                   originalCtx.drawImage(modalExportCanvas, 0, 0, tw, th);
                   originalCtx.restore();
-
-                  modalOverlay.classList.remove('active');
-                  document.documentElement.classList.remove('no-scroll');
+                  closeModal();
                });
 
-               // ---- valider : copie sans lissage depuis le calque d’export ----
-               btnValidate.addEventListener('click', ()=>{
-                  const tw = originalCanvas.width;
-                  const th = originalCanvas.height;
-
-                  originalCtx.clearRect(0,0,tw,th);
-                  originalCtx.save();
-                  originalCtx.imageSmoothingEnabled = true;       // <= activer
-                  originalCtx.imageSmoothingQuality = 'high';     // 'low' | 'medium' | 'high'
-                  originalCtx.drawImage(modalExportCanvas, 0, 0, tw, th);
-                  originalCtx.restore();
-
-                  modalOverlay.classList.remove('active');
+               // Events d'orientation et redimensionnement
+               window.addEventListener('orientationchange', () => {
+                  setTimeout(handleOrientationAndResize, 150);
                });
-
-               // Annuler
-               btnCancel.addEventListener('click', ()=>{
-                  modalOverlay.classList.remove('active');
-                  end({});
-               });
+               
+               window.addEventListener('resize', handleOrientationAndResize);
 
                // Remplir le champ caché à l'envoi
                const submitBtn  = document.getElementById('sig-submitBtn');
@@ -1010,7 +1046,7 @@ class PluginGestionCri extends CommonDBTM {
                if (submitBtn && hiddenArea && !submitBtn.dataset.sigInit) {
                   submitBtn.dataset.sigInit = '1';
                   submitBtn.addEventListener('click', function(){
-                  hiddenArea.value = originalCanvas.toDataURL();
+                        hiddenArea.value = originalCanvas.toDataURL();
                   });
                }
 
@@ -1018,9 +1054,9 @@ class PluginGestionCri extends CommonDBTM {
                document.addEventListener('touchend', (function(){
                   let last = 0;
                   return function(e){
-                  const now = Date.now();
-                  if (now - last < 300) e.preventDefault();
-                  last = now;
+                        const now = Date.now();
+                        if (now - last < 300) e.preventDefault();
+                        last = now;
                   };
                })(), {passive:false});
 
