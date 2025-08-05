@@ -1,6 +1,6 @@
-/* === FICHIER: /votre-plugin/css/signature.css === */
+/* === SIGNATURE.CSS - CSS UNIFIÉ MOBILE/DESKTOP === */
 
-/* Styles généraux pour desktop */
+/* Styles généraux pour modal */
 .modal-dialog { 
     max-width: 1050px; 
     margin: 1.75rem auto; 
@@ -12,19 +12,19 @@
 
 /* Canvas de signature - RESPONSIVE */
 .signature-container{
-  display:block;       /* au lieu de inline-block */
-  width:100%;          /* prend toute la ligne */
+  display:block;       
+  width:100%;          
   max-width:100%;
 }
 
 .sig-base{
   border: 1px solid #ccc;
   display:block;
-  width:100%;          /* pas seulement max-width */
+  width:100%;          
   height:auto;
 }
 
-/* Bouton zoom */
+/* Bouton zoom - GÉNÉRAL */
 .zoom-btn {
     position: absolute;
     top: -28px;
@@ -43,7 +43,7 @@
     background: #0056b3;
 }
 
-/* Overlay plein écran */
+/* Overlay plein écran pour modal signature */
 .signature-modal {
     display: none;
     position: fixed;
@@ -188,72 +188,360 @@
     border-color: rgba(255,255,255,0.8);
 }
 
-/* === STYLES MOBILE === */
-@media (max-width: 768px) {
-    /* Canvas responsive sur mobile */
-    .sig-base {
-        width: 100% !important;
-        max-width: 100%;
+/* === STYLES UNIFIÉS - RESPONSIVE AUTOMATIQUE === */
+
+/* Container principal - S'adapte à toutes les tailles */
+.form-container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 15px;
+}
+
+/* Style de base des cartes - UNIFIÉ */
+.form-card {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    transition: box-shadow 0.3s ease;
+    width: 100%;
+}
+
+.form-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+/* Titres des cartes */
+.form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 15px;
+    display: block;
+    font-size: 16px;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 8px;
+}
+
+/* Contenu des cartes */
+.form-content {
+    width: 100%;
+}
+
+/* Inputs généraux */
+.form-content input,
+.form-content textarea,
+.form-content select {
+    width: 100%;
+    max-width: 400px;
+    padding: 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-content input:focus,
+.form-content textarea:focus,
+.form-content select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+    outline: none;
+}
+
+/* Document info - GESTION TEXTE LONG */
+.document-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.document-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #343a40;
+    flex: 1;
+    min-width: 0; /* Permet au flexbox de réduire la taille */
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    line-height: 1.3;
+}
+
+.document-status {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    flex-shrink: 0; /* Le statut garde sa taille */
+    white-space: nowrap;
+}
+
+.status-signed {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-unsigned {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Détails du document signé */
+.signed-details {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e9ecef;
+}
+
+.signed-details p {
+    margin: 8px 0;
+    color: #495057;
+}
+
+.signed-details strong {
+    color: #343a40;
+    font-weight: 600;
+}
+
+/* PDF viewer */
+.pdf-viewer {
+    width: 100%;
+    height: 300px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 15px;
+}
+
+/* PDF container pour mobile */
+.pdf-container {
+    width: 100%;
+    max-width: 100vw;
+    aspect-ratio: 1 / 1.414;
+    overflow: hidden;
+}
+
+.pdf-container embed {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Liens PDF */
+.pdf-link {
+    display: inline-block;
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 8px 16px;
+    border: 1px solid #007bff;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.pdf-link:hover {
+    background: #007bff;
+    color: white;
+    text-decoration: none;
+}
+
+/* === CARTE SIGNATURE - GRANDE CARTE GRISE === */
+.signature-card {
+    background: #e9ecef;
+    padding: 25px;
+}
+
+/* Sous-cartes blanches dans la signature */
+.signature-sub-card {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.signature-sub-card:last-child {
+    margin-bottom: 0;
+}
+
+/* Titre des sous-cartes */
+.signature-sub-title {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+/* Input nom dans la sous-carte */
+.signature-sub-card input[type="text"] {
+    width: 100%;
+    max-width: 350px;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+/* Canvas dans la sous-carte */
+.signature-sub-card .signature-container {
+    width: 100%;
+    margin: 10px 0;
+    position: relative;
+}
+
+.signature-sub-card .sig-base {
+    width: 100%;
+    height: 120px;
+    border: 2px solid #007bff;
+    background: white;
+    display: block;
+}
+
+/* Bouton Agrandir - EN HAUT À DROITE DU CANVAS */
+.signature-sub-card .zoom-btn {
+    position: absolute;
+    top: -35px;
+    right: 0;
+    background: #007bff;
+    color: #fff;
+    border: 0;
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    z-index: 10;
+}
+
+.signature-sub-card .zoom-btn:hover {
+    background: #0056b3;
+}
+
+/* Bouton Supprimer signature - ALIGNÉ À GAUCHE FORCÉ */
+.signature-sub-card .resetButton {
+    background: #dc3545;
+    color: #fff;
+    border: 0;
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: .2s;
+    margin-top: 10px;
+    display: inline-block;
+    text-align: center;
+    float: none !important;
+    clear: both;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+}
+
+.signature-sub-card .resetButton:hover {
+    background: #c82333;
+}
+
+/* Checkbox et labels */
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: auto;
+    max-width: none;
+}
+
+.checkbox-group label {
+    margin: 0;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+/* Boutons d'action */
+.actions-card {
+    text-align: center;
+}
+
+/* Bouton Signer - MÊME STYLE QUE BOUTON AGRANDIR */
+.submit-btn {
+    background: #007bff;
+    color: #fff;
+    border: 0;
+    padding: 12px 24px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: .2s;
+}
+
+.submit-btn:hover {
+    background: #0056b3;
+}
+
+/* === RESPONSIVE DESIGN === */
+
+/* Mobile First - Base styles (déjà définis ci-dessus) */
+
+/* Tablet et petit desktop */
+@media (min-width: 768px) {
+    .form-container {
+        max-width: 900px;
+        padding: 20px;
     }
     
-    .mobile-form-row {
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 5px;
-        margin-bottom: 15px;
-        padding: 15px;
+    .form-card {
+        padding: 25px;
     }
     
-    .mobile-form-label {
-        font-weight: bold;
-        color: #495057;
-        margin-bottom: 8px;
-        display: block;
-        font-size: 14px;
+    .pdf-viewer {
+        height: 400px;
     }
     
-    .mobile-form-content {
-        width: 100%;
+    .signature-card {
+        padding: 30px;
     }
     
-    .mobile-form-content input,
-    .mobile-form-content textarea,
-    .mobile-form-content select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ced4da;
-        border-radius: 4px;
-        font-size: 16px;
+    .document-info {
+        flex-wrap: nowrap;
     }
     
-    .mobile-signature-section {
-        background: #e9ecef;
-        border-radius: 5px;
-        padding: 15px;
-        margin: 15px 0;
-    }
-    
-    .mobile-checkbox-group {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin: 10px 0;
-    }
-    
-    .mobile-radio-group {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .mobile-radio-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    /* Masquer les anciens tableaux sur desktop */
+    .table-responsive {
+        display: none !important;
     }
 }
 
-/* Mobile uniquement pour modal */
+/* Desktop */
+@media (min-width: 1024px) {
+    .form-container {
+        max-width: 1000px;
+    }
+    
+    .pdf-viewer {
+        height: 500px;
+    }
+}
+
+/* Large desktop */
+@media (min-width: 1200px) {
+    .form-container {
+        max-width: 1100px;
+    }
+}
+
+/* Mobile modal adjustments */
 @media (max-width: 1024px) {
     .signature-modal.active {
         inset: 0;
@@ -274,5 +562,46 @@
     .cri-controls-panel {
         flex-basis: 110px;
         padding: 10px;
+    }
+}
+
+/* Très petit mobile - TEXTE DOCUMENT ADAPTÉ */
+@media (max-width: 480px) {
+    .form-container {
+        padding: 10px;
+    }
+    
+    .form-card {
+        padding: 15px;
+    }
+    
+    .signature-card {
+        padding: 20px;
+    }
+    
+    .signature-sub-card {
+        padding: 15px;
+    }
+    
+    .document-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .document-title {
+        font-size: 16px;
+        line-height: 1.4;
+        margin-bottom: 5px;
+    }
+    
+    .document-status {
+        align-self: flex-start;
+    }
+    
+    .submit-btn {
+        width: 100%;
+        padding: 15px;
+        font-size: 16px;
     }
 }
