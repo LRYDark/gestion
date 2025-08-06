@@ -19,6 +19,31 @@ class PluginGestionCri extends CommonDBTM {
       echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/css/signature.css">';
       echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/scripts/signature.js" defer></script>';
 
+      // Style CSS inline pour hauteur responsive
+         $responsiveIframeStyle = "
+            width: 100%; 
+            border: 1px solid #dee2e6; 
+            border-radius: 6px;
+            height: 350px; /* Mobile par défaut */
+         ";
+
+      // JavaScript pour ajuster selon la taille d'écran
+         $responsiveScript = "
+         <style>
+         @media (min-width: 768px) {
+            .pdf-responsive { height: 500px !important; }
+         }
+         @media (min-width: 1024px) {
+            .pdf-responsive { height: 650px !important; }
+         }
+         @media (min-width: 1200px) {
+            .pdf-responsive { height: 700px !important; }
+         }
+         </style>
+         ";
+      // Ajouter le style au début de votre fonction
+         echo $responsiveScript;
+
       $config     = PluginGestionConfig::getInstance();
       $documents  = new Document();
       $job        = new Ticket();
@@ -32,6 +57,7 @@ class PluginGestionCri extends CommonDBTM {
       $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$id'")->fetch_object();
       $Doc_Name = $DOC->bl;
       $doc_id  = $DOC->doc_id;
+      $DocUrlSharePoint = $DOC->doc_url;
    
       $email = $DB->query("SELECT u.email FROM glpi_useremails u JOIN glpi_users us ON u.users_id = us.id JOIN glpi_tickets t ON us.entities_id = t.entities_id WHERE t.id = $ID LIMIT 1;")->fetch_object();
       if(!empty($email->email)){
@@ -49,10 +75,7 @@ class PluginGestionCri extends CommonDBTM {
       echo Html::hidden('DOC', ['value' => $Doc_Name]);
       echo Html::hidden('id_document', ['value' => $id]);
 
-      if($DOC->signed == 0){ // ----------------------------------- NON SIGNÉ -----------------------------------
-         
-         $DocUrlSharePoint = $DOC->doc_url;
-         
+      if($DOC->signed == 0){ // ----------------------------------- NON SIGNÉ -----------------------------------         
          echo '<div class="form-container">';
          
          // === CARTE DOCUMENT ===
@@ -76,18 +99,18 @@ class PluginGestionCri extends CommonDBTM {
 
                   if ($DOC->save == 'SharePoint'){
                      $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
-                     echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
-                           class='pdf-viewer' frameborder='0'></iframe>";
                   }
                   if ($DOC->save == 'Local'){
                      $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
-                     echo "<iframe src='$fileDownloadUrl' class='pdf-viewer' frameborder='0'></iframe>";
+
                   }
                   if ($DOC->save == 'Sage'){
                      $fileDownloadUrl = $DOC->doc_url;
-                     echo "<iframe src='$fileDownloadUrl' class='pdf-viewer' frameborder='0'></iframe>";
                   }
-                  
+                  if ($DOC->save == 'Sage' || $DOC->save == 'Local' || $DOC->save == 'SharePoint'){
+                     echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                           class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
+                  }
                } catch (Exception $e) {
                   echo "<p>Erreur lors du chargement du PDF</p>";
                }
@@ -185,10 +208,7 @@ class PluginGestionCri extends CommonDBTM {
          
          echo '</div>'; // Fin form-container
 
-      } else { // ----------------------------------- SIGNÉ -----------------------------------
-         
-         $DocUrlSharePoint = $DOC->doc_url;
-         
+      } else { // ----------------------------------- SIGNÉ -----------------------------------         
          echo '<div class="form-container">';
          
          // === CARTE DOCUMENT SIGNÉ ===
@@ -218,18 +238,18 @@ class PluginGestionCri extends CommonDBTM {
 
                   if ($DOC->save == 'SharePoint'){
                      $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
-                     echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
-                           class='pdf-viewer' frameborder='0'></iframe>";
                   }
                   if ($DOC->save == 'Local'){
                      $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
-                     echo "<iframe src='$fileDownloadUrl' class='pdf-viewer' frameborder='0'></iframe>";
+
                   }
                   if ($DOC->save == 'Sage'){
                      $fileDownloadUrl = $DOC->doc_url;
-                     echo "<iframe src='$fileDownloadUrl' class='pdf-viewer' frameborder='0'></iframe>";
                   }
-                  
+                  if ($DOC->save == 'Sage' || $DOC->save == 'Local' || $DOC->save == 'SharePoint'){
+                     echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                           class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
+                  }
                } catch (Exception $e) {
                   echo "<p>Erreur lors du chargement du PDF</p>";
                }
