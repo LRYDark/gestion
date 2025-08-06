@@ -269,17 +269,19 @@ class PluginGestionCri extends CommonDBTM {
       Html::closeForm();
       ?>
       <script>
-      // Vérifier que la fonction existe avant de l'appeler
-      if (typeof initializeSignature === 'function') {
-         initializeSignature('<?php echo $uniq; ?>');
-      } else {
-         // Si la fonction n'existe pas encore, attendre un peu
-         setTimeout(function() {
+         setTimeout(function() {    
+            // Vérifier que la fonction existe avant de l'appeler
             if (typeof initializeSignature === 'function') {
-                  initializeSignature('<?php echo $uniq; ?>');
+               initializeSignature('<?php echo $uniq; ?>');
+            } else {
+               // Si la fonction n'existe pas encore, attendre un peu
+               setTimeout(function() {
+                  if (typeof initializeSignature === 'function') {
+                        initializeSignature('<?php echo $uniq; ?>');
+                  }
+               }, 500);
             }
-         }, 500);
-      }
+         }, 100); // Délai de 100ms pour s'assurer que tout est chargé
       </script>
       <?php
    }
