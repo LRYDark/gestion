@@ -1,5 +1,14 @@
 <?php
-require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
+// --- Chargement autonome de l’autoloader Composer --------------------------
+$vendor = dirname(__DIR__) . '/vendor/autoload.php';  //  __DIR__ = .../gestion/front
+if (file_exists($vendor)) {
+    require_once $vendor;
+} else {
+    throw new RuntimeException(
+        "[Plugin Gestion] vendor/autoload.php introuvable : exécutez `composer install` dans plugins/gestion"
+    );
+}
+// ---------------------------------------------------------------------------
 
 use Smalot\PdfParser\Parser;
 
