@@ -14,9 +14,6 @@ $search = isset($_GET['q']) ? $_GET['q'] : '';
 $search = strtolower(trim($search));
 $results = [];
 
-// Debug : Log de la recherche
-error_log("Debug recherche PDF - Terme: '$search', SharePoint: " . ($config->SharePointSearch() == 1 && $config->SharePointOn() == 1 ? 'OUI' : 'NON') . ", Sage: " . ($config->SageSearch() == 1 && $config->SageOn() == 1 ? 'OUI' : 'NON') . ", Local: " . ($config->LocalSearch() == 1 ? 'OUI' : 'NON'));
-
 if ($config->SharePointSearch() == 1 && $config->SharePointOn() == 1 ){
     // SharePoint
     $sharepoint_results = $sharepoint->searchSharePointGlobal($search);
