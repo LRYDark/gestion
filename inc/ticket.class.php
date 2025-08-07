@@ -272,58 +272,66 @@ class PluginGestionTicket extends CommonDBTM {
                       $disabled = true;
                   }   
 
-///////////////// NEW TEST ////////////////////
-    $query = "
-        SELECT folder_name, params
-        FROM glpi_plugin_gestion_configsfolder
-        WHERE params IN (2, 3)
-        ORDER BY 
-            CASE params 
-                WHEN 2 THEN 0 
-                WHEN 3 THEN 1 
-            END
-        LIMIT 1
-    ";
+                  ///////////////// NEW TEST ////////////////////
+                     $query = "
+                        SELECT folder_name, params
+                        FROM glpi_plugin_gestion_configsfolder
+                        WHERE params IN (2, 3)
+                        ORDER BY 
+                              CASE params 
+                                 WHEN 2 THEN 0 
+                                 WHEN 3 THEN 1 
+                              END
+                        LIMIT 1
+                     ";
 
-    $result = $DB->query($query);
+                     $result = $DB->query($query);
 
-    if ($result && $DB->numrows($result) > 0) {
-        $data = $DB->fetchassoc($result);
-        $folder_name = $data['folder_name'];
-        $used_param = $data['params'];
+                     if ($result && $DB->numrows($result) > 0) {
+                        $data = $DB->fetchassoc($result);
+                        $folder_name = $data['folder_name'];
+                        $used_param = $data['params'];
 
-        if ($used_param == 2) {
-            $FolderDes = 'SharePoint';
-        } 
+                        if ($used_param == 2) {
+                              $FolderDes = 'SharePoint';
+                        } 
 
-        if ($used_param == 3) {
-            $FolderDes = 'local';
-            $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folder_name;
+                        if ($used_param == 3) {
+                              $FolderDes = 'local';
+                              $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folder_name;
 
-            // Vérifie si le dossier existe, sinon le crée
-            if (!is_dir($destinationPath)) {
-               if (!mkdir($destinationPath, 0755, true)) {
-                  // En cas d’échec de création
-                  echo "Erreur : impossible de créer le dossier $destinationPath";
-               }
-            }
-        }
-    } else {
-        $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/DocumentsSigned";
-    }
+                              // Vérifie si le dossier existe, sinon le crée
+                              if (!is_dir($destinationPath)) {
+                                 if (!mkdir($destinationPath, 0755, true)) {
+                                    // En cas d’échec de création
+                                    echo "Erreur : impossible de créer le dossier $destinationPath";
+                                 }
+                              }
+                        }
+                     } else {
+                        $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/DocumentsSigned";
+                     }
 
-///////////////// NEW TEST ////////////////////
+                  ///////////////// NEW TEST ////////////////////
                    
                   // Modal HTML
                   echo <<<HTML
                   <div class="modal fade" id="AddGestionModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-                      <div class="modal-dialog modal-lg">
-                          <div class="modal-content">
+                     <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
                               <div class="modal-header">
-                                  <h5 class="modal-title" id="AddGestionModalLabel">Ajouter un BC / BL</h5>
-                                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                 <h5 class="modal-title" id="AddGestionModalLabel">Ajouter un BC / BL</h5>
+                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                               </div>
                               <div class="modal-body">
+                                 <!-- Zone de messages d'erreur -->
+                                 <div id="gestion-messages" style="display:none; margin-bottom: 15px;">
+                                    <div class="alert alert-dismissible fade show" role="alert" id="gestion-alert">
+                                       <span id="gestion-message-text"></span>
+                                       <button type="button" class="btn-close" aria-label="Close" onclick="$('#gestion-messages').hide();"></button>
+                                    </div>
+                                 </div>
+
                                  <!-- Rond de chargement -->
                                  <div id="loading-spinner" style="display:none; text-align:center;">
                                     <div class="spinner-border text-info" role="status" style="width: 3rem; height: 3rem; border-width: 0.4rem;">
@@ -387,69 +395,236 @@ class PluginGestionTicket extends CommonDBTM {
   
                   // Script pour ajouter dynamiquement le bouton et gérer le clic
                   $script = <<<JAVASCRIPT
-                  $(document).ready(function() {
-                     var categorieContainer = $("select[name='itilcategories_id']").closest("div.field-container");
-                     var boutonExist = document.getElementById('add_gestion');
+                     $(document).ready(function() {
+                        var categorieContainer = $("select[name='itilcategories_id']").closest("div.field-container");
+                        var boutonExist = document.getElementById('add_gestion');
 
-                     // Si le bouton n'existe pas déjà, on l'ajoute
-                     if (categorieContainer.length > 0 && boutonExist === null) {
-                        categorieContainer.append("{$entitie}");
-                     }
+                        // Si le bouton n'existe pas déjà, on l'ajoute
+                        if (categorieContainer.length > 0 && boutonExist === null) {
+                           categorieContainer.append("{$entitie}");
+                        }
 
-                     // Clic sur le bouton pour ouvrir le modal
-                     $('#add_gestion').click(function() {
-                        // Affichage du rond de chargement
-                        $('#loading-spinner').show();
+                        let currentMode = 0; // Variable pour stocker le mode actuel
 
-                        // Requête AJAX pour charger les données
-                        $.ajax({
-                              url: '../plugins/gestion/front/charger_dropdown.php',  // Chemin vers le fichier PHP
-                              method: 'GET',
-                              data: { ticketId: {$ticketId} },  // Passer le ticketId dans la requête
-                              dataType: 'json',  // Assurez-vous que jQuery gère la réponse comme JSON
-                              success: function(response) {
-                                 console.log('Réponse brute du serveur:', response);
+                        // Fonction pour afficher un message dans le modal
+                        function showModalMessage(message, type = 'danger') {
+                           $('#gestion-message-text').text(message);
+                           $('#gestion-alert').removeClass('alert-danger alert-warning alert-success alert-info');
+                           $('#gestion-alert').addClass('alert-' + type);
+                           $('#gestion-messages').show();
+                           
+                           // Auto-masquer après 5 secondes pour les messages de succès
+                           if (type === 'success') {
+                              setTimeout(function() {
+                                 $('#gestion-messages').hide();
+                              }, 5000);
+                           }
+                        }
 
-                                 if (response.error) {
-                                    alert('Erreur : ' + response.error);
-                                    return;
-                                 }
+                        // Fonction pour masquer les messages
+                        function hideModalMessage() {
+                           $('#gestion-messages').hide();
+                        }
 
-                                 if (response.data) {
-                                    // Ajouter les options au dropdown sans doublons
-                                    $.each(response.data, function(index, value) {
-                                          // Vérifier si l'option est déjà présente avant de l'ajouter
-                                          if ($('[name="groups_id[]"] option[value="' + index + '"]').length === 0) {
-                                             $('[name="groups_id[]"]').append('<option value="' + index + '">' + value + '</option>');
+                        // Clic sur le bouton pour ouvrir le modal
+                        $('#add_gestion').click(function() {
+                           // Masquer les messages précédents et afficher le loading
+                           hideModalMessage();
+                           $('#loading-spinner').show();
+
+                           // Requête AJAX pour charger les données
+                           $.ajax({
+                                 url: '../plugins/gestion/front/charger_dropdown.php',
+                                 method: 'GET',
+                                 data: { ticketId: {$ticketId} },
+                                 dataType: 'json',
+                                 timeout: 10000, // Timeout de 10 secondes
+                                 success: function(response) {
+
+                                    if (response.error) {
+                                       console.error('Erreur dans la réponse:', response.error);
+                                       showModalMessage('Erreur : ' + response.error, 'danger');
+                                       $('#loading-spinner').hide();
+                                       return;
+                                    }
+
+                                    // Stocker le mode actuel
+                                    currentMode = response.mode || 0;
+
+                                    // Récupérer les valeurs actuellement sélectionnées avant de vider
+                                    var currentSelectedValues = $('[name="groups_id[]"]').val() || [];
+
+                                    // Vider le dropdown avant de le remplir
+                                    $('[name="groups_id[]"]').empty();
+
+                                    if (response.data && Object.keys(response.data).length > 0) {
+                                       // Ajouter les options au dropdown
+                                       $.each(response.data, function(index, value) {
+                                          $('[name="groups_id[]"]').append('<option value="' + index + '">' + value + '</option>');
+                                       });
+                                    }
+
+                                    // Configuration Select2 selon le mode
+                                    let placeholderText = currentMode == 1 ? 'Tapez le numéro de document (ex: BL154869)' : 'Sélectionnez des documents';
+                                    
+                                    let select2Config = {
+                                       width: '650px',
+                                       dropdownAutoWidth: true,
+                                       dropdownParent: $('#AddGestionModal'),
+                                       quietMillis: 100,
+                                       minimumResultsForSearch: 0,
+                                       placeholder: {
+                                          id: '',
+                                          text: placeholderText
+                                       },
+                                       allowClear: false
+                                    };
+
+                                    // Si mode == 1 (Sage), permettre l'ajout manuel
+                                    if (currentMode == 1) {
+                                       select2Config.tags = true;
+                                       select2Config.tokenSeparators = [',', ' '];
+                                       select2Config.createTag = function (params) {
+                                          var term = $.trim(params.term);
+                                          if (term === '') {
+                                             return null;
                                           }
-                                    });
+                                          return {
+                                             id: term,
+                                             text: term,
+                                             newTag: true
+                                          };
+                                       };
+                                    }
 
-                                    // Réinitialiser Select2 après avoir ajouté les options
-                                    $('[name="groups_id[]"]').trigger('change');
+                                    // Détruire l'instance Select2 existante si elle existe
+                                    if ($('[name="groups_id[]"]').hasClass("select2-hidden-accessible")) {
+                                       $('[name="groups_id[]"]').select2('destroy');
+                                    }
 
-                                    // Réinitialiser Select2
-                                    $('[name="groups_id[]"]').select2({
-                                          width: '650',
-                                          dropdownAutoWidth: true,
-                                          dropdownParent: $('[name="groups_id[]"]').closest('div.modal, div.dropdown-menu, body'),
-                                          quietMillis: 100,
-                                          minimumResultsForSearch: 10
+                                    // Initialiser Select2 avec la nouvelle configuration
+                                    $('[name="groups_id[]"]').select2(select2Config);
+
+                                    // Restaurer les valeurs sélectionnées après l'initialisation de Select2
+                                    if (currentSelectedValues.length > 0) {
+                                       
+                                       // Pour chaque valeur sélectionnée, vérifier si elle existe dans les nouvelles options, sinon l'ajouter
+                                       $.each(currentSelectedValues, function(index, selectedValue) {
+                                          if ($('[name="groups_id[]"] option[value="' + selectedValue + '"]').length === 0) {
+                                             // L'option n'existe pas, l'ajouter (cas des tags manuels en mode 1)
+                                             var displayText = selectedValue;
+                                             if (selectedValue.includes('/')) {
+                                                // Si c'est un chemin, extraire juste le nom du fichier pour l'affichage
+                                                displayText = selectedValue.split('/').pop();
+                                             }
+                                             $('[name="groups_id[]"]').append('<option value="' + selectedValue + '">' + displayText + '</option>');
+                                          }
+                                       });
+                                       
+                                       // Appliquer les valeurs sélectionnées
+                                       $('[name="groups_id[]"]').val(currentSelectedValues).trigger('change');
+                                    }
+
+                                    // Si mode == 1, gérer l'ajout de nouveaux tags
+                                    if (currentMode == 1) {
+                                       $('[name="groups_id[]"]').off('select2:select.custom').on('select2:select.custom', function (e) {
+                                          var data = e.params.data;
+                                          
+                                          // Si c'est un nouveau tag, vérifier s'il existe dans l'API
+                                          if (data.newTag) {
+                                             var docId = data.id;
+                                             
+                                             // Masquer les messages précédents et afficher le rond de chargement
+                                             hideModalMessage();
+                                             $('#loading-spinner').show();
+                                             
+                                             // Vérification via AJAX
+                                             $.ajax({
+                                                url: '../plugins/gestion/front/charger_dropdown.php',
+                                                method: 'GET',
+                                                data: { 
+                                                   ticketId: {$ticketId},
+                                                   verifyDoc: docId 
+                                                },
+                                                dataType: 'json',
+                                                timeout: 5000,
+                                                success: function(verifyResponse) {
+                                                   
+                                                   // Masquer le rond de chargement
+                                                   $('#loading-spinner').hide();
+                                                   
+                                                   if (!verifyResponse.success) {
+                                                      // Document non trouvé, retirer la sélection
+                                                      var selectedValues = $('[name="groups_id[]"]').val() || [];
+                                                      var index = selectedValues.indexOf(docId);
+                                                      if (index > -1) {
+                                                         selectedValues.splice(index, 1);
+                                                         $('[name="groups_id[]"]').val(selectedValues).trigger('change');
+                                                      }
+                                                      
+                                                      // Retirer l'option du dropdown
+                                                      $('[name="groups_id[]"] option[value="' + docId + '"]').remove();
+                                                      
+                                                      // Afficher un message d'erreur sans fermer le modal
+                                                      showModalMessage('Document "' + docId + '" non trouvé dans l\'API Sage. Il a été retiré de la sélection.', 'warning');
+                                                   } else {
+                                                      // Document trouvé, mettre à jour l'option et afficher un message de succès
+                                                      $('[name="groups_id[]"] option[value="' + docId + '"]').removeAttr('data-select2-tag');
+                                                      showModalMessage('Document "' + docId + '" vérifié et ajouté avec succès.', 'success');
+                                                   }
+                                                },
+                                                error: function(xhr, status, error) {
+                                                   console.error('Erreur lors de la vérification du document:', error, xhr.responseText);
+                                                   
+                                                   // Masquer le rond de chargement
+                                                   $('#loading-spinner').hide();
+                                                   
+                                                   // En cas d'erreur, retirer la sélection par sécurité
+                                                   var selectedValues = $('[name="groups_id[]"]').val() || [];
+                                                   var index = selectedValues.indexOf(docId);
+                                                   if (index > -1) {
+                                                      selectedValues.splice(index, 1);
+                                                      $('[name="groups_id[]"]').val(selectedValues).trigger('change');
+                                                   }
+                                                   
+                                                   $('[name="groups_id[]"] option[value="' + docId + '"]').remove();
+                                                   showModalMessage('Erreur lors de la vérification du document "' + docId + '". Il a été retiré de la sélection.', 'danger');
+                                                }
+                                             });
+                                          }
+                                       });
+                                    }
+
+                                    // Masquer le rond de chargement
+                                    $('#loading-spinner').hide();
+                                 },
+                                 error: function(xhr, status, error) {
+                                    console.error('Erreur AJAX complète:', {
+                                       status: status,
+                                       error: error,
+                                       responseText: xhr.responseText,
+                                       readyState: xhr.readyState,
+                                       statusText: xhr.statusText
                                     });
-                                 } else {
-                                    alert('Aucune donnée à afficher.');
+                                    
+                                    // Essayer de parser la réponse pour voir si c'est un JSON mal formé
+                                    try {
+                                       var response = JSON.parse(xhr.responseText);
+                                       if (response.error) {
+                                          showModalMessage('Erreur : ' + response.error, 'danger');
+                                       } else {
+                                          showModalMessage('Erreur lors du chargement des données: ' + error, 'danger');
+                                       }
+                                    } catch (parseError) {
+                                       console.error('Réponse non-JSON:', xhr.responseText);
+                                       showModalMessage('Erreur de communication avec le serveur. Vérifiez la console pour plus de détails.', 'danger');
+                                    }
+                                    
+                                    $('#loading-spinner').hide();
                                  }
-
-                                 // Masquer le rond de chargement
-                                 $('#loading-spinner').hide();
-                              },
-                              error: function(xhr, status, error) {
-                                 console.error('Erreur AJAX:', error);
-                                 $('#loading-spinner').hide();
-                                 alert('Erreur lors du chargement des données.');
-                              }
+                           });
                         });
                      });
-                  });
                   JAVASCRIPT;  
 
                   // Inclure le script dans la page

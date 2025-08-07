@@ -199,11 +199,11 @@ class PluginGestionConfig extends CommonDBTM
 
       echo "<tr class='tab_bg_1'>";
          echo "<td>" . __("Recherche de documents dans le dossier local GLPI", "gestion") . "</td><td>";
-         $current_value = $config->LocalSearch(); // Valeur réelle depuis la base (0 ou 1)
+         $LocalSearch = $config->LocalSearch(); // Valeur réelle depuis la base (0 ou 1)
          // Champ caché pour garantir la soumission de 0 si décoché
          echo '<input type="hidden" name="LocalSearch" value="0">';
          echo '<label class="switch">';
-            echo '<input type="checkbox" id="LocalSearch_switch" name="LocalSearch" value="1" ' . ($current_value == 1 ? 'checked' : '') . '>';
+            echo '<input type="checkbox" id="LocalSearch_switch" name="LocalSearch" value="1" ' . ($LocalSearch == 1 ? 'checked' : '') . '>';
             echo '<span class="slider round"></span>';
          echo '</label>';
       echo "</td></tr>";
@@ -392,11 +392,11 @@ class PluginGestionConfig extends CommonDBTM
 
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Recherche de documents dans SharePoint", "gestion") . "</td><td>";
-               $current_value = $config->SharePointSearch(); // Valeur réelle depuis la base (0 ou 1)
+               $SharePointSearch = $config->SharePointSearch(); // Valeur réelle depuis la base (0 ou 1)
                // Champ caché pour garantir la soumission de 0 si décoché
                echo '<input type="hidden" name="SharePointSearch" value="0">';
                echo '<label class="switch">';
-                  echo '<input type="checkbox" id="SharePointSearch_switch" name="SharePointSearch" value="1" ' . ($current_value == 1 ? 'checked' : '') . '>';
+                  echo '<input type="checkbox" id="SharePointSearch_switch" name="SharePointSearch" value="1" ' . ($SharePointSearch == 1 ? 'checked' : '') . '>';
                   echo '<span class="slider round"></span>';
                echo '</label>';
             echo "</td></tr>";
@@ -414,6 +414,12 @@ class PluginGestionConfig extends CommonDBTM
 
          echo "<tbody class='config-section2' style='display: none;'>"; // Début de section masquée
             echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __("Url Api Sage", "gestion") . "</td><td>";
+                  echo Html::input('SageUrlApi', ['value' => $config->SageUrlApi(), 'size' => 80]);// bouton configuration du bas de page line 1
+               echo "</td>";
+            echo "</tr>";
+
+            echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Sage Token", "gestion") . "</td><td>";
                   echo Html::input('SageToken', ['value' => $config->SageToken(), 'size' => 80]);// bouton configuration du bas de page line 1
                echo "</td>";
@@ -421,11 +427,11 @@ class PluginGestionConfig extends CommonDBTM
 
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Recherche de documents dans Sage", "gestion") . "</td><td>";
-               $current_value = $config->SageSearch(); // Valeur réelle depuis la base (0 ou 1)
+               $SageSearch = $config->SageSearch(); // Valeur réelle depuis la base (0 ou 1)
                // Champ caché pour garantir la soumission de 0 si décoché
                echo '<input type="hidden" name="SageSearch" value="0">';
                echo '<label class="switch">';
-                  echo '<input type="checkbox" id="SageSearch_switch" name="SageSearch" value="1" ' . ($current_value == 1 ? 'checked' : '') . '>';
+                  echo '<input type="checkbox" id="SageSearch_switch" name="SageSearch" value="1" ' . ($SageSearch == 1 ? 'checked' : '') . '>';
                   echo '<span class="slider round"></span>';
                echo '</label>';
             echo "</td></tr>";
@@ -888,13 +894,6 @@ class PluginGestionConfig extends CommonDBTM
       return false;
    }
 
-   // Fonction pour charger la clé de cryptage à partir du fichier
-   private function loadEncryptionKey() {
-      // Chemin vers le fichier de clé de cryptage
-      $file_path = GLPI_ROOT . '/config/glpicrypt.key';
-      return file_get_contents($file_path);
-   }
-
    // return fonction (retourn les values enregistrées en bdd)
    function formulaire(){
       return ($this->fields['formulaire']);
@@ -995,30 +994,16 @@ class PluginGestionConfig extends CommonDBTM
    function LocalSearch(){
       return ($this->fields['LocalSearch']);
    }
-   function SageToken(){
-      if(!empty($this->fields['SageToken']))
-         return openssl_decrypt(base64_decode($this->fields['SageToken']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
+   function SageUrlApi(){
+      return ($this->fields['SageUrlApi']);
    }
-   function TenantID(){
-      if(!empty($this->fields['TenantID']))
-         return openssl_decrypt(base64_decode($this->fields['TenantID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');   
-   }
-   function ClientID(){
-      if(!empty($this->fields['ClientID']))
-         return openssl_decrypt(base64_decode($this->fields['ClientID']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
-   }
-   function ClientSecret(){
-      if(!empty($this->fields['ClientSecret']))
-         return openssl_decrypt(base64_decode($this->fields['ClientSecret']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
-   }
-   function Hostname(){
-      if(!empty($this->fields['Hostname']))
-         return openssl_decrypt(base64_decode($this->fields['Hostname']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
-   }
-   function SitePath(){
-      if(!empty($this->fields['SitePath']))
-         return openssl_decrypt(base64_decode($this->fields['SitePath']), 'aes-256-cbc', $this->loadEncryptionKey(), 0, '1234567890123456');
-   }
+
+   function SageToken()     { return PluginGestionCrypto::decrypt($this->fields['SageToken']     ?? ''); }
+   function TenantID()      { return PluginGestionCrypto::decrypt($this->fields['TenantID']      ?? ''); }
+   function ClientID()      { return PluginGestionCrypto::decrypt($this->fields['ClientID']      ?? ''); }
+   function ClientSecret()  { return PluginGestionCrypto::decrypt($this->fields['ClientSecret']  ?? ''); }
+   function Hostname()      { return PluginGestionCrypto::decrypt($this->fields['Hostname']      ?? ''); }
+   function SitePath()      { return PluginGestionCrypto::decrypt($this->fields['SitePath']      ?? ''); }
    // return fonction
 
    function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)

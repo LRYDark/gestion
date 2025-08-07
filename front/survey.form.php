@@ -26,8 +26,8 @@
  along with gestion. If not, see <http://www.gnu.org/licenses/>.
  --------------------------------------------------------------------------
  */
-
 include('../../../inc/includes.php');
+require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
 
 Session::checkLoginUser();
 
@@ -62,16 +62,22 @@ if (isset($_POST["add"])) {
 
    $pdf_filename = $DB->escape($pdf_filename); // sécurise la requête SQL
 
+   if ($pdf_save == 'Sage'){
+      $fields = parseDocument($search_pdf);
+      $pdf_filename = $search_pdf.'_'.str_replace(' ', '_', $fields['client']);
+   }
+
    $query = "SELECT bl, id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename' LIMIT 1";
    $result = $DB->query($query);
 
    if ($result && $result->num_rows > 0) {
       $row = $DB->fetchassoc($result);
-      message('Document déjà ajouté : <a href="survey.form.php?id='. $row['id'] .'">Gestion - ID '.  $row['id'] .'</a>.', INFO);
+      message('Document déjà existant : <a href="survey.form.php?id='. $row['id'] .'">Gestion - ID '.  $row['id'] .'</a>.', WARNING);
    }else{
       if ($pdf_save == 'Local'){
          $valid = true;
-         $input = ['name'        => addslashes(str_replace("?", "°", $pdf_filename)),
+         $tracker = null;
+         $input = ['name'       => addslashes(str_replace("?", "°", $pdf_filename)),
                   'filename'    => addslashes($pdf_filename),
                   'filepath'    => addslashes($search_pdf),
                   'mime'        => 'application/pdf',
@@ -86,11 +92,21 @@ if (isset($_POST["add"])) {
       if ($pdf_save == 'SharePoint'){
          $valid = true;
          $doc_url = $pdf_folder;
+         $tracker = null;
+      }
+      if ($pdf_save == 'Sage'){
+         $tracker = $fields['tracker'];
+         $valid = true;
+         if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            $doc_url = "https://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/ajax/view_pdf.php?id=$search_pdf";
+         } else {
+            $doc_url = "http://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/ajax/view_pdf.php?id=$search_pdf";
+         }
       }
    }
          
    if ($valid == true){
-      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`) VALUES ($tickets_id, $entities_id, '$pdf_folder', '$pdf_filename', $pdf_signed, $NewDoc, '$doc_url', '$pdf_save');";
+      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`) VALUES ($tickets_id, $entities_id, '$tracker', '$pdf_folder', '$pdf_filename', $pdf_signed, $NewDoc, '$doc_url', '$pdf_save');";
       if($DB->doQuery($query)){
          $idsurvey = $DB->query("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename'")->fetch_object();
          $idsurvey = $idsurvey->id;

@@ -370,6 +370,7 @@ class PluginGestionSurvey extends CommonDBTM {
          echo '<input type="hidden" name="pdf_save" id="pdf_save">';
          echo '<input type="hidden" name="pdf_signed" id="pdf_signed">';
 
+         // Dans votre survey.class.php
          echo "<tr class='tab_bg_1'>";
          echo "<td>" . __('Recherche document :') . "</td>";
          echo "<td>";
@@ -382,6 +383,8 @@ class PluginGestionSurvey extends CommonDBTM {
                </div>
             ';
          echo "</td><td colspan='2'></td></tr>";
+
+         // JavaScript amélioré pour gérer la recherche Sage
          echo '
             <script>
             $(document).ready(function() {
@@ -390,7 +393,7 @@ class PluginGestionSurvey extends CommonDBTM {
                   minimumInputLength: 2,
                   ajax: {
                      delay: 300,
-                     url: "ajax_search_pdf.php",
+                     url: "../ajax/ajax_search_pdf.php",
                      dataType: "json",
                      data: function(params) {
                         $("#spinner").show();
@@ -398,7 +401,24 @@ class PluginGestionSurvey extends CommonDBTM {
                      },
                      processResults: function(data) {
                         $("#spinner").hide();
-                        return { results: data };
+                        
+                        // Si aucun résultat, ne rien retourner
+                        if (!data || data.length === 0) {
+                           return { results: [] };
+                        }
+                        
+                        // Traitement spécial pour les résultats Sage
+                        var processedResults = [];
+                        
+                        $.each(data, function(index, item) {
+                           if (item.source === "sage") {
+                              // Pour les résultats Sage, ajouter une indication visuelle
+                              item.html = item.text + \' <span style="color:white;background-color:#007bff;padding:2px 6px;border-radius:4px;font-size:11px;">📄 SAGE</span>\';
+                           }
+                           processedResults.push(item);
+                        });
+                        
+                        return { results: processedResults };
                      },
                      cache: true
                   },
@@ -410,7 +430,21 @@ class PluginGestionSurvey extends CommonDBTM {
                   },
                   escapeMarkup: function (markup) {
                      return markup;
+                  },
+                  // DÉSACTIVER COMPLÈTEMENT les tags - seuls les résultats de recherche sont autorisés
+                  tags: false,
+                  // Empêcher la création de nouvelles options
+                  createTag: function (params) {
+                     return null; // Ne jamais permettre la création de tags
                   }
+               });
+               
+               // Pas de gestion spéciale de sélection - seuls les résultats réels sont autorisés
+               $("#search_pdf").on("select2:select", function (e) {
+                  var data = e.params.data;
+                  
+                  // Tous les résultats proviennent maintenant de la recherche réelle
+                  // Pas de vérification supplémentaire nécessaire
                });
             });
             </script>

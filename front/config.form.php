@@ -10,27 +10,15 @@ Session::checkRight('config', UPDATE);
 
 $config = new PluginGestionConfig();
 
-// Fonction pour charger la clé de cryptage à partir du fichier
-function loadEncryptionKey() {
-   // Chemin vers le fichier de clé de cryptage
-   $file_path = GLPI_ROOT . '/config/glpicrypt.key';
-   return file_get_contents($file_path);
-}
-
-function encryptData($data) {
-   // Chargez la clé de cryptage
-   $encryption_key = loadEncryptionKey();
-   return base64_encode(openssl_encrypt($data, 'aes-256-cbc', $encryption_key, 0, '1234567890123456'));
-}
-
 function encryptArray($array) {
-   $include_keys = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageIp', 'SageId'];
+   $include_keys = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken'];
    $encrypted_array = [];
 
    foreach ($array as $key => $value) {
        // Crypter uniquement les clés définies dans $include_keys
        if (in_array($key, $include_keys) && !empty($value)) {
-           $encrypted_array[$key] = encryptData($value);
+           //$encrypted_array[$key] = encryptData($value);
+           $encrypted_array[$key] = PluginGestionCrypto::encrypt($value);
        } else {
            $encrypted_array[$key] = $value;
        }

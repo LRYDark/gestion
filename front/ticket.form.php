@@ -8,6 +8,8 @@ global $DB, $CFG_GLPI;
 $doc = new Document();
 
 require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
+require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
+
 $sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 
@@ -50,6 +52,18 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             if ($sharepoint->checkFileExists($file_path)) $fileExiste = true;
             $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
         }
+        if ($config->mode() == 1){
+            $save = 'Sage';
+            $fields = parseDocument($item);
+            $file_path = $item.'_'.str_replace(' ', '_', $fields['client']);
+            if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+                $fileUrl = "https://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/ajax/view_pdf.php?id=$item";
+            } else {
+                $fileUrl = "http://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/ajax/view_pdf.php?id=$item";
+            }
+            $itemUrl = $item;
+            $tracker = $fields['tracker'];
+        }
         if ($config->mode() == 2){
             $save = 'Local';
             $file_path = $item;
@@ -76,6 +90,12 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             if(empty($existedoc->bl)){
                 if ($config->mode() == 0){
                     if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker, save) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker', '$save')")) {
+                        Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
+                        $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
+                    }
+                }
+                if ($config->mode() == 1){
+                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker, save) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($file_path)."', '$fileUrl', '$tracker', '$save')")) {
                         Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
                         $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                     }
