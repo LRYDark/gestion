@@ -197,7 +197,7 @@ class PluginGestionCri extends CommonDBTM {
          
          // === CARTE ACTIONS ===
          if(Session::haveRight("plugin_gestion_sign", CREATE)){
-            echo '<div class="form-card actions-card">';
+            echo '<div class="form-card actions-card" id="actions-bottom">';
                echo '<div class="form-content">';
                   echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signer le PDF" class="submit-btn">';
                echo '</div>';
@@ -265,11 +265,36 @@ class PluginGestionCri extends CommonDBTM {
          echo '</div>'; // Fin form-container
          
       } // ----------------------------------- FIN SIGNÉ -----------------------------------
+
+      // Bouton flottant "Aller en bas"
+      echo '<button type="button" class="fab-go-bottom" title="Aller en bas" aria-label="Aller en bas">↓</button>';
       
       Html::closeForm();
       ?>
       <script>
-         setTimeout(function() {    
+         setTimeout(function() {   
+            // 4. Bouton "Aller en bas de la page"
+            const goBottomBtn = document.querySelector('.fab-go-bottom');
+               if (goBottomBtn) {
+               goBottomBtn.addEventListener('click', () => {
+                  // Fermer une modale de signature si elle est ouverte
+                  const openedModal = document.querySelector('.signature-modal[aria-hidden="false"], .signature-modal:not([aria-hidden])');
+                  if (openedModal) {
+                     openedModal.setAttribute('aria-hidden', 'true');
+                  }
+                  document.documentElement.classList.remove('no-scroll');
+                  document.body.classList.remove('no-scroll');
+
+                  // Cibler la carte Actions si présente, sinon bas de page
+                  const target = document.getElementById('actions-bottom');
+                  if (target && typeof target.scrollIntoView === 'function') {
+                     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  } else {
+                     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+                  }
+               });
+            }
+ 
             // Vérifier que la fonction existe avant de l'appeler
             if (typeof initializeSignature === 'function') {
                initializeSignature('<?php echo $uniq; ?>');
