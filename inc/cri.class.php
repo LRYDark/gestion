@@ -7,10 +7,6 @@ class PluginGestionCri extends CommonDBTM {
 
    static $rightname = 'plugin_rp_cri_create';
 
-   static function getTypeName($nb = 0) {
-      return _n('Rapport / Prise en charge', 'Rapport / Prise en charge', $nb, 'rp');
-   }
-
    function showForm($ID, $options = []) {
       global $DB, $CFG_GLPI;
       $uniq = 'cri'.mt_rand(10000,99999);

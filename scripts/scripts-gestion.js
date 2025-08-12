@@ -34,7 +34,7 @@ function gestion_loadCriForm(action, modal, params) {
                default:
                   // Ouvre le modal et force le style no-scroll avec JavaScript
                   glpi_html_dialog({
-                     title: __('Gestion BL / BC', 'gestion'),
+                     title: __('Gestion BL', 'gestion'),
                      body: response,
                      id: action,
                      afterOpen: function() {
