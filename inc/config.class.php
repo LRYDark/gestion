@@ -93,6 +93,7 @@ class PluginGestionConfig extends CommonDBTM
       $config = new self();
       $config->getFromDB(1);
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
+
       $sharepoint = new PluginGestionSharepoint();
          $errorcon = "";
          $checkcon ="";
@@ -890,6 +891,85 @@ class PluginGestionConfig extends CommonDBTM
       }
       </style><?php
 
+      
+      // --------------------- SECTION : SIGNATURE DÉPORTÉE (tablette) ---------------------
+      echo "<tr><th colspan='2'>" . __("Signature déportée (tablette)", 'gestion') . "</th></tr>";
+
+      // ON/OFF
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Activer la signature déportée", "gestion") . "</td><td>";
+            $RemoteSignatureOn = $config->RemoteSignatureOn();
+            echo '<input type="hidden" name="RemoteSignatureOn" value="0">';
+            echo '<label class="switch">';
+               echo '<input type="checkbox" id="RemoteSignatureOn_switch" name="RemoteSignatureOn" value="1" ' . ($RemoteSignatureOn == 1 ? 'checked' : '') . '>';
+               echo '<span class="slider round"></span>';
+            echo '</label>';
+         echo "</td>";
+      echo "</tr>";
+
+      // Utilisateurs autorisés
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Utilisateurs GLPI autorisés à déclencher", "gestion") . "</td><td>";
+            $selected = $config->RemoteSignatureUsers();
+            Dropdown::show('User', [
+               'name'     => 'RemoteSignatureUsers[]',
+               'multiple' => true,
+               'value'    => $selected,
+               'width'    => '60%'
+            ]);
+         echo "</td>";
+      echo "</tr>";
+
+      // Tablettes autorisées
+      echo '</table>';
+      echo "<div style='overflow-x:auto; max-width:100%;'>";
+      echo "<table class='tab_cadre' style='width:100%; min-width:700px;'>";
+      echo "<tr>
+            <th>Device ID</th>
+            <th>N° de série (info)</th>
+            <th>Token</th>
+            <th>Actif</th>
+            <th>Supprimer</th>
+            </tr>";
+
+      $rows = []; // Ajout pour éviter l'erreur
+      $res = $DB->query("SELECT * FROM glpi_plugin_gestion_signaturedevices ORDER BY device_id");
+      if ($res) {
+         while ($r = $DB->fetchassoc($res)) {
+            $rows[] = $r;
+         }
+      }
+
+      if (count($rows) > 0) {
+      foreach ($rows as $r) {
+         echo "<tr>";
+         echo "<td>" . Html::entities_deep($r['device_id']) . "</td>";
+         echo "<td>" . Html::entities_deep($r['serial']) . "</td>";
+         echo "<td style='font-family:monospace'>" . Html::entities_deep($r['device_token']) . "</td>";
+
+         // Checkbox pour Actif
+         $checked = $r['is_active'] ? "checked" : "";
+         echo "<td><input type='checkbox' name='device_active[".$r['id']."]' value='1' $checked></td>";
+
+         echo "<td><input type='checkbox' name='device_delete[]' value='".$r['id']."'></td>";
+         echo "</tr>";
+      }
+      } else {
+         echo "<tr><td colspan='5' style='text-align:center;color:#888;'>Aucun appareil trouvé</td></tr>";
+      }
+
+      // Ligne d'ajout
+      echo "<tr>";
+      echo "<td><input type='text' name='new_device_id' placeholder='iPad-Atelier'></td>";
+      echo "<td><input type='text' name='new_serial' placeholder='(optionnel)'></td>";
+      echo "<td><input type='text' name='new_token' placeholder='laisser vide pour auto'></td>";
+      echo "<td><input type='checkbox' name='new_active' checked></td>";
+      echo "<td></td>";
+      echo "</tr>";
+
+      echo "</table>";
+      echo "</div>";
+
       $config->showFormButtons(['candel' => false]);
       return false;
    }
@@ -993,6 +1073,16 @@ class PluginGestionConfig extends CommonDBTM
    }
    function LocalSearch(){
       return ($this->fields['LocalSearch']);
+   }
+
+   // --- Remote signature getters ---
+   function RemoteSignatureOn() {
+      return isset($this->fields['RemoteSignatureOn']) ? (int)$this->fields['RemoteSignatureOn'] : 0;
+   }
+   function RemoteSignatureUsers() {
+      $raw = $this->fields['RemoteSignatureUsers'] ?? '[]';
+      $arr = json_decode($raw, true);
+      return is_array($arr) ? $arr : [];
    }
    function SageUrlApi(){
       return ($this->fields['SageUrlApi']);
@@ -1132,6 +1222,11 @@ class PluginGestionConfig extends CommonDBTM
          include(PLUGIN_GESTION_DIR . "/install/update_144_next.php");
          update_144_next(); 
       }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.4.4'){
+         include(PLUGIN_GESTION_DIR . "/install/update_150_remote.php");
+         update_150_remote(); 
+      }
+
    }
 
    static function uninstall(Migration $migration)
@@ -1144,6 +1239,16 @@ class PluginGestionConfig extends CommonDBTM
          $migration->dropTable($table);
       }
       $table = 'glpi_plugin_gestion_configsfolder';
+      if ($DB->TableExists($table)) {
+         $migration->displayMessage("Uninstalling $table");
+         $migration->dropTable($table);
+      }
+      $table = 'glpi_plugin_gestion_remote_sign_requests';
+      if ($DB->TableExists($table)) {
+         $migration->displayMessage("Uninstalling $table");
+         $migration->dropTable($table);
+      }
+      $table = 'glpi_plugin_gestion_signaturedevices';
       if ($DB->TableExists($table)) {
          $migration->displayMessage("Uninstalling $table");
          $migration->dropTable($table);

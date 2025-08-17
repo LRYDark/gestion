@@ -14,6 +14,9 @@ class PluginGestionCri extends CommonDBTM {
       // Inclure les fichiers CSS et JS externes
       echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/css/signature.css">';
       echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/scripts/signature.js" defer></script>';
+      // Remote signature additions
+      echo '<script>const GLPI_PLUG_GESTION = "'.PLUGIN_GESTION_WEBDIR.'";</script>';
+      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/scripts/remote_signature.js?v=' . time() . '" defer></script>';
 
       // Style CSS inline pour hauteur responsive
          $responsiveIframeStyle = "
@@ -39,6 +42,12 @@ class PluginGestionCri extends CommonDBTM {
          ";
       // Ajouter le style au début de votre fonction
          echo $responsiveScript;
+
+      // Fonction pour générer le token temporaire (identique à view_pdf.php)
+      function generateTempTokenForPreview($doc_id, $secret_key = 'GLPI_PDF_SECRET_2024') {
+          $today = date('Y-m-d');
+          return hash('sha256', $doc_id . $today . $secret_key);
+      }
 
       $config     = PluginGestionConfig::getInstance();
       $documents  = new Document();
@@ -89,22 +98,44 @@ class PluginGestionCri extends CommonDBTM {
             
             if ($config->fields['SharePointLinkDisplay'] == 1) {
                try {
-                  $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
-                  $filePath = $folderPath . $Doc_Name;
-                  $filePath = preg_replace('#/+#', '/', $filePath);
-
                   if ($DOC->save == 'SharePoint'){
-                     $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
+                     $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);  
                   }
                   if ($DOC->save == 'Local'){
                      $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
-
                   }
                   if ($DOC->save == 'Sage'){
                      $fileDownloadUrl = $DOC->doc_url;
                   }
-                  if ($DOC->save == 'Sage' || $DOC->save == 'Local' || $DOC->save == 'SharePoint'){
-                     echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+               
+                  if ($DOC->save == 'Sage' || $DOC->save == 'Local' /*|| $DOC->save == 'SharePoint'*/){
+                     
+                     // CORRECTION : Ajouter le token UNIQUEMENT pour Sage
+                     if ($DOC->save == 'Sage') {
+                        // Extraire l'ID du document
+                        $doc_id_for_token = '';
+                        if (preg_match('/[?&]id=([^&]+)/', $fileDownloadUrl, $matches)) {
+                            $doc_id_for_token = $matches[1];
+                        } elseif (preg_match('/docid=([^&]+)/', $fileDownloadUrl, $matches)) {
+                            $doc_id_for_token = $matches[1];
+                        }
+                        
+                        // Construire l'URL avec token pour Google Viewer
+                        $tokenized_url_for_preview = $fileDownloadUrl;
+                        if (!empty($doc_id_for_token)) {
+                            $temp_token = generateTempTokenForPreview($doc_id_for_token);
+                            $separator = (strpos($fileDownloadUrl, '?') !== false) ? '&' : '?';
+                            $tokenized_url_for_preview = $fileDownloadUrl . $separator . 'token=' . $temp_token;
+                        }
+                        
+                        // Construire l'URL Google Viewer avec l'URL tokenisée
+                        $google_viewer_url = "https://docs.google.com/viewerng/viewer?url=" . urlencode($tokenized_url_for_preview) . "&embedded=true";
+                     } else {
+                        // Pour Local et SharePoint : pas de token, URL directe
+                        $google_viewer_url = "https://docs.google.com/viewerng/viewer?url=" . $fileDownloadUrl . "&embedded=true";
+                     }
+                     
+                     echo "<iframe src='" . htmlspecialchars($google_viewer_url, ENT_QUOTES, 'UTF-8') . "' 
                            class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
                   }
                } catch (Exception $e) {
@@ -176,7 +207,291 @@ class PluginGestionCri extends CommonDBTM {
             echo '</div>';
             
          echo '</div>';
+
+         function isCurrentUserAuthorized($authorized_users_string) {
+            $current_user_id = $_SESSION['glpiID'];
+            $authorized_users = json_decode($authorized_users_string, true);
+            
+            return is_array($authorized_users) && in_array($current_user_id, $authorized_users);
+         }
          
+// MODIFICATION DANS cri.class.php - VERSION ACTUELLE (DOCUMENT UNIQUEMENT)
+// Remplacer la section signature déportée existante par celle-ci :
+
+if ($config->fields['RemoteSignatureOn'] == 1 && isCurrentUserAuthorized($config->fields['RemoteSignatureUsers'])) {                 
+   // === CARTE SIGNATURE DÉPORTÉE (tablette) ===
+   
+   $can_remote = false;
+   $devices = [];
+   // Lire la configuration directement depuis la table du plugin (si les colonnes existent)
+   try {
+         $cfgrow = [];
+         $rescfg = $DB->query("SELECT * FROM glpi_plugin_gestion_configs LIMIT 1");
+         if ($rescfg && $DB->numrows($rescfg) > 0) {
+            $cfgrow = $DB->fetchassoc($rescfg);
+         }
+         $enabled = isset($cfgrow['enable_remote_signature']) ? (int)$cfgrow['enable_remote_signature'] : 1;
+         $allowed_users = [];
+         if (isset($cfgrow['remote_allowed_users']) && $cfgrow['remote_allowed_users'] !== '') {
+            $raw = $cfgrow['remote_allowed_users'];
+            if (is_string($raw) && strlen($raw) > 0) {
+               if ($raw[0] === '[') {
+                  $decoded = json_decode($raw, true);
+                  if (is_array($decoded)) {
+                     foreach ($decoded as $u) { $allowed_users[] = (int)$u; }
+                  }
+               } else {
+                  foreach (preg_split('/[\s,;]+/', $raw) as $u) { if ($u !== '') $allowed_users[] = (int)$u; }
+               }
+            }
+         }
+         $uid = (int)Session::getLoginUserID();
+         $can_remote = (bool)$enabled && (empty($allowed_users) || in_array($uid, $allowed_users, true));
+         if ($can_remote) {
+            $resdev = $DB->query("SELECT id, device_id, serial, device_token, is_active FROM glpi_plugin_gestion_signaturedevices WHERE is_active = 1 ORDER BY device_id ASC");
+            if ($resdev) {
+               while ($r = $DB->fetchassoc($resdev)) { $devices[] = $r; }
+            }
+         }
+   } catch (Throwable $e) {
+         $can_remote = false;
+         $devices = [];
+   }
+   
+   if (!empty($devices)) {
+      echo '<div class="form-card">';
+      echo '  <div class="form-label">Signature déportée (tablette)</div>';
+      echo '  <div class="form-content">';
+      echo '    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+   
+      // (re)build device list with tokens directly from DB
+      global $DB;
+      $rows = [];
+      $res = $DB->query("SELECT device_id, serial, device_token FROM glpi_plugin_gestion_signaturedevices WHERE is_active = 1");
+      if ($res) {
+         while ($r = $DB->fetchassoc($res)) { $rows[] = $r; }
+      }
+
+      echo '      <select id="remote-device" style="padding:6px">';
+      foreach ($rows as $d) {
+         $did = Html::entities_deep($d['device_id']);
+         $tok = Html::entities_deep($d['device_token']);
+         $ser = Html::entities_deep($d['serial']);
+         $label = $did . ($ser ? ' · ' . $ser : '');
+         echo '        <option value="'.$did.'" data-token="'.$tok.'" data-has-token="'.(!empty($tok) ? '1' : '0').'">'.$label.'</option>';
+      }
+      
+      // expose ticket id for JS in a robust way
+      $ticket_id_js = isset($ID) ? (int)$ID : 0;
+      echo '<input type="hidden" id="remote-ticket-id" value="'.$ticket_id_js.'">';
+      echo '      </select>';
+
+      // Alerts after actual DB-backed tokens
+      $no_rows = (count($rows) === 0);
+      $no_token = true;
+      foreach ($rows as $d) { if (!empty($d['device_token'])) { $no_token = false; break; } }
+
+      if ($no_rows) {
+         echo '<div class="alert alert-important alert-danger glpi-debug-alert" style="z-index:10000">';
+         echo __('Aucune tablette active. Ajoutez-en au moins une dans la configuration.', 'gestion');
+         echo '</div>';
+      } else if ($no_token) {
+         echo '<div class="alert alert-important alert-danger glpi-debug-alert" style="z-index:10000">';
+         echo __('Aucun token de tablette détecté : supprimez puis ré-ajoutez la tablette dans la configuration pour générer un token.', 'gestion');
+         echo '</div>';
+      }
+
+      echo '      <button type="button" id="remote-start" class="btn btn-primary">Demander la signature</button>';
+      echo '      <span id="remote-status" class="text-muted"></span>';
+      echo '    </div>';
+      echo '  </div>';
+      echo '</div>';
+      
+// VERSION CORRIGÉE : Préparation des paramètres automatiques (DOCUMENT UNIQUEMENT)
+$autoParams = [];
+
+// Document name (depuis la variable existante)
+if (!empty($Doc_Name)) {
+   $autoParams['document_name'] = $Doc_Name;
+}
+
+// Document URL avec token temporaire (depuis la variable existante)
+if (!empty($fileDownloadUrl)) {
+   // Fonction pour générer le token temporaire
+   function generateTempToken($doc_id, $secret_key = 'GLPI_PDF_SECRET_2024') {
+       $today = date('Y-m-d');
+       return hash('sha256', $doc_id . $today . $secret_key);
+   }
+   
+   // Extraire l'ID du document depuis l'URL existante
+   $doc_id = '';
+   if (preg_match('/[?&]id=([^&]+)/', $fileDownloadUrl, $matches)) {
+       $doc_id = $matches[1];
+   } elseif (preg_match('/docid=([^&]+)/', $fileDownloadUrl, $matches)) {
+       $doc_id = $matches[1];
+   }
+   
+   if (!empty($doc_id)) {
+       // Générer le token temporaire
+       $temp_token = generateTempToken($doc_id);
+       
+       // Créer l'URL avec token
+       $separator = (strpos($fileDownloadUrl, '?') !== false) ? '&' : '?';
+       $tokenized_url = $fileDownloadUrl . $separator . 'token=' . $temp_token;
+       
+       // CORRECTION : Assigner à document_url, pas document_name
+       // ET s'assurer qu'il n'y a pas d'encodage HTML
+       $autoParams['document_url'] = html_entity_decode($tokenized_url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+   } else {
+       // Fallback si on n'arrive pas à extraire l'ID
+       $autoParams['document_url'] = html_entity_decode($fileDownloadUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+   }
+}
+      
+      // Entity (récupérer l'entité du ticket)
+      $entity_name = '';
+      try {
+         $entity_sql = "SELECT e.name FROM glpi_entities e 
+                       JOIN glpi_tickets t ON e.id = t.entities_id 
+                       WHERE t.id = " . (int)$ID . " LIMIT 1";
+         $entity_result = $DB->query($entity_sql);
+         if ($entity_result && $DB->numrows($entity_result) > 0) {
+            $entity_row = $DB->fetchAssoc($entity_result);
+            $entity_name = $entity_row['name'];
+         }
+      } catch (Exception $e) {
+         $entity_name = '';
+      }
+      
+      if (!empty($entity_name)) {
+         $autoParams['entity_name'] = $entity_name;
+      }
+      
+      // Convertir en JSON pour JavaScript
+      $autoParamsJson = !empty($autoParams) ? json_encode($autoParams, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : 'null';
+      
+      echo '<script>
+      // Variable globale contenant les paramètres automatiques
+      window.REMOTE_SIGN_AUTO_PARAMS = ' . $autoParamsJson . ';
+      
+      // Script de récupération automatique des signatures déportées
+      (function() {
+      function initRemoteSignatureCapture() {
+         const stat = document.getElementById("remote-status");
+         if (!stat) {
+            setTimeout(initRemoteSignatureCapture, 2000);
+            return;
+         }
+         
+         // Observer les changements de statut
+         let lastStatus = stat.textContent;
+         const checkStatus = function() {
+            const currentStatus = stat.textContent;
+            if (currentStatus !== lastStatus) {
+            lastStatus = currentStatus;
+            
+            // Si on voit "Signature reçue", récupérer les données
+            if (currentStatus.includes("Signature reçue")) {
+               setTimeout(retrieveSignatureData, 100);
+            }
+            }
+         };
+         
+         setInterval(checkStatus, 500);
+         
+         async function retrieveSignatureData() {
+            try {
+            const sel = document.getElementById("remote-device");
+            if (!sel) return;
+            
+            const opt = sel.options[sel.selectedIndex];
+            const device_id = opt.value;
+            const device_token = opt.getAttribute("data-token");
+            const ticket_id = '.((int)$ID).';
+            
+            const r = await RemoteSign.pollTicket(ticket_id, { device_id, device_token });
+            
+            if (r.ok && r.ready && r.signature_base64) {
+               // Remplir le champ caché
+               const hiddenArea = document.getElementById("sig-dataUrl");
+               if (hiddenArea) {
+                  const sigData = r.signature_base64.startsWith("data:") ? r.signature_base64 : "data:image/png;base64," + r.signature_base64;
+                  hiddenArea.value = sigData;
+               }
+               
+               // Dessiner sur le canvas
+               const allCanvas = document.querySelectorAll("canvas");
+               if (allCanvas.length > 0) {
+                  const canvas = allCanvas[0];
+                  const ctx = canvas.getContext("2d");
+                  
+                  const img = new Image();
+                  img.onload = function() {
+                  ctx.clearRect(0, 0, canvas.width, canvas.height);
+                  
+                  const tempCanvas = document.createElement("canvas");
+                  tempCanvas.width = img.width;
+                  tempCanvas.height = img.height;
+                  const tempCtx = tempCanvas.getContext("2d");
+                  
+                  tempCtx.drawImage(img, 0, 0);
+                  
+                  const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                  const data = imageData.data;
+                  
+                  for (let i = 0; i < data.length; i += 4) {
+                     const alpha = data[i + 3];
+                     if (alpha > 0) {
+                        data[i] = 0;
+                        data[i + 1] = 0;
+                        data[i + 2] = 0;
+                     }
+                  }
+                  
+                  tempCtx.putImageData(imageData, 0, 0);
+                  ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+                  };
+                  img.onerror = function() {
+                  console.error("Erreur chargement signature image");
+                  };
+                  const sigData = r.signature_base64.startsWith("data:") ? r.signature_base64 : "data:image/png;base64," + r.signature_base64;
+                  img.src = sigData;
+               }
+               
+               // Remplir le champ nom
+               const nameField = document.getElementById("name");
+               if (nameField && r.signer_name) {
+                  nameField.value = r.signer_name;
+               }
+               
+               // Remplir le champ email
+               const emailField = document.getElementById("mail");
+               if (emailField && r.signer_email) {
+                  emailField.value = r.signer_email;
+                  const emailCheckbox = document.getElementById("send_email");
+                  if (emailCheckbox && r.signer_email.trim() !== "") {
+                     emailCheckbox.checked = true;
+                  }
+               }
+            }
+            
+            } catch (e) {
+            console.error("Erreur récupération signature:", e);
+            }
+         }
+      }
+
+      // Initialiser
+      if (document.readyState === "loading") {
+         document.addEventListener("DOMContentLoaded", initRemoteSignatureCapture);
+      } else {
+         setTimeout(initRemoteSignatureCapture, 100);
+      }
+      })();
+      </script>';
+   }
+}
+
          // === CARTE EMAIL (si activée) ===
          if ($config->fields['MailTo'] == 1) {
             echo '<div class="form-card">';
@@ -228,22 +543,44 @@ class PluginGestionCri extends CommonDBTM {
             
             if ($config->fields['SharePointLinkDisplay'] == 1) {
                try {
-                  $folderPath = (!empty($DOC->url_bl)) ? $DOC->url_bl . "/" : "";
-                  $filePath = $folderPath . $Doc_Name;
-                  $filePath = preg_replace('#/+#', '/', $filePath);
-
                   if ($DOC->save == 'SharePoint'){
-                     $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($filePath);  
+                     $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);  
                   }
                   if ($DOC->save == 'Local'){
                      $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
-
                   }
                   if ($DOC->save == 'Sage'){
                      $fileDownloadUrl = $DOC->doc_url;
                   }
-                  if ($DOC->save == 'Sage' || $DOC->save == 'Local' || $DOC->save == 'SharePoint'){
-                     echo "<iframe src='https://docs.google.com/gview?url=" . urlencode($fileDownloadUrl) . "&embedded=true' 
+                  
+                  if ($DOC->save == 'Sage' || $DOC->save == 'Local' /*|| $DOC->save == 'SharePoint'*/){
+                     
+                     // CORRECTION : Ajouter le token UNIQUEMENT pour Sage (SECTION SIGNÉ)
+                     if ($DOC->save == 'Sage') {
+                        // Extraire l'ID du document
+                        $doc_id_for_token = '';
+                        if (preg_match('/[?&]id=([^&]+)/', $fileDownloadUrl, $matches)) {
+                            $doc_id_for_token = $matches[1];
+                        } elseif (preg_match('/docid=([^&]+)/', $fileDownloadUrl, $matches)) {
+                            $doc_id_for_token = $matches[1];
+                        }
+                        
+                        // Construire l'URL avec token pour Google Viewer
+                        $tokenized_url_for_preview = $fileDownloadUrl;
+                        if (!empty($doc_id_for_token)) {
+                            $temp_token = generateTempTokenForPreview($doc_id_for_token);
+                            $separator = (strpos($fileDownloadUrl, '?') !== false) ? '&' : '?';
+                            $tokenized_url_for_preview = $fileDownloadUrl . $separator . 'token=' . $temp_token;
+                        }
+                        
+                        // Construire l'URL Google Viewer avec l'URL tokenisée
+                        $google_viewer_url = "https://docs.google.com/viewerng/viewer?url=" . urlencode($tokenized_url_for_preview) . "&embedded=true";
+                     } else {
+                        // Pour Local et SharePoint : pas de token, URL directe
+                        $google_viewer_url = "https://docs.google.com/viewerng/viewer?url=" . $fileDownloadUrl . "&embedded=true";
+                     }
+                     
+                     echo "<iframe src='" . htmlspecialchars($google_viewer_url, ENT_QUOTES, 'UTF-8') . "' 
                            class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
                   }
                } catch (Exception $e) {
