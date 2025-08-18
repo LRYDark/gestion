@@ -66,6 +66,10 @@ $plugin_base = $rootdoc . '/plugins/gestion';
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- iOS plein écran -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="<?= htmlspecialchars(($CFG_GLPI['root_doc'] ?? '/glpi').'/plugins/gestion/icons/icon-192.png', ENT_QUOTES, 'UTF-8') ?>">
   <title>Signature électronique</title>
   <style>
     * { box-sizing: border-box; }
@@ -77,9 +81,19 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       color: #2c3e50; 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
       line-height: 1.6;
+      overscroll-behavior: none;      /* évite le “pull to refresh” */
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation;     /* réduit les gestes parasites */
     }
     
     .header {
+      position: sticky;    /* reste collé au sommet quand on scrolle */
+      top: 0;
+      z-index: 1000;       /* au-dessus du contenu */
+      /* confort iPad avec encoches */
+      padding-top: calc(16px + env(safe-area-inset-top));
       background: #ffffff;
       border-bottom: 1px solid #e9ecef;
       padding: 16px 24px;
@@ -471,8 +485,28 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       font-size: 14px;
       color: #6c757d;
     }
+
+    .is-standalone .external-link { display: none !important; }
   </style>
 </head>
+
+<script>
+(function(){
+  // Détecte l’ouverture depuis l’icône d’accueil (sans barre d’adresse)
+  var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+                   || ('standalone' in navigator && navigator.standalone);
+  if (standalone) document.documentElement.classList.add('is-standalone');
+
+  // (optionnel) éviter le double-tap zoom
+  var last = 0;
+  document.addEventListener('touchend', function(e){
+    var now = Date.now();
+    if (now - last <= 350) e.preventDefault();
+    last = now;
+  }, {passive:false});
+})();
+</script>
+
 <body>
   <header class="header">
     <div class="header-content">

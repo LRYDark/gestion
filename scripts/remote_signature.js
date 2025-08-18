@@ -2,7 +2,11 @@
   'use strict';
 
   // Créer un namespace unique basé sur le plugin actuel
-  const currentPlugin = (typeof GLPI_PLUG_GESTION === 'string' && GLPI_PLUG_GESTION) ? GLPI_PLUG_GESTION : '/glpi/plugins/gestion';
+  const currentPlugin =
+    (typeof GLPI_PLUG_GESTION !== 'undefined' && typeof GLPI_PLUG_GESTION === 'string' && GLPI_PLUG_GESTION.trim()) ||
+    (typeof GLPI_PLUG_RP       !== 'undefined' && typeof GLPI_PLUG_RP       === 'string' && GLPI_PLUG_RP.trim()) ||
+    '/glpi/plugins/gestion';
+
   const pluginHash = btoa(currentPlugin).replace(/[^a-zA-Z0-9]/g, '');
   const namespace = 'RemoteSign_' + pluginHash;
   
@@ -93,7 +97,6 @@
         payload.parameters = finalParameters;
       }
       
-      console.debug(`[${namespace}.create]`, payload);
       return postForm(base + '/ajax/create_remote_signature.php', payload);
     },
 
@@ -124,8 +127,6 @@
     const listenerKey = 'listener_' + pluginHash;
     if (btn.dataset[listenerKey] === '1') return;
     btn.dataset[listenerKey] = '1';
-
-    console.debug(`Attaching button handler for ${namespace}`);
 
     btn.addEventListener('click', async function(){
       const inflightKey = 'inflight_' + pluginHash;
@@ -206,7 +207,5 @@
   
   // Attacher les event listeners
   attachButtonHandler(RemoteSignInstance);
-
-  console.debug(`RemoteSign initialized for plugin: ${currentPlugin} (namespace: ${namespace})`);
 
 })(window);
