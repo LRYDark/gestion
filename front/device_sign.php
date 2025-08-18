@@ -798,24 +798,72 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   function generateRecapContent(parameters) {
     let html = '';
 
+    // ########################################## Netoyage du HTML ########################################## \\
     // --- Helpers: décoder & sécuriser le HTML ---
-    const decodeEntitiesToString = (str) => {
+
+    // 1) Décodage profond
+    const decodeEntitiesDeep = (str, max = 5) => {
       if (str == null) return '';
-      const ta = document.createElement('textarea');
-      ta.innerHTML = String(str);
-      return ta.value; // ex: "&#60;p&#62;Hi&#60;/p&#62;" -> "<p>Hi</p>"
+      let prev = String(str);
+      for (let i = 0; i < max; i++) {
+        const ta = document.createElement('textarea');
+        ta.innerHTML = prev;
+        const next = ta.value;
+        if (next === prev) break;
+        prev = next;
+      }
+      return prev;
     };
 
-    // Fallback simple si DOMPurify n'est pas chargé
+    // 2) Normaliser les chevrons et mapper tes pseudo-tags si besoin
+    const normalizeAndMapTags = (html) => {
+      let s = String(html)
+        .replace(/<\s+/g, '<')
+        .replace(/\s+>/g, '>')
+        .replace(/<\/\s+/g, '</');
+
+      // Exemple: <hl> -> <h4> (garde si tu en as réellement)
+      s = s.replace(/<hl>/gi, '<h4>').replace(/<\/hl>/gi, '</h4>');
+      return s;
+    };
+
+    // 3) Aplatir vers un sous-ensemble de balises simples
+    const flattenBasic = (html) => {
+      const tpl = document.createElement('template');
+      tpl.innerHTML = html;
+
+      // h1–h6 => <p><strong>texte</strong></p>
+      tpl.content.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => {
+        const p = document.createElement('p');
+        const strong = document.createElement('strong');
+        strong.textContent = h.textContent;
+        p.appendChild(strong);
+        h.replaceWith(p);
+      });
+
+      // div => p (en conservant le contenu)
+      tpl.content.querySelectorAll('div').forEach(d => {
+        const p = document.createElement('p');
+        p.innerHTML = d.innerHTML;
+        d.replaceWith(p);
+      });
+
+      // span => désemballer
+      tpl.content.querySelectorAll('span').forEach(s => {
+        s.replaceWith(...s.childNodes);
+      });
+
+      return tpl.innerHTML;
+    };
+
+    // 4) Fallback si DOMPurify absent (supprime éléments/attributs dangereux)
     const sanitizeHtmlBasic = (html) => {
       const tpl = document.createElement('template');
       tpl.innerHTML = String(html);
 
-      // Retire balises dangereuses
       ['script','style','iframe','object','embed','link','meta','base','form']
         .forEach(tag => tpl.content.querySelectorAll(tag).forEach(el => el.remove()));
 
-      // Retire attributs on* et URLs javascript:
       tpl.content.querySelectorAll('*').forEach(el => {
         [...el.attributes].forEach(attr => {
           const name = attr.name.toLowerCase();
@@ -830,7 +878,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       return tpl.innerHTML;
     };
 
-    // Si pas de balises, on formate joliment (¶ + sauts de ligne)
+    // 5) Ajouter des paragraphes si aucun tag
     const ensureParagraphs = (html) => {
       const hasTags = /<\w[\s\S]*>/.test(html);
       if (hasTags) return html;
@@ -838,12 +886,26 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       return parts.join('') || '';
     };
 
-    // Pipeline complet
+    // 6) Pipeline complet
     const renderSafeHtml = (raw) => {
-      const decoded   = decodeEntitiesToString(raw);
-      const sanitized = (window.DOMPurify ? window.DOMPurify.sanitize(decoded) : sanitizeHtmlBasic(decoded));
+      const decoded = decodeEntitiesDeep(raw);
+      const fixed   = normalizeAndMapTags(decoded);
+
+      // Aplatir AVANT la sanitization (pour avoir un DOM simple)
+      const flattened = flattenBasic(fixed);
+
+      // Restreindre le HTML final à un set minimal
+      const sanitized = (window.DOMPurify
+        ? window.DOMPurify.sanitize(flattened, {
+            ALLOWED_TAGS: ['p','br','strong','b','em','i','u','ul','ol','li','a'],
+            ALLOWED_ATTR: ['href','title','target','rel']
+          })
+        : sanitizeHtmlBasic(flattened)
+      );
+
       return ensureParagraphs(sanitized);
     };
+    // ########################################## Netoyage du HTML ########################################## \\
     
     if (!parameters || Object.keys(parameters).length === 0) {
       return '<div class="section"><div class="section-content">Aucune information supplémentaire disponible.</div></div>';
