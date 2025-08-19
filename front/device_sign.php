@@ -718,6 +718,11 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   // Navigation
   nextToSignBtn.addEventListener('click', () => {
     showStep('pad');
+
+    // NOUVEAU : Pré-remplir l'email si disponible
+    if (window.TABLET_CLIENT_EMAIL && document.getElementById('signerEmail')) {
+      document.getElementById('signerEmail').value = window.TABLET_CLIENT_EMAIL;
+    }
   });
 
   backToRecapBtn.addEventListener('click', () => {
@@ -1055,6 +1060,12 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       }
     });
 
+    // NOUVEAU : Pré-remplir le champ email de la tablette
+    if (parameters && parameters.client_email) {
+      // Stocker l'email pour le pré-remplissage
+      window.TABLET_CLIENT_EMAIL = parameters.client_email;
+    }
+
     return html || '<div class="section"><div class="section-content">Aucune information supplémentaire disponible.</div></div>';
   }
 
@@ -1160,6 +1171,11 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         
         // Générer le contenu du récapitulatif
         recapContentEl.innerHTML = generateRecapContent(data.parameters);
+
+        // NOUVEAU : Pré-remplir l'email si disponible dans les paramètres
+        if (data.parameters && data.parameters.client_email) {
+          window.TABLET_CLIENT_EMAIL = data.parameters.client_email;
+        }
         
         // Aller à l'étape récapitulatif
         showStep('recap');

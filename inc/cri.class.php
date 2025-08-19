@@ -64,9 +64,9 @@ class PluginGestionCri extends CommonDBTM {
       $doc_id  = $DOC->doc_id;
       $DocUrlSharePoint = $DOC->doc_url;
    
-      $email = $DB->query("SELECT u.email FROM glpi_useremails u JOIN glpi_users us ON u.users_id = us.id JOIN glpi_tickets t ON us.entities_id = t.entities_id WHERE t.id = $ID LIMIT 1;")->fetch_object();
-      if(!empty($email->email)){
-         $email = $email->email;
+      $email = $DB->query("SELECT GROUP_CONCAT(email SEPARATOR ',') AS emails FROM ( SELECT DISTINCT u.email AS email FROM glpi_useremails u JOIN glpi_users us ON us.id = u.users_id JOIN glpi_tickets t ON t.id = $ID WHERE us.entities_id = t.entities_id AND u.email IS NOT NULL AND u.email <> '' AND us.is_deleted = 0 UNION SELECT DISTINCT e.email FROM glpi_entities e JOIN glpi_tickets t ON t.entities_id = e.id WHERE t.id = $ID AND e.email IS NOT NULL AND e.email <> '' ) AS mails;")->fetch_object();   
+      if(!empty($email->emails)){
+         $email = $email->emails;
       }else{
          $email = '';
       }
@@ -366,6 +366,11 @@ if (!empty($fileDownloadUrl)) {
       if (!empty($entity_name)) {
          $autoParams['entity_name'] = $entity_name;
       }
+
+      // NOUVEAU : Ajouter l'email s'il est disponible
+if (!empty($email)) {
+   $autoParams['client_email'] = $email;
+}
       
       // Convertir en JSON pour JavaScript
       $autoParamsJson = !empty($autoParams) ? json_encode($autoParams, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : 'null';
@@ -491,20 +496,137 @@ if (!empty($fileDownloadUrl)) {
       </script>';
    }
 }
+?>
+<style>
+.email-combo-container {
+    position: relative;
+    width: 100%;
+}
 
-         // === CARTE EMAIL (si activée) ===
-         if ($config->fields['MailTo'] == 1) {
-            echo '<div class="form-card">';
-               echo '<div class="form-label">Mail client</div>';
-               echo '<div class="form-content">';
-                  echo '<div class="checkbox-group">';
-                     echo '<input type="checkbox" name="mailtoclient" value="1" id="send_email">';
-                     echo '<label for="send_email">Envoyer le PDF par email</label>';
-                  echo '</div>';
-                  echo '<input type="email" id="mail" name="email" value="'.$email.'" placeholder="Email du client">';
-               echo '</div>';
+.email-input {
+    width: 100%;
+    padding: 8px 30px 8px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    font-size: 14px;
+}
+
+.email-dropdown-btn {
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    color: #666;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.email-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.email-option {
+    padding: 8px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+
+.email-option:hover {
+    background: #f5f5f5;
+}
+
+.email-option:last-child {
+    border-bottom: none;
+}
+</style>
+<?php
+// === CARTE EMAIL (si activée) ===
+if ($config->fields['MailTo'] == 1) {
+    // Traitement de la variable $email pour créer un tableau
+    $emailArray = array();
+    if (!empty($email)) {
+        $emailArray = array_filter(array_map('trim', explode(',', $email)));
+        // Supprimer les doublons et réindexer
+        $emailArray = array_values(array_unique($emailArray));
+    }
+    
+    // Premier email par défaut
+    $defaultEmail = !empty($emailArray) ? $emailArray[0] : '';
+    
+    echo '<div class="form-card">';
+        echo '<div class="form-label">Mail client</div>';
+        echo '<div class="form-content">';
+            echo '<div class="checkbox-group">';
+                echo '<input type="checkbox" name="mailtoclient" value="1" id="send_email">';
+                echo '<label for="send_email">Envoyer le PDF par email</label>';
             echo '</div>';
-         }
+            
+            echo '<div class="email-combo-container">';
+                // Input principal (celui qui sera envoyé)
+                echo '<input type="email" id="mail" name="email" class="email-input" value="' . htmlspecialchars($defaultEmail) . '" placeholder="Email du client">';
+                
+                // Bouton dropdown si on a des emails
+                if (!empty($emailArray)) {
+                    echo '<button type="button" class="email-dropdown-btn" onclick="toggleEmailDropdown()">▼</button>';
+                    
+                    // Dropdown personnalisé
+                    echo '<div id="email_dropdown_list" class="email-dropdown">';
+                        foreach ($emailArray as $emailOption) {
+                            echo '<div class="email-option" onclick="selectEmail(\'' . htmlspecialchars($emailOption, ENT_QUOTES) . '\')">';
+                            echo htmlspecialchars($emailOption);
+                            echo '</div>';
+                        }
+                    echo '</div>';
+                }
+                
+            echo '</div>';
+            
+        echo '</div>';
+    echo '</div>';
+    
+    // JavaScript pour gérer l'interaction
+    echo '<script>';
+    echo 'function toggleEmailDropdown() {';
+    echo '    var dropdown = document.getElementById("email_dropdown_list");';
+    echo '    dropdown.style.display = dropdown.style.display === "block" ? "none" : "block";';
+    echo '}';
+    echo '';
+    echo 'function selectEmail(email) {';
+    echo '    document.getElementById("mail").value = email;';
+    echo '    document.getElementById("email_dropdown_list").style.display = "none";';
+    echo '}';
+    echo '';
+    echo '// Fermer le dropdown si on clique ailleurs';
+    echo 'document.addEventListener("click", function(event) {';
+    echo '    var container = document.querySelector(".email-combo-container");';
+    echo '    var dropdown = document.getElementById("email_dropdown_list");';
+    echo '    if (dropdown && !container.contains(event.target)) {';
+    echo '        dropdown.style.display = "none";';
+    echo '    }';
+    echo '});';
+    echo '</script>';
+}
+
+
+
+         
          
          // === CARTE ACTIONS ===
          if(Session::haveRight("plugin_gestion_sign", CREATE)){
