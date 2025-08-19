@@ -333,7 +333,7 @@ class PluginGestionConfig extends CommonDBTM
          // Utilisation
          try {
             $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-            if ($result['status']) {
+            if (isset($result['status']) && $result['status'] === true) {
                $checkcon = 'Connexion API : <i class="fa fa-check-circle fa-xl text-success"></i></i>' . "\n";
                try {              
                   // Étape 2 : Récupérer l'ID du site
@@ -461,7 +461,7 @@ class PluginGestionConfig extends CommonDBTM
          echo "</tr>";
 
       if($mode == true && !empty($config->TenantID()) || !empty($config->SageToken())){
-         if ($config->SharePointOn() == 1 && !empty($result['status'])) {
+         if ($config->SharePointOn() == 1 && (isset($result['status']) && $result['status'] === true)) {
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __("Bibliothèques SahrePoint : <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip' data-bs-placement='top' title='Attention : toute modification de la bibliothèque après l’utilisation d’une bibliothèque précédent peut entraîner des bugs ou des conflits.'></i>", "gestion") ;
                   //Récupérer les bibliothèques de documents du site

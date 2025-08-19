@@ -344,24 +344,22 @@ class PluginGestionTicket extends CommonDBTM {
                                           <span class="visually-hidden">Loading...</span>
                                     </div>
                                  </div>
-
                   HTML;
                   $connexion = false;
                   if($config->SageOn() == 1 && $config->SharePointOn() == 0){
-                     if(!empty($config->SageId())){
+                     if(!empty($config->SageToken())){
                         $connexion = true;
                      }
-
                   }
                   if($config->SageOn() == 0 && $config->SharePointOn() == 1){
                      $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-                     if($result['status']){
+                     if(isset($result['status']) && $result['status'] === true){
                         $connexion = true;
                      }
                   }
                   if($config->SageOn() == 1 && $config->SharePointOn() == 1){
                      $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-                     if($result['status'] || !empty($config->SageId())){
+                     if((isset($result['status']) && $result['status'] === true) || !empty($config->SageToken())){
                         $connexion = true;
                      }
                   }
