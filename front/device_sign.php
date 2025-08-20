@@ -81,7 +81,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       color: #2c3e50; 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
       line-height: 1.6;
-      overscroll-behavior: none;      /* évite le “pull to refresh” */
+      overscroll-behavior: none;      /* évite le "pull to refresh" */
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
@@ -492,7 +492,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
 
 <script>
 (function(){
-  // Détecte l’ouverture depuis l’icône d’accueil (sans barre d’adresse)
+  // Détecte l'ouverture depuis l'icône d'accueil (sans barre d'adresse)
   var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
                    || ('standalone' in navigator && navigator.standalone);
   if (standalone) document.documentElement.classList.add('is-standalone');
@@ -837,6 +837,10 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   let requestData = null;
   let polling = true;
 
+  // NOUVEAU : Variables pour le refresh automatique (30 minutes)
+  let autoRefreshTimer = null;
+  const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes en millisecondes
+
   // Simple clock
   function upClock(){
     const d = new Date();
@@ -847,10 +851,46 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   }
   setInterval(upClock, 1000); upClock();
 
-  // Navigation entre étapes
+  // NOUVEAU : Gestion du refresh automatique
+  function startAutoRefresh() {
+    // Annuler le timer existant s'il y en a un
+    if (autoRefreshTimer) {
+      clearTimeout(autoRefreshTimer);
+      autoRefreshTimer = null;
+    }
+    
+    // Démarrer un nouveau timer seulement si on est en mode attente
+    if (polling && waitingEl.classList.contains('show')) {
+      console.log('Auto-refresh programmé dans 30 minutes');
+      autoRefreshTimer = setTimeout(() => {
+        // Vérifier qu'on est toujours en mode attente avant de refresh
+        if (polling && waitingEl.classList.contains('show')) {
+          console.log('Auto-refresh exécuté');
+          window.location.reload();
+        }
+      }, REFRESH_INTERVAL);
+    }
+  }
+
+  function stopAutoRefresh() {
+    if (autoRefreshTimer) {
+      console.log('Auto-refresh annulé');
+      clearTimeout(autoRefreshTimer);
+      autoRefreshTimer = null;
+    }
+  }
+
+  // Navigation entre étapes (MODIFIÉE pour gérer le refresh)
   function showStep(stepName) {
     document.querySelectorAll('.step').forEach(step => step.classList.remove('show'));
     document.getElementById(stepName).classList.add('show');
+    
+    // NOUVEAU : Gestion du refresh
+    if (stepName === 'waiting') {
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
   }
 
   // Drawing helpers
@@ -1028,7 +1068,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       const tpl = document.createElement('template');
       tpl.innerHTML = html;
 
-      // h1–h6 => <p><strong>texte</strong></p>
+      // h1—h6 => <p><strong>texte</strong></p>
       tpl.content.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => {
         const p = document.createElement('p');
         const strong = document.createElement('strong');
@@ -1233,7 +1273,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       html += `</div>`;
     }
 
-    // NOUVEAU : Affichage du temps total (texte simple => on garde l’échappement)
+    // NOUVEAU : Affichage du temps total (texte simple => on garde l'échappement)
     if (parameters.total_time) {
       html += `    <div style="background: rgba(52,152,219,0.1); padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-top: 8px;">`;
       html += `      <strong>⏱️ Temps total :</strong> ${escapeHtml(parameters.total_time)}`;
@@ -1276,7 +1316,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     }
   }
 
-  // Fonction pour réinitialiser l'interface après envoi
+  // Fonction pour réinitialiser l'interface après envoi (MODIFIÉE pour le refresh)
   function resetToWaiting() {
     document.getElementById('signer').value = '';
     document.getElementById('signerEmail').value = '';
@@ -1293,6 +1333,9 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     
     polling = true;
     setTimeout(poll, 2000);
+    
+    // NOUVEAU : Redémarrer le refresh après reset
+    startAutoRefresh();
   }
 
   async function post(url, data){
@@ -1349,6 +1392,9 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         ticketId = data.ticket_id;
         requestData = data;
         
+        // NOUVEAU : Arrêter le refresh car une demande est active
+        stopAutoRefresh();
+        
         // Mettre à jour les infos ticket
         const ticketText = ticketId ? ('Ticket #' + ticketId) : '';
         ticketInfoEl.textContent = ticketText;
@@ -1382,6 +1428,9 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   }
 
   setTimeout(poll, 600);
+  
+  // NOUVEAU : Démarrer le refresh initial
+  startAutoRefresh();
 
   sendBtn.addEventListener('click', async () => {
     sendErr.style.display = 'none'; 
