@@ -580,24 +580,212 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         </div>
         <div class="card-content">
           <div class="form-group">
-            <label class="form-label" for="signer">Nom du signataire</label>
-            <input id="signer" type="text" class="form-input" placeholder="Nom et prénom (optionnel)">
+            <label class="form-label" for="signer">Nom du signataire *</label>
+            <input id="signer" type="text" class="form-input" placeholder="Nom et prénom">
           </div>
-          
+
+          <style>
+          .signer-email-combo-container {
+              position: relative;
+              width: 100%;
+          }
+
+          .form-input {
+              width: 100%;
+              padding: 8px 30px 8px 8px;
+              border: 1px solid #ddd;
+              border-radius: 4px;
+              background: white;
+              font-size: 14px;
+              box-sizing: border-box;
+          }
+
+          .signer-email-dropdown-btn {
+              position: absolute;
+              right: 5px;
+              top: 50%;
+              transform: translateY(-50%);
+              background: none;
+              border: none;
+              cursor: pointer;
+              color: #666;
+              font-size: 12px;
+              display: none;
+              align-items: center;
+              justify-content: center;
+              width: 20px;
+              height: 20px;
+              border-radius: 3px;
+              transition: transform 0.3s ease;
+          }
+
+          .signer-email-dropdown-btn.open {
+              transform: translateY(-50%) rotate(180deg);
+          }
+
+          .signer-email-dropdown {
+              position: absolute;
+              top: 100%;
+              left: 0;
+              width: 100%;
+              background: white;
+              border: 1px solid #ddd;
+              border-top: none;
+              border-radius: 0 0 4px 4px;
+              max-height: 200px;
+              overflow-y: auto;
+              z-index: 1000;
+              display: none;
+              box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+              box-sizing: border-box;
+          }
+
+          .signer-email-option {
+              padding: 8px;
+              cursor: pointer;
+              border-bottom: 1px solid #eee;
+          }
+
+          .signer-email-option:hover {
+              background: #f5f5f5;
+          }
+
+          .signer-email-option:last-child {
+              border-bottom: none;
+          }
+          </style>
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
           <div class="form-group">
-            <label class="form-label" for="signerEmail">Email du signataire</label>
-            <input id="signerEmail" type="email" class="form-input" placeholder="email@exemple.com (optionnel)">
+              <label class="form-label" for="signerEmail">Email du signataire</label>
+              <div class="signer-email-combo-container">
+                  <input id="signerEmail" type="email" class="form-input" placeholder="email@exemple.com (optionnel)" onclick="showSignerEmailDropdown()" onfocus="showSignerEmailDropdown()">
+                  
+                  <button type="button" class="signer-email-dropdown-btn" onclick="toggleSignerEmailDropdown()">
+                      <i class="fa-solid fa-chevron-down"></i>
+                  </button>
+                  
+                  <div id="signerEmail_dropdown_list" class="signer-email-dropdown">
+                  </div>
+              </div>
           </div>
-          
+
+          <script>
+          let signerEmailArray = [];
+          let isDropdownInitialized = false;
+
+          function initializeSignerEmailDropdown() {
+              if (window.TABLET_CLIENT_EMAIL) {
+                  // Convertir la chaîne en tableau d'emails
+                  signerEmailArray = window.TABLET_CLIENT_EMAIL.split(',')
+                      .map(email => email.trim())
+                      .filter(email => email.length > 0);
+                  
+                  // Supprimer les doublons
+                  signerEmailArray = [...new Set(signerEmailArray)];
+                  
+                  // IMPORTANT: Pré-remplir avec SEULEMENT le premier email
+                  if (signerEmailArray.length > 0 && document.getElementById('signerEmail')) {
+                      document.getElementById('signerEmail').value = signerEmailArray[0];
+                  }
+                  
+                  // Créer le dropdown et afficher le bouton si plusieurs emails
+                  if (signerEmailArray.length > 1) {
+                      createSignerEmailDropdown();
+                      showDropdownButton();
+                  } else {
+                      hideDropdownButton();
+                  }
+              }
+              
+              isDropdownInitialized = true;
+          }
+
+          function createSignerEmailDropdown() {
+              let dropdown = document.getElementById("signerEmail_dropdown_list");
+              if (!dropdown) return;
+              
+              dropdown.innerHTML = '';
+              
+              signerEmailArray.forEach(email => {
+                  let option = document.createElement('div');
+                  option.className = 'signer-email-option';
+                  option.textContent = email;
+                  option.onclick = () => selectSignerEmail(email);
+                  dropdown.appendChild(option);
+              });
+          }
+
+          function showDropdownButton() {
+              let btn = document.querySelector(".signer-email-dropdown-btn");
+              if (btn) btn.style.display = "flex";
+          }
+
+          function hideDropdownButton() {
+              let btn = document.querySelector(".signer-email-dropdown-btn");
+              if (btn) btn.style.display = "none";
+          }
+
+          function showSignerEmailDropdown() {
+              if (!isDropdownInitialized) {
+                  initializeSignerEmailDropdown();
+              }
+              
+              var dropdown = document.getElementById("signerEmail_dropdown_list");
+              if (!dropdown || signerEmailArray.length <= 1) return;
+
+              dropdown.style.display = "block";
+              var btn = document.querySelector(".signer-email-dropdown-btn");
+              if (btn) btn.classList.add("open");
+          }
+
+          function toggleSignerEmailDropdown() {
+              if (!isDropdownInitialized) {
+                  initializeSignerEmailDropdown();
+              }
+              
+              var dropdown = document.getElementById("signerEmail_dropdown_list");
+              if (!dropdown || signerEmailArray.length <= 1) return;
+
+              var btn = document.querySelector(".signer-email-dropdown-btn");
+              var isOpen = dropdown.style.display === "block";
+
+              dropdown.style.display = isOpen ? "none" : "block";
+              if (btn) btn.classList.toggle("open", !isOpen);
+          }
+
+          function selectSignerEmail(email) {
+              document.getElementById("signerEmail").value = email;
+
+              var dropdown = document.getElementById("signerEmail_dropdown_list");
+              if (dropdown) dropdown.style.display = "none";
+
+              var btn = document.querySelector(".signer-email-dropdown-btn");
+              if (btn) btn.classList.remove("open");
+          }
+
+          // Fermer le dropdown si on clique ailleurs
+          document.addEventListener("click", function(event) {
+              var container = document.querySelector(".signer-email-combo-container");
+              var dropdown = document.getElementById("signerEmail_dropdown_list");
+              if (!dropdown) return;
+
+              if (!container.contains(event.target)) {
+                  dropdown.style.display = "none";
+                  var btn = document.querySelector(".signer-email-dropdown-btn");
+                  if (btn) btn.classList.remove("open");
+              }
+          });
+          </script>
+
           <div class="signature-area">
-            <label class="form-label">Signature</label>
+            <label class="form-label">Signature *</label>
             <canvas id="sig" class="signature-canvas" width="1000" height="300"></canvas>
             <div class="signature-hint">Signez dans la zone ci-dessus avec votre doigt ou un stylet</div>
           </div>
           
           <div id="sendErr" class="alert alert-error" style="display:none;"></div>
           <div id="sendOk" class="alert alert-success" style="display:none;">
-            ✅ Signature enregistrée avec succès.
+            Signature enregistrée avec succès.
           </div>
           
           <div class="button-group">
@@ -719,9 +907,12 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   nextToSignBtn.addEventListener('click', () => {
     showStep('pad');
 
-    // NOUVEAU : Pré-remplir l'email si disponible
+    // Version simplifiée - remplace votre ancien code
     if (window.TABLET_CLIENT_EMAIL && document.getElementById('signerEmail')) {
-      document.getElementById('signerEmail').value = window.TABLET_CLIENT_EMAIL;
+      document.getElementById('signerEmail').value = window.TABLET_CLIENT_EMAIL.split(',')[0].trim();
+      
+      // AJOUTER cette ligne :
+      initializeSignerEmailDropdown();
     }
   });
 
@@ -996,13 +1187,6 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         html += `    <div style="opacity: 0.9; font-size: 13px; margin-bottom: 8px; line-height: 1.6;">${descHTML}</div>`;
       }
 
-      // NOUVEAU : Affichage du temps total (texte simple => on garde l’échappement)
-      if (parameters.total_time) {
-        html += `    <div style="background: rgba(52,152,219,0.1); padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-top: 8px;">`;
-        html += `      <strong>⏱️ Temps total :</strong> ${escapeHtml(parameters.total_time)}`;
-        html += `    </div>`;
-      }
-
       html += `  </div>`;
       html += `</div>`;
     }
@@ -1013,7 +1197,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       html += `  <div class="section-title">📝 Tâches</div>`;
       html += `  <div class="section-content">`;
       
-      parameters.ticket_tasks.forEach((task, index) => {
+      parameters.ticket_tasks.slice().reverse().forEach((task) => {
         if (task.content) {
           const contentHTML = renderSafeHtml(task.content);
 
@@ -1049,8 +1233,15 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       html += `</div>`;
     }
 
+    // NOUVEAU : Affichage du temps total (texte simple => on garde l’échappement)
+    if (parameters.total_time) {
+      html += `    <div style="background: rgba(52,152,219,0.1); padding: 8px 12px; border-radius: 6px; font-size: 12px; margin-top: 8px;">`;
+      html += `      <strong>⏱️ Temps total :</strong> ${escapeHtml(parameters.total_time)}`;
+      html += `    </div>`;
+    }
+
     // Autres champs dynamiques (pour le futur)
-    const displayedKeys = ['document_name', 'document_url', 'entity_name', 'client_name', 'ticket_title', 'ticket_description', 'ticket_tasks', 'total_time', 'total_seconds', 'description', 'url'];
+    const displayedKeys = ['document_name', 'document_url', 'entity_name', 'client_name', 'ticket_title', 'ticket_description', 'ticket_tasks', 'total_seconds', 'description', 'url', 'total_time','client_email'];
     Object.keys(parameters).forEach(key => {
       if (!displayedKeys.includes(key) && parameters[key] && typeof parameters[key] === 'string') {
         html += `<div class="section">`;
@@ -1059,12 +1250,6 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         html += `</div>`;
       }
     });
-
-    // NOUVEAU : Pré-remplir le champ email de la tablette
-    if (parameters && parameters.client_email) {
-      // Stocker l'email pour le pré-remplissage
-      window.TABLET_CLIENT_EMAIL = parameters.client_email;
-    }
 
     return html || '<div class="section"><div class="section-content">Aucune information supplémentaire disponible.</div></div>';
   }
@@ -1217,7 +1402,15 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       sendErr.style.display = 'block';
       return;
     }
-    
+
+    const signerInput = document.getElementById('signer');
+    // Vérifier si le champ est vide
+    if (!signerInput.value.trim()) {
+      sendErr.textContent = 'Veuillez saisir votre nom et prénom.';
+      sendErr.style.display = 'block';
+      return;
+    }
+
     sendBtn.disabled = true;
     
     try {
