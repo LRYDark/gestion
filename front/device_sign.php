@@ -1195,11 +1195,17 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         // DEBUG : Afficher l'URL finale qui sera utilisée
         console.log('URL finale utilisée:', decodedUrl);
         
-        const googleViewerUrl = `https://docs.google.com/viewerng/viewer?url=${encodeURIComponent(decodedUrl)}&embedded=true`;
-        
-        // DEBUG : Afficher l'URL Google Viewer complète
-        console.log('URL Google Viewer:', googleViewerUrl);
-        
+        // ✅ Déclaration en amont
+        let googleViewerUrl = '';
+        // Vérifier si l'URL contient document.send.php
+        if (decodedUrl.includes('document.send.php')) {
+          // Affichage direct via iframe
+          googleViewerUrl = decodedUrl;
+        } else {
+          // Sinon, passer par Google Docs Viewer
+          googleViewerUrl = `https://docs.google.com/viewerng/viewer?url=${encodeURIComponent(decodedUrl)}&embedded=true`;
+        }
+
         html += `    <iframe src="${escapeHtml(googleViewerUrl)}" class="pdf-viewer" frameborder="0" title="Visualisation PDF"></iframe>`;
         
         html += `    <div style="margin-top: 8px; text-align: center;">`;

@@ -15,6 +15,8 @@ $sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 $doc = new Document();
 
+
+
 ///////////////// NEW TEST ////////////////////
     $query = "
         SELECT folder_name, params
@@ -36,11 +38,23 @@ $doc = new Document();
         $used_param = $data['params'];
 
         if ($used_param == 2) {
-            $FolderDes = 'SharePoint';
+            $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
+            if(isset($result['status']) && $result['status'] === true){
+                $FolderDes = 'SharePoint';
+            }else{
+                $used_param = 3;
+                message("Erreur d'enregistrement du PDF dans SharePoint, Enregistrement dans le dossier Local", WARNING);
+            }
         } 
 
         if ($used_param == 3) {
             $FolderDes = 'Local';
+            if (is_dir($folder_name)) {
+                $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folder_name;
+            } else {
+                $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/DocumentsSigned";
+            }
+
             $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folder_name;
 
             // Vérifie si le dossier existe, sinon le crée
@@ -103,7 +117,7 @@ if (file_put_contents($signaturePath, $signatureData) === false) {
     message("Échec de la sauvegarde de l'image de signature.", ERROR);
 }
 
-if ($config->mode() == 0){ //Récup BL depuis sharepoint
+if ($DOC->save == "SharePoint"){ //Récup BL depuis sharepoint
     try {
         $folderPath = ""; // Par défaut, $folderPath est vide
         if (!empty($DOC->url_bl)){
@@ -133,20 +147,21 @@ if ($config->mode() == 0){ //Récup BL depuis sharepoint
     // Vérifiez que le PDF source existe
     $existingPdfPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
 }
-if ($config->mode() == 2){ //Récup BL depuis local
+if ($DOC->save == "Local"){ //Récup BL depuis local
     // Vérifiez que le PDF source existe
-    $existingPdfPath = GLPI_PLUGIN_DOC_DIR . "/gestion/Documents/" . $DOC->bl;
+    $url = str_replace("_plugins", "", $DOC->url_bl.$DOC->bl);
+    $existingPdfPath = GLPI_PLUGIN_DOC_DIR . $url;
 }
-if ($config->mode() == 1){ //Récup BL depuis local
+if ($DOC->save == "Sage"){ //Récup BL depuis local
     // Vérifiez que le PDF source existe
     $existingPdfPath = downloadDocument($DOC->url_bl, GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/Sage_Temp_".$nombreAleatoire.".pdf");
 }
 
-    if (!file_exists($existingPdfPath)) {
-        message("Le fichier PDF source n'existe pas.", ERROR);
-        Html::back();
-        exit;
-    }
+if (!file_exists($existingPdfPath)) {
+    message("Le fichier PDF source n'existe pas.", ERROR);
+    Html::back();
+    exit;
+}
 
 ob_end_clean(); // Vide le tampon de sortie
 
@@ -273,6 +288,9 @@ if($config->fields['DisplayPdfEnd'] == 1){
 
 // Sauvegarder Temporaire due PDF modifié avec la signature ajoutée
 $outputPathTemp = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/".$DOC_NAME;
+if (!str_ends_with($outputPathTemp, '.pdf')) {
+    $outputPathTemp .= '.pdf';
+}
 
 if ($pdf->Output('F', $outputPathTemp) === '') {
     $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
@@ -287,7 +305,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     }
     
     if($config->ConfigModes() == 0){
-        if($config->mode() == 0){
+        if($DOC->save == "SharePoint"){
             try {
                 $folderPathFile = ""; // Par défaut, $folderPath est vide
                 if (!empty($DOC->url_bl)){
@@ -298,7 +316,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
                 message("Erreur : " . $e->getMessage(), ERROR);
             }
         }
-        if($config->mode() == 2){
+        if($DOC->save == "Local"){
             try {
                 $queryDelete = "DELETE FROM `glpi_documents` WHERE `id` = '$DOC->doc_id';";
                 if ($DB->query($queryDelete)) {
@@ -308,7 +326,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
                 message("Erreur de suppression du document non signé : " . $e->getMessage(), ERROR);
             }
         }
-        if ($config->mode() == 1){ //Récup BL depuis local
+        if ($DOC->save == "Sage"){ //Récup BL depuis local
             unlink($existingPdfPath);
         }
     }
@@ -339,6 +357,9 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             }
             // Construire le chemin complet de destination
             $destPath = $destDir . '/' . $fileName;
+            if (!str_ends_with($destPath, '.pdf')) {
+                $destPath .= '.pdf';
+            }
             // Copier le fichier
             copy($outputPathTemp, $destPath);
         }
@@ -361,6 +382,9 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         }
         if ($FolderDes == 'Local'){
             $folderPath = "_plugins/gestion/". $folderPath; // Chemin relatif pour le stockage local
+             if (!str_ends_with($DOC_NAME, '.pdf')) {
+                $DOC_NAME .= '.pdf';
+            }
             $input = ['name'        => addslashes(str_replace("?", "°", $DOC_NAME)),
                     'filename'    => addslashes($DOC_NAME),
                     'filepath'    => addslashes($folderPath . $DOC_NAME),
@@ -385,7 +409,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
 
         message('Documents : '. $DOC_NAME.' signé', INFO);
     } catch (Exception $e) {
-        message("Signé avec erreur, voir votre administrateur informatique : " . $e->getMessage(), ERROR);
+        message("Signé avec erreur, voir votre administrateur : " . $e->getMessage(), ERROR);
     }
                 
 

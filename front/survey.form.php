@@ -79,7 +79,7 @@ if (isset($_POST["add"])) {
          $tracker = null;
          $input = ['name'       => addslashes(str_replace("?", "°", $pdf_filename)),
                   'filename'    => addslashes($pdf_filename),
-                  'filepath'    => addslashes($search_pdf),
+                  'filepath'    => addslashes($pdf_folder.$pdf_filename),
                   'mime'        => 'application/pdf',
                   'users_id'    => Session::getLoginUserID(),
                   'entities_id' => 0,

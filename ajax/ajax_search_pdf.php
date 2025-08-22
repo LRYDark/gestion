@@ -15,27 +15,30 @@ $search = strtolower(trim($search));
 $results = [];
 
 if ($config->SharePointSearch() == 1 && $config->SharePointOn() == 1 ){
-    // SharePoint
-    $sharepoint_results = $sharepoint->searchSharePointGlobal($search);
-    if (is_array($sharepoint_results)) {
-        error_log("Debug SharePoint - Nombre de résultats: " . count($sharepoint_results));
-        
-        // Ajouter le badge SharePoint à chaque résultat
-        foreach ($sharepoint_results as &$result) {
-            // Ajouter la source SharePoint
-            $result['source'] = 'sharepoint';
+    $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
+    if(isset($result['status']) && $result['status'] === true){
+        // SharePoint
+        $sharepoint_results = $sharepoint->searchSharePointGlobal($search);
+        if (is_array($sharepoint_results)) {
+            error_log("Debug SharePoint - Nombre de résultats: " . count($sharepoint_results));
             
-            // Ajouter le badge SharePoint au HTML
-            if (isset($result['html'])) {
-                $result['html'] .= ' <span style="color:white;background-color:#0078d4;padding:2px 6px;border-radius:4px;font-size:11px;">☁️ SHAREPOINT</span>';
-            } else {
-                $result['html'] = $result['text'] . ' <span style="color:white;background-color:#0078d4;padding:2px 6px;border-radius:4px;font-size:11px;">☁️ SHAREPOINT</span>';
+            // Ajouter le badge SharePoint à chaque résultat
+            foreach ($sharepoint_results as &$result) {
+                // Ajouter la source SharePoint
+                $result['source'] = 'sharepoint';
+                
+                // Ajouter le badge SharePoint au HTML
+                if (isset($result['html'])) {
+                    $result['html'] .= ' <span style="color:white;background-color:#0078d4;padding:2px 6px;border-radius:4px;font-size:11px;">☁️ SHAREPOINT</span>';
+                } else {
+                    $result['html'] = $result['text'] . ' <span style="color:white;background-color:#0078d4;padding:2px 6px;border-radius:4px;font-size:11px;">☁️ SHAREPOINT</span>';
+                }
+                
+                error_log("Debug SharePoint - Résultat: " . json_encode($result));
             }
             
-            error_log("Debug SharePoint - Résultat: " . json_encode($result));
+            $results = array_merge($results, $sharepoint_results);
         }
-        
-        $results = array_merge($results, $sharepoint_results);
     }
 }
 

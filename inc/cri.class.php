@@ -79,7 +79,28 @@ class PluginGestionCri extends CommonDBTM {
       echo Html::hidden('REPORT_ID', ['value' => $ID]);
       echo Html::hidden('DOC', ['value' => $Doc_Name]);
       echo Html::hidden('id_document', ['value' => $id]);
+      
+      // Détection du protocole
+      $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
 
+      // Domaine
+      $host = $_SERVER['HTTP_HOST'];
+
+      // Chemin complet
+      $requestUri = $_SERVER['REQUEST_URI']; // ex: /glpi/plugins/gestion/front/survey.form.php
+
+      // Cherche la position de /glpi/
+      $pos = strpos($requestUri, '/glpi/');
+      if ($pos !== false) {
+         // Récupère tout jusqu'à /glpi
+         $beforeGlpi = substr($requestUri, 0, $pos + strlen('/glpi'));
+         // Construit l'URL complète
+         $baseUrl = $scheme . "://" . $host . $beforeGlpi . '/front';
+      } else {
+         // Si /glpi/ n'est pas trouvé, retourne juste le domaine
+         $baseUrl = $scheme . "://" . $host . '/front';
+      }
+ 
       if($DOC->signed == 0){ // ----------------------------------- NON SIGNÉ -----------------------------------         
          echo '<div class="form-container">';
          
@@ -102,14 +123,13 @@ class PluginGestionCri extends CommonDBTM {
                      $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);  
                   }
                   if ($DOC->save == 'Local'){
-                     $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
+                     $fileDownloadUrl = $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
                   }
                   if ($DOC->save == 'Sage'){
                      $fileDownloadUrl = $DOC->doc_url;
                   }
                
-                  if ($DOC->save == 'Sage' || $DOC->save == 'Local' /*|| $DOC->save == 'SharePoint'*/){
-                     
+                  if ($DOC->save == 'Sage' || $DOC->save == 'SharePoint'){
                      // CORRECTION : Ajouter le token UNIQUEMENT pour Sage
                      if ($DOC->save == 'Sage') {
                         // Extraire l'ID du document
@@ -136,6 +156,9 @@ class PluginGestionCri extends CommonDBTM {
                      }
                      
                      echo "<iframe src='" . htmlspecialchars($google_viewer_url, ENT_QUOTES, 'UTF-8') . "' 
+                           class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
+                  }elseif ($DOC->save == 'Local'){
+                     echo "<iframe src='" . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . "' 
                            class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
                   }
                } catch (Exception $e) {
@@ -706,13 +729,13 @@ class PluginGestionCri extends CommonDBTM {
                      $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);  
                   }
                   if ($DOC->save == 'Local'){
-                     $fileDownloadUrl = 'document.send.php?docid='.$DOC->doc_id;
+                     $fileDownloadUrl = $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
                   }
                   if ($DOC->save == 'Sage'){
                      $fileDownloadUrl = $DOC->doc_url;
                   }
                   
-                  if ($DOC->save == 'Sage' || $DOC->save == 'Local' /*|| $DOC->save == 'SharePoint'*/){
+                  if ($DOC->save == 'Sage' || $DOC->save == 'SharePoint'){
                      
                      // CORRECTION : Ajouter le token UNIQUEMENT pour Sage (SECTION SIGNÉ)
                      if ($DOC->save == 'Sage') {
@@ -740,6 +763,9 @@ class PluginGestionCri extends CommonDBTM {
                      }
                      
                      echo "<iframe src='" . htmlspecialchars($google_viewer_url, ENT_QUOTES, 'UTF-8') . "' 
+                           class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
+                  }elseif ( $DOC->save == 'Local'){
+                     echo "<iframe src='" . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . "' 
                            class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
                   }
                } catch (Exception $e) {
