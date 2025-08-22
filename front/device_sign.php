@@ -861,11 +861,9 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     
     // Démarrer un nouveau timer seulement si on est en mode attente
     if (polling && waitingEl.classList.contains('show')) {
-      console.log('Auto-refresh programmé dans 30 minutes');
       autoRefreshTimer = setTimeout(() => {
         // Vérifier qu'on est toujours en mode attente avant de refresh
         if (polling && waitingEl.classList.contains('show')) {
-          console.log('Auto-refresh exécuté');
           window.location.reload();
         }
       }, REFRESH_INTERVAL);
@@ -874,7 +872,6 @@ $plugin_base = $rootdoc . '/plugins/gestion';
 
   function stopAutoRefresh() {
     if (autoRefreshTimer) {
-      console.log('Auto-refresh annulé');
       clearTimeout(autoRefreshTimer);
       autoRefreshTimer = null;
     }
@@ -978,13 +975,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     
     refuseBtn.disabled = true;
     
-    try {
-      console.log('Refusing signature...', {
-        device_id: DEVICE_ID,
-        token: TOKEN,
-        request_id: requestId
-      });
-      
+    try {     
       const res = await fetch(BASE + '/ajax/device_refuse.php', {
         method: 'POST',
         headers: {
@@ -1000,7 +991,6 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       });
       
       const responseText = await res.text();
-      console.log('Refuse response:', responseText);
       
       let data;
       try {
@@ -1014,7 +1004,6 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         throw new Error(data.error || 'Erreur serveur HTTP ' + res.status);
       }
       
-      console.log('Refusal success:', data);
       sendOk.textContent = 'Signature refusée. Vous pouvez fermer cette page.';
       sendOk.style.display = 'block';
       
@@ -1162,10 +1151,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     }
 
     // Document avec debug pour identifier le problème
-    if (parameters.document_name) {
-      // DEBUG : Afficher l'URL reçue
-      console.log('URL reçue dans parameters.document_url:', parameters.document_url);
-      
+    if (parameters.document_name) {   
       html += `<div class="section">`;
       html += `  <div class="section-title">📄 Document</div>`;
       html += `  <div class="section-content">`;
@@ -1183,17 +1169,10 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         // Décoder l'URL
         let decodedUrl = decodeHtmlEntities(parameters.document_url);
         
-        // DEBUG : Afficher l'URL après décodage
-        console.log('URL après décodage:', decodedUrl);
-        
         // Si le décodage n'a pas fonctionné, forcer le remplacement manuel
         if (decodedUrl.includes('&#38;')) {
           decodedUrl = decodedUrl.replace(/&#38;/g, '&');
-          console.log('URL après remplacement manuel:', decodedUrl);
         }
-        
-        // DEBUG : Afficher l'URL finale qui sera utilisée
-        console.log('URL finale utilisée:', decodedUrl);
         
         // ✅ Déclaration en amont
         let googleViewerUrl = '';
@@ -1386,14 +1365,11 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       
       const data = await res.json();
       
-      console.log('Poll response:', data);
-      
       if (!res.ok || !data.ok) {
         throw new Error(data.error || 'Erreur de polling');
       }
       
       if (data.pending === true && data.request_id) {
-        console.log('Request found:', data);
         requestId = data.request_id;
         ticketId = data.ticket_id;
         requestData = data;
@@ -1472,16 +1448,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       const png = canvas.toDataURL('image/png');
       const signer = document.getElementById('signer').value || '';
       const signerEmail = document.getElementById('signerEmail').value || '';
-      
-      console.log('Sending signature...', {
-        device_id: DEVICE_ID,
-        token: TOKEN,
-        request_id: requestId,
-        signer_name: signer,
-        signer_email: signerEmail,
-        signature_length: png.length
-      });
-      
+            
       const res = await fetch(BASE + '/ajax/device_submit.php', {
         method: 'POST',
         headers: {
@@ -1500,7 +1467,6 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       });
       
       const responseText = await res.text();
-      console.log('Raw response:', responseText);
       
       let data;
       try {
@@ -1514,7 +1480,6 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         throw new Error(data.error || 'Erreur serveur HTTP ' + res.status);
       }
       
-      console.log('Success:', data);
       sendOk.style.display = 'block';
       
       // Après succès, attendre 3 secondes puis retourner à l'écran d'attente
