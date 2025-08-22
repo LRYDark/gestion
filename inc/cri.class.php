@@ -62,7 +62,7 @@ class PluginGestionCri extends CommonDBTM {
       $DOC = $DB->query("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$id'")->fetch_object();
       $Doc_Name = $DOC->bl;
       $doc_id  = $DOC->doc_id;
-      $DocUrlSharePoint = $DOC->doc_url;
+      $DocUrlSharePoint = "";
    
       $email = $DB->query("SELECT GROUP_CONCAT(email SEPARATOR ',') AS emails FROM ( SELECT DISTINCT u.email AS email FROM glpi_useremails u JOIN glpi_users us ON us.id = u.users_id JOIN glpi_tickets t ON t.id = $ID WHERE us.entities_id = t.entities_id AND u.email IS NOT NULL AND u.email <> '' AND us.is_deleted = 0 UNION SELECT DISTINCT e.email FROM glpi_entities e JOIN glpi_tickets t ON t.entities_id = e.id WHERE t.id = $ID AND e.email IS NOT NULL AND e.email <> '' ) AS mails;")->fetch_object();   
       if(!empty($email->emails)){
@@ -120,12 +120,15 @@ class PluginGestionCri extends CommonDBTM {
             if ($config->fields['SharePointLinkDisplay'] == 1) {
                try {
                   if ($DOC->save == 'SharePoint'){
+                     $DocUrlSharePoint = $DOC->doc_url;
                      $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);  
                   }
                   if ($DOC->save == 'Local'){
                      $fileDownloadUrl = $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
+                     $DocUrlSharePoint = $fileDownloadUrl;
                   }
                   if ($DOC->save == 'Sage'){
+                     $DocUrlSharePoint = $DOC->doc_url;
                      $fileDownloadUrl = $DOC->doc_url;
                   }
                
@@ -726,17 +729,19 @@ class PluginGestionCri extends CommonDBTM {
             if ($config->fields['SharePointLinkDisplay'] == 1) {
                try {
                   if ($DOC->save == 'SharePoint'){
+                     $DocUrlSharePoint = $DOC->doc_url;
                      $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);  
                   }
                   if ($DOC->save == 'Local'){
                      $fileDownloadUrl = $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
+                     $DocUrlSharePoint = $fileDownloadUrl;
                   }
                   if ($DOC->save == 'Sage'){
+                     $DocUrlSharePoint = $DOC->doc_url;
                      $fileDownloadUrl = $DOC->doc_url;
                   }
                   
                   if ($DOC->save == 'Sage' || $DOC->save == 'SharePoint'){
-                     
                      // CORRECTION : Ajouter le token UNIQUEMENT pour Sage (SECTION SIGNÉ)
                      if ($DOC->save == 'Sage') {
                         // Extraire l'ID du document
