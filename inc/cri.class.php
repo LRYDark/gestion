@@ -201,7 +201,7 @@ class PluginGestionCri extends CommonDBTM {
                echo "<div id='".$uniq."' class='cri-signature-root'>";
                   echo "  <div class='signature-container'>";
                   echo "    <button type='button' class='zoom-btn'>Agrandir <i class='fa-solid fa-up-right-and-down-left-from-center'></i></button>";
-                  echo "    <canvas id='sig-canvas-".$uniq."' width='400' height='120' class='sig-base'></canvas>";
+                  echo "    <canvas id='sig-canvas-".$uniq."' height='190' class='sig-base'></canvas>";
                   echo "  </div>";
                   echo "  <button type='button' id='sig-clearBtn-".$uniq."' class='resetButton'>Supprimer la signature</button>";
 
