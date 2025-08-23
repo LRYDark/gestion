@@ -45,10 +45,11 @@ function initializeSignature(uniqId) {
     let needModalResync = false; // resynchro forcée après pivot
 
     // Épaisseurs (px CSS)
-    const TARGET_BASE_LINE   = 1.2;  // ta nouvelle épaisseur “en live” sur le canvas de base
-    const VISUAL_MODAL_LINE  = 1.6;  // affichage modale (comme avant)
-    const REF_BASE_EXPORT_LINE = 1.8; // ⬅️ épaisseur “cible” quand on revient de la modale vers la base
+    const TARGET_BASE_LINE   = 2.00;  // ta nouvelle épaisseur “en live” sur le canvas de base
+    const VISUAL_MODAL_LINE  = 1.80;  // affichage modale (comme avant)
+    const REF_BASE_EXPORT_LINE = 2.40; // ⬅️ épaisseur “cible” quand on revient de la modale vers la base
     let   exportLineCSS = TARGET_BASE_LINE;
+    const MOBILE_TWEAK = 0.90;
 
     // ---- utilitaires ----
     function setup(ctx, lw) {
@@ -91,7 +92,8 @@ function initializeSignature(uniqId) {
       ctx.setTransform(1,0,0,1,0,0);               // unité = pixel bitmap
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-      ctx.lineWidth = Math.max(1, cssLineWidth * s); // épaisseur bitmap
+      const isModal = (canvas === modalCanvas || canvas === modalExportCanvas);
+      ctx.lineWidth = Math.max(1, cssLineWidth * s * (isModal ? MOBILE_TWEAK : 1));
       ctx.beginPath();
       ctx.moveTo(fromCSS.x * s, fromCSS.y * s);
       ctx.lineTo(toCSS.x   * s, toCSS.y   * s);
@@ -130,7 +132,8 @@ function initializeSignature(uniqId) {
       ctx.imageSmoothingQuality = "high";
       ctx.strokeStyle = "#000";
       ctx.lineCap="round"; ctx.lineJoin="round";
-      ctx.lineWidth = Math.max(1, cssLineWidth * s);
+      const isModal = (canvas === modalCanvas || canvas === modalExportCanvas);
+      ctx.lineWidth = Math.max(1, cssLineWidth * s * (isModal ? MOBILE_TWEAK : 1));
 
       const W = canvas.width, H = canvas.height;
       for (const path of paths) {
@@ -145,7 +148,11 @@ function initializeSignature(uniqId) {
 
     function applyModalStyle() {
       setup(modalCtx, VISUAL_MODAL_LINE);
-      const ratio = (modalExportCanvas.width || 1) / (originalCanvas.width || 1);
+      const ratioRaw = (modalExportCanvas.width || 1) / (originalCanvas.width || 1);
+
+      // ⬇️ garde-fou : évite d’amplifier/réduire trop l’épaisseur quand la modale est bien plus grande/petite
+      const ratio = Math.min(1.15, Math.max(0.85, ratioRaw));
+
       exportLineCSS = Math.max(1, REF_BASE_EXPORT_LINE * ratio);
       setup(modalExportCtx, exportLineCSS);
     }
