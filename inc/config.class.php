@@ -940,20 +940,37 @@ class PluginGestionConfig extends CommonDBTM
          }
       }
 
-      if (count($rows) > 0) {
-      foreach ($rows as $r) {
-         echo "<tr>";
-         echo "<td>" . Html::entities_deep($r['device_id']) . "</td>";
-         echo "<td>" . Html::entities_deep($r['serial']) . "</td>";
-         echo "<td style='font-family:monospace'>" . Html::entities_deep($r['device_token']) . "</td>";
-
-         // Checkbox pour Actif
-         $checked = $r['is_active'] ? "checked" : "";
-         echo "<td><input type='checkbox' name='device_active[".$r['id']."]' value='1' $checked></td>";
-
-         echo "<td><input type='checkbox' name='device_delete[]' value='".$r['id']."'></td>";
-         echo "</tr>";
+      // Fonction PHP pour générer l'URL de signature
+      function generateSignatureUrl($device_id, $token) {
+         global $CFG_GLPI;
+         // Détection du protocole (HTTP ou HTTPS)
+         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+         // Récupération du nom de domaine
+         $domain = $_SERVER['SERVER_NAME'];
+         // Construction du chemin GLPI - détection intelligente
+         $rootdoc = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');
+         // Construction de l'URL finale
+         $url = $protocol . $domain . $rootdoc . '/plugins/gestion/front/device_sign.php?device_id=' . urlencode($device_id) . '&token=' . urlencode($token);
+         
+         return $url;
       }
+
+      if (count($rows) > 0) {
+         foreach ($rows as $r) {
+            echo "<tr>";
+            $signatureUrl = generateSignatureUrl($r['device_id'], $r['device_token']);
+            echo "<tr>";
+            echo "<td>" . Html::entities_deep($r['device_id']) . " <i class='fa-solid fa-circle-info text-primary' style='cursor: pointer; margin-left: 5px;' onclick='showSignatureUrl(\"" . addslashes($signatureUrl) . "\")' data-bs-toggle='tooltip' data-bs-placement='top' title='Cliquer pour voir le lien de signature'></i></td>";
+            echo "<td>" . Html::entities_deep($r['serial']) . "</td>";
+            echo "<td style='font-family:monospace'>" . Html::entities_deep($r['device_token']) . "</td>";
+
+            // Checkbox pour Actif
+            $checked = $r['is_active'] ? "checked" : "";
+            echo "<td><input type='checkbox' name='device_active[".$r['id']."]' value='1' $checked></td>";
+
+            echo "<td><input type='checkbox' name='device_delete[]' value='".$r['id']."'></td>";
+            echo "</tr>";
+         }
       } else {
          echo "<tr><td colspan='5' style='text-align:center;color:#888;'>Aucun appareil trouvé</td></tr>";
       }
@@ -969,6 +986,62 @@ class PluginGestionConfig extends CommonDBTM
 
       echo "</table>";
       echo "</div>";
+      
+      // Modal pour afficher l'URL de signature
+      echo <<<HTML
+      <div class="modal fade" id="signatureUrlModal" tabindex="-1" aria-labelledby="signatureUrlModalLabel" aria-hidden="true">
+         <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+               <div class="modal-header">
+                  <h5 class="modal-title" id="signatureUrlModalLabel">Lien de signature pour tablette</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+               </div>
+               <div class="modal-body">
+                  <p>Voici le lien pour accéder à la page de signature sur la tablette :</p>
+                  <div class="input-group">
+                     <input type="text" class="form-control" id="signatureUrlInput" readonly>
+                     <button class="btn btn-outline-secondary" type="button" onclick="copySignatureUrl()">
+                        <i class="fa fa-copy"></i> Copier
+                     </button>
+                  </div>
+                  <div class="mt-2">
+                     <small class="text-muted">Ce lien permet à la tablette d'accéder à l'interface de signature déportée.</small>
+                  </div>
+               </div>
+               <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+               </div>
+            </div>
+         </div>
+      </div>
+
+      <script>
+         function showSignatureUrl(url) {
+            document.getElementById('signatureUrlInput').value = url;
+            var modal = new bootstrap.Modal(document.getElementById('signatureUrlModal'));
+            modal.show();
+         }
+         
+         function copySignatureUrl() {
+            var input = document.getElementById('signatureUrlInput');
+            input.select();
+            input.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(input.value).then(function() {
+               var btn = event.target.closest('button');
+               var originalHtml = btn.innerHTML;
+               btn.innerHTML = '<i class="fa fa-check"></i> Copié !';
+               btn.classList.remove('btn-outline-secondary');
+               btn.classList.add('btn-success');
+               
+               setTimeout(function() {
+                  btn.innerHTML = originalHtml;
+                  btn.classList.remove('btn-success');
+                  btn.classList.add('btn-outline-secondary');
+               }, 2000);
+            });
+         }
+      </script>
+      HTML;
 
       $config->showFormButtons(['candel' => false]);
       return false;
