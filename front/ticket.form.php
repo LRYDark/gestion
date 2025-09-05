@@ -16,7 +16,7 @@ $config = new PluginGestionConfig();
 // Vérifier que le formulaire a été soumis
 if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     $ticketId = (int) $_POST['tickets_id'];
-
+    
     // Récupérer l'ID de l'entité associée au ticket
     $entityResult = $DB->query("SELECT entities_id FROM glpi_tickets WHERE id = $ticketId")->fetch_object();
     $entityId = $entityResult->entities_id;
@@ -85,8 +85,11 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                     $item .= '.pdf';
                 }
             }    
-            
-            $existedoc = $DB->query("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
+            if ($config->mode() == 1){
+                $existedoc = $DB->query("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE url_bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
+            }else{
+                $existedoc = $DB->query("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
+            }
             if(empty($existedoc->bl)){
                 if ($config->mode() == 0){
                     if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker, save) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker', '$save')")) {
@@ -128,11 +131,10 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                             SET tickets_id = ?, 
                                 url_bl = ?,
                                 tracker = ?
-                            WHERE bl = ?";
+                            WHERE bl = ? OR url_bl = ?";
 
-                    // Exécution de la requête préparée
                     $stmt = $DB->prepare($sql);
-                    $stmt->execute([$ticketId, $itemUrl, $tracker, $item]);
+                    $stmt->execute([$ticketId, $itemUrl, $tracker, $item, $item]);
                 }elseif($existedoc->tickets_id != $ticketId){
                     Session::addMessageAfterRedirect(__($DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
                     $success = false;
@@ -169,11 +171,10 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
         // Préparer la requête SQL
         $sql = "UPDATE glpi_plugin_gestion_surveys 
                 SET tickets_id = ?
-                WHERE bl = ?";
+                WHERE bl = ? OR url_bl = ?";
 
-        // Exécution de la requête préparée
         $stmt = $DB->prepare($sql);
-        if (!$stmt->execute([0, $item])){
+        if (!$stmt->execute([0, $item, $item])){
             Session::addMessageAfterRedirect(__("Erreur de suppression des éléments", 'gestion'), true, ERROR);
         }else{
             //Event::log($UserId, "users", 5, "setup", sprintf(__('%s updates an item'), $_SESSION["glpiname"]));

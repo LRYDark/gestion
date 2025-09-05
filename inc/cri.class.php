@@ -132,38 +132,11 @@ class PluginGestionCri extends CommonDBTM {
                      $fileDownloadUrl = $DOC->doc_url;
                   }
                
-                  if ($DOC->save == 'Sage' || $DOC->save == 'SharePoint'){
-                     // CORRECTION : Ajouter le token UNIQUEMENT pour Sage
-                     if ($DOC->save == 'Sage') {
-                        // Extraire l'ID du document
-                        $doc_id_for_token = '';
-                        if (preg_match('/[?&]id=([^&]+)/', $fileDownloadUrl, $matches)) {
-                            $doc_id_for_token = $matches[1];
-                        } elseif (preg_match('/docid=([^&]+)/', $fileDownloadUrl, $matches)) {
-                            $doc_id_for_token = $matches[1];
-                        }
-                        
-                        // Construire l'URL avec token pour Google Viewer
-                        $tokenized_url_for_preview = $fileDownloadUrl;
-                        if (!empty($doc_id_for_token)) {
-                            $temp_token = generateTempTokenForPreview($doc_id_for_token);
-                            $separator = (strpos($fileDownloadUrl, '?') !== false) ? '&' : '?';
-                            $tokenized_url_for_preview = $fileDownloadUrl . $separator . 'token=' . $temp_token;
-                        }
-                        
-                        // Construire l'URL Google Viewer avec l'URL tokenisée
-                        $google_viewer_url = "https://docs.google.com/viewerng/viewer?url=" . urlencode($tokenized_url_for_preview) . "&embedded=true";
-                     } else {
-                        // Pour Local et SharePoint : pas de token, URL directe
-                        $google_viewer_url = "https://docs.google.com/viewerng/viewer?url=" . $fileDownloadUrl . "&embedded=true";
-                     }
-                     
-                     echo "<iframe src='" . htmlspecialchars($google_viewer_url, ENT_QUOTES, 'UTF-8') . "' 
-                           class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
-                  }elseif ($DOC->save == 'Local'){
-                     echo "<iframe src='" . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . "' 
-                           class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
-                  }
+                  echo '<object data="' . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . '#view=FitH" '
+                     . 'type="application/pdf" class="pdf-viewer pdf-responsive" '
+                     . 'style="' . htmlspecialchars($responsiveIframeStyle, ENT_QUOTES, 'UTF-8') . '">'
+                     . 'Votre navigateur ne peut pas afficher le PDF.'
+                     . '</object>';
                } catch (Exception $e) {
                   echo "<p>Erreur lors du chargement du PDF</p>";
                }
@@ -741,38 +714,11 @@ class PluginGestionCri extends CommonDBTM {
                      $fileDownloadUrl = $DOC->doc_url;
                   }
                   
-                  if ($DOC->save == 'Sage' || $DOC->save == 'SharePoint'){
-                     // CORRECTION : Ajouter le token UNIQUEMENT pour Sage (SECTION SIGNÉ)
-                     if ($DOC->save == 'Sage') {
-                        // Extraire l'ID du document
-                        $doc_id_for_token = '';
-                        if (preg_match('/[?&]id=([^&]+)/', $fileDownloadUrl, $matches)) {
-                            $doc_id_for_token = $matches[1];
-                        } elseif (preg_match('/docid=([^&]+)/', $fileDownloadUrl, $matches)) {
-                            $doc_id_for_token = $matches[1];
-                        }
-                        
-                        // Construire l'URL avec token pour Google Viewer
-                        $tokenized_url_for_preview = $fileDownloadUrl;
-                        if (!empty($doc_id_for_token)) {
-                            $temp_token = generateTempTokenForPreview($doc_id_for_token);
-                            $separator = (strpos($fileDownloadUrl, '?') !== false) ? '&' : '?';
-                            $tokenized_url_for_preview = $fileDownloadUrl . $separator . 'token=' . $temp_token;
-                        }
-                        
-                        // Construire l'URL Google Viewer avec l'URL tokenisée
-                        $google_viewer_url = "https://docs.google.com/viewerng/viewer?url=" . urlencode($tokenized_url_for_preview) . "&embedded=true";
-                     } else {
-                        // Pour Local et SharePoint : pas de token, URL directe
-                        $google_viewer_url = "https://docs.google.com/viewerng/viewer?url=" . $fileDownloadUrl . "&embedded=true";
-                     }
-                     
-                     echo "<iframe src='" . htmlspecialchars($google_viewer_url, ENT_QUOTES, 'UTF-8') . "' 
-                           class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
-                  }elseif ( $DOC->save == 'Local'){
-                     echo "<iframe src='" . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . "' 
-                           class='pdf-viewer pdf-responsive' style='$responsiveIframeStyle' frameborder='0'></iframe>";
-                  }
+                  echo '<object data="' . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . '#view=FitH" '
+                     . 'type="application/pdf" class="pdf-viewer pdf-responsive" '
+                     . 'style="' . htmlspecialchars($responsiveIframeStyle, ENT_QUOTES, 'UTF-8') . '">'
+                     . 'Votre navigateur ne peut pas afficher le PDF.'
+                     . '</object>';
                } catch (Exception $e) {
                   echo "<p>Erreur lors du chargement du PDF</p>";
                }
