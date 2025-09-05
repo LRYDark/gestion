@@ -112,12 +112,12 @@ class PluginGestionReminder extends CommonDBTM {
          $lastdate = date('Y-m-d H:i', strtotime('-30 minutes'));
          //$lastdate = date('Y-m-d H:i', strtotime('-2 hours'));
 
-         $DB->query("UPDATE glpi_plugin_gestion_configs SET LastCronTask = '$lastdate' WHERE id = 1");
+         $DB->doQuery("UPDATE glpi_plugin_gestion_configs SET LastCronTask = '$lastdate' WHERE id = 1");
 
          // Étape 2 : Récupérer les fichiers récents
          $recentFiles = $sharepoint->searchSharePointCron($startDate, $endDate);
 
-         $requet2 = $DB->query("SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1")->fetch_object();
+         $requet2 = $DB->doQuery("SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 2 LIMIT 1")->fetch_object();
          $fileDestination = $requet2->folder_name ?? NULL;
 
          foreach ($recentFiles as $file) {
@@ -151,7 +151,7 @@ class PluginGestionReminder extends CommonDBTM {
                         $entities = $matches[1];
                      }       
 
-                     $entities = $DB->query("SELECT id FROM `glpi_entities` WHERE name = '$entities'")->fetch_object();
+                     $entities = $DB->doQuery("SELECT id FROM `glpi_entities` WHERE name = '$entities'")->fetch_object();
                      if (!empty($entities->id)) {
                         $entitiesid = $entities->id;
                      }
@@ -180,7 +180,7 @@ class PluginGestionReminder extends CommonDBTM {
 
                // Vérifier si le fichier existe déjà en base
                $query = "SELECT COUNT(*) AS count FROM `glpi_plugin_gestion_surveys` WHERE `bl` = '$fileName';";
-               $result = $DB->query($query);
+               $result = $DB->doQuery($query);
                $row = $DB->fetchassoc($result);
                $id_survey = 0;
 
@@ -190,9 +190,9 @@ class PluginGestionReminder extends CommonDBTM {
                      ? "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, signed, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned, '$tracker')"
                      : "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', '$tracker')";
                      
-                  if ($DB->query($sql)) {
+                  if ($DB->doQuery($sql)) {
                      // Récupérer l'ID de la dernière ligne insérée avec LAST_INSERT_ID()
-                     $result = $DB->query("SELECT LAST_INSERT_ID() AS id");
+                     $result = $DB->doQuery("SELECT LAST_INSERT_ID() AS id");
                      if ($result) {
                         $row = $result->fetch_assoc();
                         $id_survey = $row['id'];
@@ -205,7 +205,7 @@ class PluginGestionReminder extends CommonDBTM {
                if($config->MailTrackerYesNo() == 1 && !empty($config->MailTracker())){
                   // Requête pour récupérer les enregistrements ayant params = 5
                   $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 5";
-                  $result = $DB->query($query);
+                  $result = $DB->doQuery($query);
 
                   if ($result || $DB->numrows($result) != 0) {
                      // Vérification des correspondances

@@ -1,11 +1,11 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.4.3'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.5.0_beta1'); // version du plugin
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 // Minimal GLPI version,
-define("PLUGIN_GESTION_MIN_GLPI", "10.0.3");
+define("PLUGIN_GESTION_MIN_GLPI", "11.0.0");
 // Maximum GLPI version,
-define("PLUGIN_GESTION_MAX_GLPI", "10.2.0");
+define("PLUGIN_GESTION_MAX_GLPI", "11.0.1");
 
 define("PLUGIN_GESTION_WEBDIR", Plugin::getWebDir("gestion"));
 define("PLUGIN_GESTION_DIR", Plugin::getPhpDir("gestion"));
@@ -19,28 +19,25 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
    $PLUGIN_HOOKS['change_profile']['gestion'] = [PluginGestionProfile::class, 'initProfile'];
 
    $plugin = new Plugin();
-   if ($plugin->isActivated('gestion')){ // verification si le plugin gestion est installé et activé
+   if ($plugin->isInstalled('gestion') && $plugin->isActivated('gestion')){  // verification si le plugin gestion est installé et activé
 
       if (Session::getLoginUserID()) {
          Plugin::registerClass('PluginGestionProfile', ['addtabon' => 'Profile']);
+
+         $PLUGIN_HOOKS['add_css']['rp'] = ["css/signature.css"];
+         $PLUGIN_HOOKS['add_javascript']['gestion'] = ['js/scripts.js'];
       }
 
       if (Session::haveRight('plugin_gestion_survey', READ)) {
          $PLUGIN_HOOKS["menu_toadd"]['gestion'] = ['management' => PluginGestionMenu::class];
       }
 
-      if (isset($_SESSION['glpiactiveprofile']['interface'])
-         && $_SESSION['glpiactiveprofile']['interface'] == 'central') {
-         $PLUGIN_HOOKS['add_javascript']['gestion'] = ['scripts/scripts-gestion.js'];
-      }
+      $PLUGIN_HOOKS['post_item_form']['gestion'] = ['PluginGestionTicket','AddDocForm']; // initialisation de la class formroutetime
 
       Plugin::registerClass('PluginGestionTicket', ['addtabon' => 'Ticket']);
 
-      $PLUGIN_HOOKS['config_page']['gestion'] = 'front/config.form.php'; // initialisation de la page config
+      $PLUGIN_HOOKS['config_page']['gestion'] = '../../front/config.form.php?forcetab=' . urlencode('PluginGestionConfig$1'); // initialisation de la page config
       Plugin::registerClass('PluginGestionConfig', ['addtabon' => 'Config']); // ajout de la de la class config dans glpi
-
-      $PLUGIN_HOOKS['post_show_item']['gestion'] = ['PluginGestionTicket', 'postShowItemNewTicketGESTION']; // initialisation de la class
-      $PLUGIN_HOOKS['pre_show_item']['gestion'] = ['PluginGestionTicket', 'postShowItemNewTaskGESTION']; // initialisation de la class
    }
 }
 

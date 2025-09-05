@@ -1,0 +1,97 @@
+{# @gestion/tickets/config.html.twig #}
+
+{% if embed_in_ticket_form %}
+            </div>
+        </section>
+    </section>
+
+    <section class="accordion-item" aria-label="{{ type_name }}">
+        <div class="accordion-header d-flex align-items-center justify-content-between" id="heading-plugin-gestion-ticket-config">
+            <button
+                class="accordion-button {{ uncollapsed ? '' : 'collapsed' }}"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#plugin-gestion-ticket-config"
+                aria-expanded="{{ uncollapsed ? 'true' : 'false' }}"
+                aria-controls="plugin-gestion-ticket-config">
+                <i class="ti ti-paperclip me-2"></i>
+                <span class="item-title">{{ type_name }}</span>
+            </button>
+
+            {# ---- BOUTON DIRECT "LIER DES DOCUMENTS" (avec un peu d’air à droite) ---- #}
+            {% if gestion_button_enabled %}
+            <button class="btn btn-sm btn-outline-secondary me-3 pe-2"
+                    type="button"
+                    data-action="open-gestion-modal">
+                <i class="ti ti-link me-2"></i>Lier des documents
+            </button>
+            {% endif %}
+        </div>
+
+        <div id="plugin-gestion-ticket-config"
+             class="accordion-collapse collapse {{ uncollapsed ? 'show' : '' }}"
+             aria-labelledby="heading-plugin-gestion-ticket-config">
+
+            <div class="accordion-body row m-0 mt-n2">
+                <div class="text-muted small mb-2">
+                    <em>Cliquez sur “Lier des documents” pour ajouter des documents depuis Sage / SharePoint / Dossier local.</em>
+                </div>
+
+                {# Liste des documents liés (non signés) #}
+                {% if linked_docs is defined and linked_docs|length > 0 %}
+                    <ul class="mb-0 ps-4">
+                        {% for doc in linked_docs %}
+                            <li>{{ doc.label }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <span class="text-muted small">Aucun document lié pour l’instant.</span>
+                {% endif %}
+            </div>
+
+            {% if gestion_button_enabled %}
+                {{ gestion_modal_html|raw }}
+                <script>
+                    {{ gestion_js_block|raw }}
+                </script>
+            {% endif %}
+{% else %}
+    <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title m-0">
+                <i class="ti ti-paperclip me-2"></i>{{ type_name }}
+            </h3>
+
+            {% if gestion_button_enabled %}
+            <button class="btn btn-sm btn-outline-secondary me-3 pe-2"
+                    type="button"
+                    data-action="open-gestion-modal">
+                <i class="ti ti-link me-2"></i>Lier des documents
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="card-body">
+            <div class="text-muted small mb-2">
+                <em>Cliquez sur “Lier des documents” pour ajouter des documents depuis Sage / SharePoint / Dossier local.</em>
+            </div>
+
+            {% if linked_docs is defined and linked_docs|length > 0 %}
+                <ul class="mb-0 ps-4">
+                    {% for doc in linked_docs %}
+                        <li>{{ doc.label }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <span class="text-muted small">Aucun document lié pour l’instant.</span>
+            {% endif %}
+        </div>
+
+        {% if gestion_button_enabled %}
+            {{ gestion_modal_html|raw }}
+            <script>
+                {{ gestion_js_block|raw }}
+            </script>
+        {% endif %}
+    </div>
+{% endif %}

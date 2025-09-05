@@ -1,5 +1,6 @@
 <?php
 include('../../../inc/includes.php');
+global $DB;
 
 $plugin = new Plugin();
 if (!$plugin->isInstalled('gestion') || !$plugin->isActivated('gestion')) {
@@ -10,27 +11,15 @@ Session::checkRight('config', UPDATE);
 
 $config = new PluginGestionConfig();
 
-// Fonction pour charger la clé de cryptage à partir du fichier
-function loadEncryptionKey() {
-   // Chemin vers le fichier de clé de cryptage
-   $file_path = GLPI_ROOT . '/config/glpicrypt.key';
-   return file_get_contents($file_path);
-}
-
-function encryptData($data) {
-   // Chargez la clé de cryptage
-   $encryption_key = loadEncryptionKey();
-   return base64_encode(openssl_encrypt($data, 'aes-256-cbc', $encryption_key, 0, '1234567890123456'));
-}
-
 function encryptArray($array) {
-   $include_keys = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath'];
+   $include_keys = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken'];
    $encrypted_array = [];
 
    foreach ($array as $key => $value) {
        // Crypter uniquement les clés définies dans $include_keys
        if (in_array($key, $include_keys) && !empty($value)) {
-           $encrypted_array[$key] = encryptData($value);
+           //$encrypted_array[$key] = encryptData($value);
+           $encrypted_array[$key] = PluginGestionCrypto::encrypt($value);
        } else {
            $encrypted_array[$key] = $value;
        }
@@ -39,13 +28,12 @@ function encryptArray($array) {
 }
 
 if (isset($_POST["update"])) {
-   $config->check($_POST['id'], UPDATE);
    $encrypted_post = encryptArray($_POST);
 
    // Vérification et mise à jour des dossiers en fonction des entrées dans $_POST
    $queryAllFolders = "SELECT `id`, `folder_name`, `params`
                      FROM `glpi_plugin_gestion_configsfolder`;";
-   $resultFolders = $DB->query($queryAllFolders);
+   $resultFolders = $DB->doQuery($queryAllFolders);
 
    while ($row = $DB->fetchassoc($resultFolders)) {
       $folderId = $row['id'];
@@ -61,7 +49,7 @@ if (isset($_POST["update"])) {
                $queryUpdate = "UPDATE `glpi_plugin_gestion_configsfolder`
                               SET `params` = '$newValue'
                               WHERE `id` = '$folderId';";
-               if ($DB->query($queryUpdate)) {
+               if ($DB->doQuery($queryUpdate)) {
                   Session::addMessageAfterRedirect(
                      __("Le dossier $folderName a été mis à jour avec succès", 'gestion'),
                      true,
@@ -87,14 +75,14 @@ if (isset($_POST["update"])) {
                FROM `glpi_plugin_gestion_configsfolder`
                WHERE `folder_name` = '$folderName';";
 
-      $result = $DB->query($query);
+      $result = $DB->doQuery($query);
       $row = $DB->fetchassoc($result);
 
       if ($row['count'] == 0) {
          // Ajouter une nouvelle ligne
          $queryAdd = "INSERT INTO `glpi_plugin_gestion_configsfolder` (`folder_name`, `params`) 
                         VALUES ('$folderName', 8);";
-         if ($DB->query($queryAdd)) {
+         if ($DB->doQuery($queryAdd)) {
                Session::addMessageAfterRedirect(
                   __('Dossier ajouté avec succès', 'gestion'),
                   true,
@@ -120,7 +108,7 @@ if (isset($_POST["update"])) {
    $queryAllFolders = "SELECT `id`, `folder_name`
                      FROM `glpi_plugin_gestion_configsfolder`;";
 
-   $resultFolders = $DB->query($queryAllFolders);
+   $resultFolders = $DB->doQuery($queryAllFolders);
 
    while ($row = $DB->fetchassoc($resultFolders)) {
       $folderId = $row['id'];
@@ -130,13 +118,13 @@ if (isset($_POST["update"])) {
                            FROM `glpi_plugin_gestion_configsfolder`
                            WHERE `id` = '$folderId' AND `params` = '6';";
 
-      $resultCheck = $DB->query($queryCheckContent);
+      $resultCheck = $DB->doQuery($queryCheckContent);
       $rowCheck = $DB->fetchassoc($resultCheck);
 
       if ($rowCheck['count'] > 0) {
          // Supprimer la ligne
          $queryDelete = "DELETE FROM `glpi_plugin_gestion_configsfolder` WHERE `id` = '$folderId';";
-         if ($DB->query($queryDelete)) {
+         if ($DB->doQuery($queryDelete)) {
                Session::addMessageAfterRedirect(
                   __("Le dossier {$row['folder_name']} a été supprimé", 'gestion'),
                   true,
@@ -149,6 +137,73 @@ if (isset($_POST["update"])) {
                   ERROR
                );
          }
+      }
+   }
+
+   
+   // ===== AJOUTS POUR SIGNATURE DÉPORTÉE =====
+
+   // Encoder en JSON la liste des utilisateurs autorisés (si fournie)
+   if (isset($encrypted_post['RemoteSignatureUsers']) && is_array($encrypted_post['RemoteSignatureUsers'])) {
+      $ids = array_map('intval', $encrypted_post['RemoteSignatureUsers']);
+      $encrypted_post['RemoteSignatureUsers'] = json_encode(array_values($ids));
+   }
+
+   // Ajout d'une tablette autorisée (ligne d'ajout dans la config)
+   if (!empty($_POST['new_device_id'])) {
+      $did    = $DB->escape($_POST['new_device_id']);
+      $serial = $DB->escape($_POST['new_serial'] ?? '');
+      $token  = trim($_POST['new_token'] ?? '');
+      if ($token === '') {
+         try {
+            $token = bin2hex(random_bytes(32)); // 64 hex
+         } catch (Exception $e) {
+            $token = bin2hex(openssl_random_pseudo_bytes(32));
+         }
+      }
+      $token  = $DB->escape($token);
+      $active = isset($_POST['new_active']) ? 1 : 0;
+
+      $sql = "INSERT INTO `glpi_plugin_gestion_signaturedevices`
+              (`device_id`,`serial`,`device_token`,`is_active`)
+              VALUES ('$did','$serial','$token',$active)";
+      if ($DB->doQuery($sql)) {
+         Session::addMessageAfterRedirect(__('Tablette ajoutée', 'gestion'), true, INFO);
+      } else {
+         Session::addMessageAfterRedirect(__('Erreur ajout tablette: '.$DB->error(), 'gestion'), true, ERROR);
+      }
+   }
+
+   // Suppression de tablettes sélectionnées
+   if (!empty($_POST['device_delete']) && is_array($_POST['device_delete'])) {
+      $ids = array_map('intval', $_POST['device_delete']);
+      if (count($ids)) {
+         $in = implode(',', $ids);
+         $DB->doQuery("DELETE FROM `glpi_plugin_gestion_signaturedevices` WHERE id IN ($in)");
+         Session::addMessageAfterRedirect(sprintf(__('%d tablette(s) supprimée(s)', 'gestion'), count($ids)), true, INFO);
+      }
+   }
+
+   // Mise à jour des statuts Actif/Non actif (même si aucune case n'est cochée)
+   $res = $DB->doQuery("SELECT id FROM glpi_plugin_gestion_signaturedevices");
+   $all_ids = [];
+   while ($row = $DB->fetchassoc($res)) {
+      $all_ids[] = (int)$row['id'];
+   }
+
+   // Si rien n'est coché, device_active n'existe pas dans $_POST → on le traite comme un tableau vide
+   $active_ids = (isset($_POST['device_active']) && is_array($_POST['device_active']))
+      ? array_map('intval', array_keys($_POST['device_active']))
+      : [];
+
+   // (Option bulk) 1 requête pour tout passer à 0, puis 1 requête pour remettre à 1 les cochés
+   if (!empty($all_ids)) {
+      $in_all = implode(',', $all_ids);
+      $DB->doQuery("UPDATE glpi_plugin_gestion_signaturedevices SET is_active = 0 WHERE id IN ($in_all)");
+
+      if (!empty($active_ids)) {
+         $in_active = implode(',', $active_ids);
+         $DB->doQuery("UPDATE glpi_plugin_gestion_signaturedevices SET is_active = 1 WHERE id IN ($in_active)");
       }
    }
 

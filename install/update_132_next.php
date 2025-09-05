@@ -38,13 +38,13 @@ function update() {
 
    // Vérifier si la colonne EntitiesExtractValue existe déjà
    $checkQuery = "SHOW COLUMNS FROM `glpi_plugin_gestion_configs` LIKE 'EntitiesExtractValue'";
-   $result = $DB->query($checkQuery);
+   $result = $DB->doQuery($checkQuery);
 
    if ($result->num_rows == 0) {
       // Si la colonne n'existe pas, on l'ajoute
       $query = "ALTER TABLE `glpi_plugin_gestion_configs`
                ADD COLUMN `EntitiesExtractValue` VARCHAR(255) NULL;";
-      $DB->query($query) or die($DB->error());
+      $DB->doQuery($query) or die($DB->error());
    }
 }
   

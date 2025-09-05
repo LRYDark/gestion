@@ -51,14 +51,6 @@ class PluginGestionSurvey extends CommonDBTM {
       return $ong;
    }
 
-   function canCreateItem() {
-
-      if (!$this->checkEntity()) {
-         return false;
-      }
-      return true;
-   }
-
    /**
     * @return array
     */
@@ -161,40 +153,9 @@ class PluginGestionSurvey extends CommonDBTM {
       return $tab;
    }
 
-
-   /**
-    * Print survey
-    *
-    * @param       $ID
-    * @param array $options
-    *
-    * @return bool
-    */
-   function showForm($ID, $options = []) {
-      global $DB;
+   public function Formulaire(){
+      global $DB, $CFG_GLPI;
       $config = new PluginGestionConfig();
-
-      $params = ['job'           => $ID,
-                 'root_doc'      => PLUGIN_GESTION_WEBDIR,
-                 'root_modal'    => 'survey-form'];
-
-      
-      if (!$this->canView()) {
-         return false;
-      }
-
-      $this->initForm($ID, $options);
-      $this->showFormHeader($options);
-
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __('Non du document : ') . "</td>";
-            echo "<td>";
-            echo $this->fields['bl'].'.pdf';
-            echo "</td>";  
-            echo "<td>";
-            echo '<a href="' . $this->fields['doc_url'] . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
-         echo "</td></tr>";
-
       //----------------------------------------------------------------------------------------------------------------
       if (Plugin::isPluginActive('formcreator')) {
          if(empty($this->fields["tickets_id"]) && $config->fields['formulaire'] != 0){
@@ -275,6 +236,216 @@ class PluginGestionSurvey extends CommonDBTM {
          }
       }
       //----------------------------------------------------------------------------------------------------------------
+   }
+
+   /**
+    * Print survey
+    *
+    * @param       $ID
+    * @param array $options
+    *
+    * @return bool
+    */
+   function showForm($ID, $options = []) {
+      global $DB, $CFG_GLPI;
+      $config = new PluginGestionConfig();
+
+      // AJOUTER CETTE LIGNE pour charger votre fichier JS
+      echo "<script src='" . Plugin::getWebDir('gestion') . "/public/js/scripts.js'></script>";
+
+      $params = ['job'           => $ID,
+                 'root_doc'      => PLUGIN_GESTION_WEBDIR,
+                 'root_modal'    => 'survey-form'];
+
+      
+      if (!$this->canView()) {
+         return false;
+      }
+
+      $this->initForm($ID, $options);
+      $this->showFormHeader($options);
+
+      if ($_GET['id'] != null){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Non du document : ') . "</td>";
+               echo "<td>";
+               echo $this->fields['bl'];
+               echo "</td>";  
+               echo "<td>";
+               echo '<a href="' . $this->fields['doc_url'] . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
+            echo "</td></tr>";
+
+         $this->Formulaire();
+
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Entity') . "</td>";
+               echo "<td>";
+               Dropdown::show('Entity', [
+                  'name' => 'entities_id',
+                  'value' => $this->fields["entities_id"],
+                  'display_emptychoice' => 1,
+                  'specific_tags' => [],
+                  'itemtype' => 'Entity',
+                  'displaywith' => [],
+                  'emptylabel' => "-----",
+                  'used' => [],
+                  'toadd' => [],
+                  'entity_restrict' => 0,
+               ]); 
+            echo "</td><td colspan='2'></td></tr>";
+
+            echo "<tr class='tab_bg_1'>";
+            echo "<td>" . __('<a href="../../../front/ticket.form.php?id='. $this->fields["tickets_id"] .'">Ticket ID : '. $this->fields["tickets_id"] .'</a>') . "</td>";
+               echo "<td>";
+               Dropdown::show('Ticket', [
+                  'name' => 'tickets_id', // Le nom du champ
+                  'value' => $this->fields["tickets_id"], // La valeur sélectionnée par défaut
+                  'display_emptychoice' => 1, // Afficher un choix vide
+                  'specific_tags' => [], // Éventuels attributs HTML supplémentaires
+                  'itemtype' => 'Ticket', // Type d'objet à afficher
+                  'displaywith' => ['id'], // Champs à afficher pour les tickets
+                  'emptylabel' => "-----", // Étiquette pour l'option vide
+                  'used' => [], // Filtrage des tickets déjà utilisés
+                  'toadd' => [], // Liste personnalisée d'objets à ajouter
+                  'entity_restrict' => 0, // Autoriser les tickets de toutes les entités
+               ]);;
+            echo "</td><td colspan='2'></td></tr>";
+
+            echo "<tr class='tab_bg_1'><td></td></tr>";
+            echo "<tr class='tab_bg_1'><td></td></tr>";
+            echo "<tr class='tab_bg_1'><td></td></tr>";
+            echo "<tr class='tab_bg_1'><td></td></tr>";
+            echo "<tr class='tab_bg_1'><td></td></tr>";
+
+         $signed = '';
+         if ($this->fields['signed'] == 1){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Informations sur le document <strong>Signé</strong> :') ."</td>";
+               echo "<td>";
+                  echo Html::submit($this->fields['bl'], [
+                     'name'    => 'showCriForm',
+                     'class'   => 'btn btn-secondary',
+                     'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
+               ]);
+            echo "</td></tr>";
+         }else{
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Informations sur le document <strong>Non signé</strong> ')."</td>";
+               echo "<td>";
+                  echo Html::submit($this->fields['bl'], [
+                     'name'    => 'showCriForm',
+                     'class'   => 'btn btn-primary',
+                     'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
+                  ]);
+            echo "</td></tr>";
+         }
+      }else{
+         $script = <<<JAVASCRIPT
+            $('#search_pdf').on('select2:select', function (e) {
+               const data = e.params.data;
+
+               const filename = data.filename;
+               const folder   = data.folder;
+               const save   = data.save; // ici : "Local"
+               const signed   = data.signed; // ici : "Local"
+
+               // Exemple : remplir des champs cachés
+               $('#pdf_filename').val(filename);
+               $('#pdf_folder').val(folder);
+               $('#pdf_save').val(save);
+               $('#pdf_signed').val(signed);
+            });
+         JAVASCRIPT;  
+
+         // Inclure le script dans la page
+         echo Html::scriptBlock($script);
+
+         echo '<input type="hidden" name="pdf_filename" id="pdf_filename">';
+         echo '<input type="hidden" name="pdf_folder" id="pdf_folder">';
+         echo '<input type="hidden" name="pdf_save" id="pdf_save">';
+         echo '<input type="hidden" name="pdf_signed" id="pdf_signed">';
+
+         // Dans votre survey.class.php
+         echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __('Recherche document :') . "</td>";
+         echo "<td>";
+            echo '
+               <div>
+                  <select id="search_pdf" name="search_pdf" style="width:650px;"></select>
+                  <span id="spinner" style="display:none;">
+                     <img src="' . $CFG_GLPI['root_doc'] . '/pics/spinner.gif" alt="Chargement...">
+                  </span>
+               </div>
+            ';
+         echo "</td><td colspan='2'></td></tr>";
+
+         // JavaScript amélioré pour gérer la recherche Sage
+         echo '
+            <script>
+            $(document).ready(function() {
+               $("#search_pdf").select2({
+                  placeholder: "Recherche de fichier PDF...",
+                  minimumInputLength: 2,
+                  ajax: {
+                     delay: 300,
+                     url: "../ajax/ajax_search_pdf.php",
+                     dataType: "json",
+                     data: function(params) {
+                        $("#spinner").show();
+                        return { q: params.term };
+                     },
+                     processResults: function(data) {
+                        $("#spinner").hide();
+                        
+                        // Si aucun résultat, ne rien retourner
+                        if (!data || data.length === 0) {
+                           return { results: [] };
+                        }
+                        
+                        // Traitement spécial pour les résultats Sage
+                        var processedResults = [];
+                        
+                        $.each(data, function(index, item) {
+                           if (item.source === "sage") {
+                              // Pour les résultats Sage, ajouter une indication visuelle
+                              item.html = item.text + \' <span style="color:white;background-color:#007bff;padding:2px 6px;border-radius:4px;font-size:11px;">📄 SAGE</span>\';
+                           }
+                           processedResults.push(item);
+                        });
+                        
+                        return { results: processedResults };
+                     },
+                     cache: true
+                  },
+                  templateResult: function (data) {
+                     return data.html ? data.html : data.text;
+                  },
+                  templateSelection: function (data) {
+                     return data.text;
+                  },
+                  escapeMarkup: function (markup) {
+                     return markup;
+                  },
+                  // DÉSACTIVER COMPLÈTEMENT les tags - seuls les résultats de recherche sont autorisés
+                  tags: false,
+                  // Empêcher la création de nouvelles options
+                  createTag: function (params) {
+                     return null; // Ne jamais permettre la création de tags
+                  }
+               });
+               
+               // Pas de gestion spéciale de sélection - seuls les résultats réels sont autorisés
+               $("#search_pdf").on("select2:select", function (e) {
+                  var data = e.params.data;
+                  
+                  // Tous les résultats proviennent maintenant de la recherche réelle
+                  // Pas de vérification supplémentaire nécessaire
+               });
+            });
+            </script>
+         ';
+
+         $this->Formulaire();
 
          echo "<tr class='tab_bg_1'>";
             echo "<td>" . __('Entity') . "</td>";
@@ -309,34 +480,6 @@ class PluginGestionSurvey extends CommonDBTM {
                'entity_restrict' => 0, // Autoriser les tickets de toutes les entités
             ]);;
          echo "</td><td colspan='2'></td></tr>";
-
-         echo "<tr class='tab_bg_1'><td></td></tr>";
-         echo "<tr class='tab_bg_1'><td></td></tr>";
-         echo "<tr class='tab_bg_1'><td></td></tr>";
-         echo "<tr class='tab_bg_1'><td></td></tr>";
-         echo "<tr class='tab_bg_1'><td></td></tr>";
-
-      $signed = '';
-      if ($this->fields['signed'] == 1){
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __('Informations sur le document <strong>Signé</strong> :') ."</td>";
-            echo "<td>";
-               echo Html::submit($this->fields['bl'], [
-                  'name'    => 'showCriForm',
-                  'class'   => 'btn btn-secondary',
-                  'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
-              ]);
-         echo "</td></tr>";
-      }else{
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __('Informations sur le document <strong>Non signé</strong> ')."</td>";
-            echo "<td>";
-               echo Html::submit($this->fields['bl'], [
-                  'name'    => 'showCriForm',
-                  'class'   => 'btn btn-primary',
-                  'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
-               ]);
-         echo "</td></tr>";
       }
          
       if (Session::haveRight('plugin_gestion_survey', UPDATE)) {

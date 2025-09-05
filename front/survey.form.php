@@ -26,9 +26,10 @@
  along with gestion. If not, see <http://www.gnu.org/licenses/>.
  --------------------------------------------------------------------------
  */
-
-
 include('../../../inc/includes.php');
+require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
+
+global $DB, $CFG_GLPI;
 
 Session::checkLoginUser();
 
@@ -36,9 +37,88 @@ if (!isset($_GET["id"])) {
    $_GET["id"] = "";
 }
 
+$config = new PluginGestionConfig();
 $survey = new PluginGestionSurvey();
+$doc = new Document();
 
-if (isset($_POST["purge"])) {
+function message($msg, $msgtype){
+    Session::addMessageAfterRedirect(
+        __($msg, 'gestion'),
+        true,
+        $msgtype
+    );
+}
+
+if (isset($_POST["add"])) {
+   $valid = false;
+   $NewDoc = 0;
+   $tickets_id = $_POST['tickets_id'];
+   $entities_id = $_POST['entities_id'];
+   $pdf_filename = $_POST['pdf_filename'];
+   $pdf_folder = $_POST['pdf_folder'];
+   $search_pdf = $_POST['search_pdf'];
+   $pdf_save = $_POST['pdf_save'];
+   $pdf_signed = $_POST['pdf_signed'];
+
+   $pdf_filename = $DB->escape($pdf_filename); // sécurise la requête SQL
+
+   if ($pdf_save == 'Sage'){
+      $fields = parseDocument($search_pdf);
+      $pdf_filename = $search_pdf.'_'.str_replace(' ', '_', $fields['client']);
+   }
+
+   $query = "SELECT bl, id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename' LIMIT 1";
+   $result = $DB->doQuery($query);
+
+   if ($result && $result->num_rows > 0) {
+      $row = $DB->fetchassoc($result);
+      message('Document déjà existant : <a href="survey.form.php?id='. $row['id'] .'">Gestion - ID '.  $row['id'] .'</a>.', WARNING);
+   }else{
+      if ($pdf_save == 'Local'){
+         $valid = true;
+         $tracker = null;
+         $input = ['name'       => addslashes(str_replace("?", "°", $pdf_filename)),
+                  'filename'    => addslashes($pdf_filename),
+                  'filepath'    => addslashes($pdf_folder.$pdf_filename),
+                  'mime'        => 'application/pdf',
+                  'users_id'    => Session::getLoginUserID(),
+                  'entities_id' => 0,
+                  'tickets_id'  => 0,
+                  'is_recursive'=> 1];
+
+         $NewDoc = $doc->add($input);
+         $doc_url = 'document.send.php?docid='.$NewDoc;
+      }
+      if ($pdf_save == 'SharePoint'){
+         $valid = true;
+         $doc_url = $pdf_folder;
+         $tracker = null;
+      }
+      if ($pdf_save == 'Sage'){
+         $tracker = $fields['tracker'];
+         $valid = true;
+         if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            $doc_url = "https://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/view_pdf.php?id=$search_pdf";
+         } else {
+            $doc_url = "http://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/view_pdf.php?id=$search_pdf";
+         }
+      }
+   }
+         
+   if ($valid == true){
+      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`) VALUES ($tickets_id, $entities_id, '$tracker', '$pdf_folder', '$pdf_filename', $pdf_signed, $NewDoc, '$doc_url', '$pdf_save');";
+      if($DB->doQuery($query)){
+         $idsurvey = $DB->doQuery("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename'")->fetch_object();
+         $idsurvey = $idsurvey->id;
+         message('Document ajouté : <a href="survey.form.php?id='.$idsurvey.'">Gestion - ID '.$idsurvey.'</a>.', INFO);
+      }else{
+         message("Erreur de l'ajout du document", ERROR);
+      }
+   }
+
+   Html::back();
+
+}else if (isset($_POST["purge"])) {
    $survey->check($_POST['id'], PURGE);
    $survey->delete($_POST);
    $survey->redirectToList();
@@ -46,16 +126,12 @@ if (isset($_POST["purge"])) {
 } else if (isset($_POST["update"])) {
    $survey->check($_POST['id'], UPDATE);
    $survey->update($_POST);
+
    Html::back();
 
 } else {
-
    $survey->checkGlobal(READ);
-
    Html::header(PluginGestionSurvey::getTypeName(2), '', "management", "plugingestionmenu", "gestion");
-
    $survey->display(['id' => $_GET['id']]);
-
    Html::footer();
 }
-

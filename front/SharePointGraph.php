@@ -113,7 +113,7 @@ class PluginGestionSharepoint extends CommonDBTM {
     public function getFoldersByParams1() {
         global $DB;
         $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 1";
-        $result = $DB->query($query);
+        $result = $DB->doQuery($query);
 
         $folders = [];
         while ($row = $DB->fetchassoc($result)) {
@@ -127,7 +127,7 @@ class PluginGestionSharepoint extends CommonDBTM {
     public function getSearchKeywordsByParams10() {
         global $DB;
         $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = 10";
-        $result = $DB->query($query);
+        $result = $DB->doQuery($query);
 
         $keywords = [];
         while ($row = $DB->fetchassoc($result)) {
@@ -138,7 +138,7 @@ class PluginGestionSharepoint extends CommonDBTM {
     }
 
     // Fonction pour effectuer la requête de recherche
-    public function searchSharePoint() {
+    /*public function searchSharePoint() {
         $accessToken = $this->getAccessToken();
         $config = new PluginGestionConfig();
         $NumberViews = $config->NumberViews();
@@ -249,6 +249,192 @@ class PluginGestionSharepoint extends CommonDBTM {
         }
     
         return $pdfFiles;
+    }*/
+
+    public function searchSharePoint() {
+        $accessToken = $this->getAccessToken();
+        $config = new PluginGestionConfig();
+        $driveId = $this->GetDriveId(); // Doit être implémenté
+        $NumberViews = $config->NumberViews(); // facultatif, si tu veux limiter
+        $keywords = $this->getSearchKeywordsByParams10(); // tableau de mots-clés
+        $folders = $this->getFoldersByParams1(); // tableau de noms de dossiers dans "Clients"
+
+        $results = [];
+
+        // Aucun mot-clé → rien à faire
+        if (empty($keywords)) {
+            return $results;
+        }
+
+        // Aucun dossier → recherche globale sur tous les mots-clés
+        if (empty($folders)) {
+            foreach ($keywords as $query) {
+                $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/search(q='" . urlencode($query) . "')";
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_HTTPHEADER => [
+                        "Authorization: Bearer $accessToken",
+                        "Content-Type: application/json",
+                        "ConsistencyLevel: eventual"
+                    ]
+                ]);
+                $response = curl_exec($ch);
+                curl_close($ch);
+                $data = json_decode($response, true);
+
+                foreach ($data['value'] ?? [] as $item) {
+                    $filename = $item['name'] ?? '';
+                    if (
+                        strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pdf' &&
+                        stripos($filename, $query) !== false
+                    ) {
+                        $results[] = [
+                            'name'     => $filename,
+                            'lastModifiedDateTime' => $item['lastModifiedDateTime'] ?? 'Non disponible',
+                            'webUrl'   => $item['webUrl'] ?? 'Non disponible'
+                        ];
+                    }
+                }
+            }
+        } else {
+            // Pour chaque combinaison dossier + mot-clé
+            foreach ($folders as $folderName) {
+                $encodedPath = rawurlencode($folderName);
+                $urlGetId = "https://graph.microsoft.com/v1.0/drives/$driveId/root:/$encodedPath";
+
+                $ch = curl_init($urlGetId);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_HTTPHEADER => [
+                        "Authorization: Bearer $accessToken",
+                        "Content-Type: application/json"
+                    ]
+                ]);
+                $response = curl_exec($ch);
+                curl_close($ch);
+                $data = json_decode($response, true);
+
+                if (!isset($data['id'])) continue;
+                $itemId = $data['id'];
+
+                foreach ($keywords as $query) {
+                    $url = "https://graph.microsoft.com/v1.0/drives/$driveId/items/$itemId/search(q='" . urlencode($query) . "')";
+                    $ch = curl_init($url);
+                    curl_setopt_array($ch, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_HTTPHEADER => [
+                            "Authorization: Bearer $accessToken",
+                            "Content-Type: application/json",
+                            "ConsistencyLevel: eventual"
+                        ]
+                    ]);
+                    $response = curl_exec($ch);
+                    curl_close($ch);
+                    $data = json_decode($response, true);
+
+                    foreach ($data['value'] ?? [] as $item) {
+                        $filename = $item['name'] ?? '';
+                        if (
+                            strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pdf' &&
+                            stripos($filename, $query) !== false
+                        ) {
+                            $results[] = [
+                                'name'     => $filename,
+                                'lastModifiedDateTime' => $item['lastModifiedDateTime'] ?? 'Non disponible',
+                                'webUrl'   => $item['webUrl'] ?? 'Non disponible'
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        return $results;
+    }
+
+    public function searchSharePointGlobal(string $query): array {
+        global $DB;
+        $accessToken = $this->getAccessToken(); // doit exister dans ta classe
+        $config = new PluginGestionConfig();
+        $driveId = $this->GetDriveId(); // ID du Drive
+
+        $results = [];
+
+        // Construire l’URL de recherche globale
+        $url = "https://graph.microsoft.com/v1.0/drives/$driveId/root/search(q='" . urlencode($query) . "')";
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                "Authorization: Bearer $accessToken",
+                "Content-Type: application/json",
+                "ConsistencyLevel: eventual"
+            ]
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            return [['error' => "Erreur HTTP $httpCode"]];
+        }
+
+        $data = json_decode($response, true);
+                        
+        $folders = [];
+        // On récupère tous les folder_name avec params = 3 ou 2
+        $res = $DB->doQuery("SELECT folder_name FROM `glpi_plugin_gestion_configsfolder` WHERE params IN (2,3)");
+
+        foreach ($data['value'] ?? [] as $item) {
+            $filename = $item['name'] ?? '';
+            $webUrl = $item['webUrl'] ?? '';
+
+                if (
+                    strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pdf' &&
+                    stripos($filename, $query) !== false
+                ) {
+                if ($res) {
+                    while ($row = $res->fetch_object()) {
+                        if (!empty($row->folder_name)) {
+                            $folders[] = $row->folder_name;
+                        }
+                    }
+                }
+
+                // Si aucun résultat, on ajoute le nom par défaut
+                if (empty($folders)) {
+                    $folders[] = "DocumentsSigned";
+                }
+
+                // Vérification dans $webUrl
+                $signed = false;
+                foreach ($folders as $folder) {
+                    if (stripos($webUrl, $folder) !== false) {
+                        $signed = true;
+                        break;
+                    }
+                }
+
+                $badge = $signed
+                    ? ' <span style="color:white;background-color:#28a745;padding:2px 6px;border-radius:4px;font-size:11px;">SIGNÉ</span>'
+                    : '';
+
+                $results[] = [
+                    'id'       => $item['id'],
+                    'text'     => $filename,
+                    'filename' => $filename,
+                    'folder'   => $webUrl,
+                    'save'     => 'SharePoint',
+                    'signed'   => $signed ? 1 : 0,
+                    'html'     => $filename . $badge
+                ];
+            }
+        }
+
+        return $results;
     }
       
     /**
@@ -488,7 +674,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_close($ch);
 
         if ($httpStatus === 200 || $httpStatus === 201) {
-            echo "Fichier téléversé avec succès dans le dossier cible.\n";
+            
         } else {
             throw new Exception("Erreur lors du téléversement du fichier : HTTP $httpStatus");
         }
@@ -676,7 +862,7 @@ class PluginGestionSharepoint extends CommonDBTM {
 
         // Exemple de requête pour récupérer tous les folder_name de la base de données
         $query = "SELECT folder_name FROM glpi_plugin_gestion_configsfolder WHERE params = $param";
-        $result = $DB->query($query);
+        $result = $DB->doQuery($query);
 
         $folderNames = [];
         if ($result) {
@@ -798,7 +984,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         return $tracker;
     }
 
-    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL){
+    /*public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL){
         global $DB, $CFG_GLPI;
 
         // Validation de l'email
@@ -824,14 +1010,14 @@ class PluginGestionSharepoint extends CommonDBTM {
         $mmail = new GLPIMailer(); // génération du mail
         $config = new PluginGestionConfig();
     
-        $NotifMailTemplate = $DB->query("SELECT * FROM glpi_notificationtemplatetranslations WHERE notificationtemplates_id=$gabarit_id")->fetch_object();
+        $NotifMailTemplate = $DB->doQuery("SELECT * FROM glpi_notificationtemplatetranslations WHERE notificationtemplates_id=$gabarit_id")->fetch_object();
         if (!$NotifMailTemplate) {
             throw new RuntimeException("Aucun template trouvé pour l'ID : $gabarit_id");
         }    
             $BodyHtml = html_entity_decode($NotifMailTemplate->content_html, ENT_QUOTES, 'UTF-8');
             $BodyText = html_entity_decode($NotifMailTemplate->content_text, ENT_QUOTES, 'UTF-8');
     
-        $footer = $DB->query("SELECT value FROM glpi_configs WHERE name = 'mailing_signature'")->fetch_object();
+        $footer = $DB->doQuery("SELECT value FROM glpi_configs WHERE name = 'mailing_signature'")->fetch_object();
         if(!empty($footer->value)){$footer = html_entity_decode($footer->value, ENT_QUOTES, 'UTF-8');}else{$footer='';}
     
         // For exchange
@@ -865,6 +1051,145 @@ class PluginGestionSharepoint extends CommonDBTM {
                 }
             }
             
+        $mmail->ClearAddresses();
+    }*/
+    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL) {
+        global $DB, $CFG_GLPI;
+
+        // --- Validation email ---
+        $EMAIL = trim((string)$EMAIL);
+        if (!filter_var($EMAIL, FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException("L'adresse email est invalide : $EMAIL");
+        }
+
+        // --- Balises ---
+        $Balises = [
+            ['Balise' => '##gestion.id##',      'Value' => (string)$id_survey],
+            ['Balise' => '##gestion.tracker##', 'Value' => (string)$tracker],
+            ['Balise' => '##gestion.url##',     'Value' => $url && $fileName ? "<a href=\"{$url}\">{$fileName}</a>" : ''],
+        ];
+
+        if (!function_exists('balise')) {
+            function balise($corps, $Balises) {
+                if ($corps === null) return '';
+                if (!isset($Balises) || !is_iterable($Balises)) return (string)$corps;
+                foreach ($Balises as $b) {
+                    $tag = isset($b['Balise']) ? (string)$b['Balise'] : '';
+                    if ($tag === '') continue;
+                    $val = array_key_exists('Value', $b) ? (string)$b['Value'] : '';
+                    $corps = str_replace($tag, $val, (string)$corps);
+                }
+                return $corps;
+            }
+        }
+
+        if (!function_exists('normalize_eols')) {
+            function normalize_eols(string $s): string {
+                $s = str_replace("\0", '', $s);
+                return preg_replace("/\r\n|\r|\n/u", "\r\n", $s);
+            }
+        }
+
+        // --- Lecture gabarit notification (avec fallback de langue) ---
+        $BodyHtml = $BodyText = $Subject = '';
+        $curLang  = $_SESSION['glpilanguage'] ?? ($CFG_GLPI['language'] ?? 'fr_FR');
+        $langs    = array_values(array_unique([$curLang, substr($curLang, 0, 2), '']));
+        $order    = new \QueryExpression("FIELD(language,'" . implode("','", array_map('addslashes', $langs)) . "')");
+
+        if ((int)$gabarit_id > 0) {
+            $itTpl = $DB->request([
+                'SELECT' => ['subject', 'content_text', 'content_html', 'language'],
+                'FROM'   => 'glpi_notificationtemplatetranslations',
+                'WHERE'  => [
+                    'notificationtemplates_id' => (int)$gabarit_id,
+                    'language'                 => $langs  // IN (...)
+                ],
+                'ORDER'  => [$order],
+                'LIMIT'  => 1
+            ])->current();
+
+            if (!is_array($itTpl)) {
+                // dernier recours sans filtre de langue
+                $itTpl = $DB->request([
+                    'SELECT' => ['subject', 'content_text', 'content_html', 'language'],
+                    'FROM'   => 'glpi_notificationtemplatetranslations',
+                    'WHERE'  => ['notificationtemplates_id' => (int)$gabarit_id],
+                    'LIMIT'  => 1
+                ])->current();
+            }
+
+            if (is_array($itTpl)) {
+                $Subject  = (string)($itTpl['subject'] ?? '');
+                $BodyText = isset($itTpl['content_text']) ? html_entity_decode((string)$itTpl['content_text'], ENT_QUOTES, 'UTF-8') : '';
+                $BodyHtml = isset($itTpl['content_html']) ? html_entity_decode((string)$itTpl['content_html'], ENT_QUOTES, 'UTF-8') : '';
+            }
+        }
+
+        // --- Footer signature ---
+        $footerValue = '';
+        $rowCfg = $DB->request([
+            'SELECT' => ['value'],
+            'FROM'   => 'glpi_configs',
+            'WHERE'  => ['name' => 'mailing_signature'],
+            'LIMIT'  => 1
+        ])->current();
+        if (is_array($rowCfg) && !empty($rowCfg['value'])) {
+            $footerValue = html_entity_decode((string)$rowCfg['value'], ENT_QUOTES, 'UTF-8');
+        }
+
+        // --- Mailer (GLPI 11 / Symfony Mailer) ---
+        $mmail = new GLPIMailer();
+        $mmail->addCustomHeader("X-Auto-Response-Suppress: OOF, DR, NDR, RN, NRN");
+
+        // From (sécurisé: nom non nul)
+        $fromEmail = !empty($CFG_GLPI['from_email'])
+            ? (string)$CFG_GLPI['from_email']
+            : (!empty($CFG_GLPI['admin_email']) ? (string)$CFG_GLPI['admin_email'] : 'no-reply@localhost');
+
+        $fromName = $CFG_GLPI['from_email_name'] ?? $CFG_GLPI['admin_email_name'] ?? null;
+        $fromName = (is_string($fromName) && $fromName !== '') ? $fromName : 'GLPI';
+
+        $emailObj = $mmail->getEmail();
+        $emailObj->from(new \Symfony\Component\Mime\Address($fromEmail, $fromName));
+        $emailObj->to($EMAIL); // pas de "name" → évite null
+
+        // Pièce jointe optionnelle (vérif + taille)
+        if (!empty($outputPath) && is_string($outputPath) && file_exists($outputPath)) {
+            $size = filesize($outputPath);
+            if ($size !== false && $size > 15 * 1024 * 1024) {
+                // Préfixer le sujet d'un avertissement si >15MB
+                $Subject = "⚠️ " . ($Subject ?: "Notification GLPI");
+            } else {
+                $emailObj->attachFromPath($outputPath);
+            }
+        }
+
+        // Sujet / corps
+        $Subject   = is_string($Subject)   ? $Subject   : '';
+        $BodyHtml  = is_string($BodyHtml)  ? $BodyHtml  : '';
+        $BodyText  = is_string($BodyText)  ? $BodyText  : '';
+        $footerStr = is_string($footerValue) ? $footerValue : '';
+
+        if ($Subject !== '') {
+            $mmail->Subject = balise($Subject, $Balises);
+        }
+
+        $mmail->Body    = normalize_eols(balise($BodyHtml, $Balises)) . ($footerStr ? "<br>".$footerStr : "");
+        $mmail->AltBody = normalize_eols(balise($BodyText, $Balises)) . ($footerStr ? "\r\n".strip_tags($footerStr) : "");
+
+        // Envoi + messages
+        $ok = $mmail->send();
+        if (!$ok) {
+            Session::addMessageAfterRedirect(__("Erreur lors de l'envoi du mail : ", 'gestion') . $mmail->ErrorInfo, true, ERROR);
+        } else {
+            // Message conditionnel comme avant
+            $config = PluginGestionConfig::getInstance();
+            if ((int)$gabarit_id === (int)($config->fields['gabarit'] ?? 0) && $message !== NULL) {
+                Session::addMessageAfterRedirect(__($message, 'gestion'), true, INFO);
+            }
+        }
+
+        // Nettoyage adresses (facultatif ici)
         $mmail->ClearAddresses();
     }
 

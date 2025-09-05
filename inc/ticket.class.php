@@ -11,6 +11,10 @@ class PluginGestionTicket extends CommonDBTM {
    public  static  $gestion = 0 ;
 
 //*--------------------------------------------------------------------------------------------- GESTION ONGLET
+   static function getIcon() {
+      return "fa-solid fa-file-contract";
+   }
+
    static function getTypeName($nb = 0) { // voir doc glpi 
       if(Session::haveRight("plugin_gestion_sign", READ)){
          return _n('Gestion', 'Gestion', $nb, 'gestion');
@@ -63,20 +67,34 @@ class PluginGestionTicket extends CommonDBTM {
       return $vouchers;
    }
 
+   static public function AddDocForm($params) { 
+      global $CFG_GLPI, $DB;
+
+      $item = $params['item'];
+
+      if ($item instanceof Ticket) {
+         echo PluginGestionTicketConfig::showForTicket($item, true);
+         return;
+      }
+   }
+
    static function showForTicket(Ticket $ticket) { // formulaire sur le ticket
       global $DB, $CFG_GLPI;
+
+      // AJOUTER CETTE LIGNE pour charger votre fichier JS
+      echo "<script src='" . Plugin::getWebDir('gestion') . "/public/js/scripts.js'></script>";
 
       function isMobile() {
          return preg_match('/(android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)/i', $_SERVER['HTTP_USER_AGENT']);
       }
-     
+
       $ID = $ticket->getField('id'); // recupération de l'id ticket
       $sum = 0;
       $count = 0;
 
       $params = ['job'           => $ticket->getField('id'),
-                 'root_doc'      => PLUGIN_GESTION_WEBDIR,
-                 'root_modal'    => 'ticket-form'];
+               'root_doc'      => PLUGIN_GESTION_WEBDIR,
+               'root_modal'    => 'ticket-form'];
 
       if (!$ticket->can($ID, READ)) {
          return false;
@@ -96,7 +114,7 @@ class PluginGestionTicket extends CommonDBTM {
       $out .= "<div class='spaced'>";
       $out .= "<table class='tab_cadre_fixe'>";
       $out .= "<tr class='tab_bg_1'><th colspan='2'>";
-      $out .= __('Gestion BL / BC', 'gestion');
+      $out .= __('Gestion BL', 'gestion');
       $out .= "</th></tr></table></div>";
 
       $number = self::countForItem($ticket);
@@ -109,38 +127,42 @@ class PluginGestionTicket extends CommonDBTM {
             if(Session::haveRight("plugin_gestion_sign", PURGE)){
                if ($canedit) {
                   $out .= Html::getOpenMassiveActionsForm('mass'.__CLASS__.$rand);
-                     if( Session::haveRight("plugin_gestion_sign", PURGE)){
-                        $massiveactionparams =  [
-                           'num_displayed'    => $number,
-                           'container'        => 'mass'.__CLASS__.$rand,
-                           'rand'             => $rand,
-                           'display'          => false,
-                           'specific_actions' => [
-                              'purge'  => _x('button', 'Supprimer définitivement de GLPI')
-                           ]
-                        ];
-                     }
+                  if( Session::haveRight("plugin_gestion_sign", PURGE)){
+                     $massiveactionparams =  [
+                        'num_displayed'    => $number,
+                        'container'        => 'mass'.__CLASS__.$rand,
+                        'rand'             => $rand,
+                        'display'          => false,
+                        'specific_actions' => [
+                           'purge'  => _x('button', 'Supprimer définitivement de GLPI')
+                        ]
+                     ];
+                  }
                   $out .= Html::showMassiveActions($massiveactionparams);
                }
             }
 
-               $out .= "<table class='tab_cadre_fixehov'>";
-               $header_begin  = "<tr>";
-               $header_top    = '';
-               $header_bottom = '';
-               $header_end    = '';
-               if(Session::haveRight("plugin_gestion_sign", PURGE)){
-                  if ($canedit) {
-                     $header_begin  .= "<th width='10'>";
-                     $header_top    .= Html::getCheckAllAsCheckbox('mass'.__CLASS__.$rand);
-                     $header_bottom .= Html::getCheckAllAsCheckbox('mass'.__CLASS__.$rand);
-                     $header_end    .= "</th>";
-                  }
-               }
+            // --- Début : wrapper scrollable pour rendre le tableau responsive sans modifier sa forme
+            $out .= "<div class='gestion-table-wrapper' style='overflow-x:auto; -webkit-overflow-scrolling:touch; width:100%; margin-bottom:.5rem;'>";
+            $out .= "<table class='tab_cadre_fixehov' style='width:max-content; min-width:100%; table-layout:auto; white-space:nowrap;'>";
+            // --- Fin : wrapper scrollable
 
-            //tableau d'affichage des valeurs
+            $header_begin  = "<tr>";
+            $header_top    = '';
+            $header_bottom = '';
+            $header_end    = '';
+            if(Session::haveRight("plugin_gestion_sign", PURGE)){
+               if ($canedit) {
+                  $header_begin  .= "<th width='10'>";
+                  $header_top    .= Html::getCheckAllAsCheckbox('mass'.__CLASS__.$rand);
+                  $header_bottom .= Html::getCheckAllAsCheckbox('mass'.__CLASS__.$rand);
+                  $header_end    .= "</th>";
+               }
+            }
+
+            // tableau d'affichage des valeurs
             $header_end .= "<th class='center'>".__('ID', 'gestion')."</th>";
-            //$header_end .= "<th class='center'>".__('Entité', 'gestion')."</th>";
+            // $header_end .= "<th class='center'>".__('Entité', 'gestion')."</th>";
             $header_end .= "<th class='center'>".__("Date de signature", 'gestion')."</th>";
             if (!isMobile()) {
                $header_end .= "<th class='center'>".__('Technicien', 'gestion')."</th>";
@@ -148,7 +170,7 @@ class PluginGestionTicket extends CommonDBTM {
             }
             $header_end .= "<th class='center'>".__('Numéro de BL / BC', 'gestion')."</th>";
             $header_end .= "</tr>";
-            $out.= $header_begin.$header_top.$header_end;
+            $out .= $header_begin.$header_top.$header_end;
 
             foreach (self::getAllForTicket($ID) as $data) {
 
@@ -164,7 +186,8 @@ class PluginGestionTicket extends CommonDBTM {
                $out .= "<td class='center'>";
                $out .= $data['id'];
                $out .= "</td>";
-               $out .= "<td class='center'>"; 
+
+               $out .= "<td class='center'>";
                $out .= Html::convDate($data["date_creation"]);
                $out .= "</td>";
 
@@ -185,31 +208,31 @@ class PluginGestionTicket extends CommonDBTM {
                $out .= "<td class='center'>";
                if (!isMobile()) {
                   $BlName = $data['bl']; // Récupère le numéro de BL depuis la base
-               }else{
-                  $BlName = substr($data['bl'], 0, 10).'...'; // Récupère le numéro de BL depuis la base
+               } else {
+                  $BlName = substr($data['bl'], 0, 8).'...'; // Raccourci sur mobile
                }
-               $blId = $data['id']; // Récupère le numéro de BL depuis la base
-               $status = $data["signed"]; // Définit le statut signé true = signé / flase non signé
-               
+               $blId = $data['id']; // Récupère l'ID de la ligne
+               $status = $data["signed"]; // 1 = signé / 0 = non signé
+
                if ($data["signed"] == 1) {
                   $out .= Html::submit($BlName . ' - Signé', [
                      'name'    => 'showCriForm',
                      'class'   => 'btn btn-secondary',
                      'onclick' => "gestion_loadCriForm('showCriForm', '$blId', " . json_encode($params) . "); return false;"
-                 ]);
-                  } else {
-                     $out .= Html::submit($BlName, [
-                        'name'    => 'showCriForm',
-                        'class'   => 'btn btn-primary',
-                        'onclick' => "gestion_loadCriForm('showCriForm', '$blId', " . json_encode($params) . "); return false;"
-                    ]);
-                  }       
+                  ]);
+               } else {
+                  $out .= Html::submit($BlName, [
+                     'name'    => 'showCriForm',
+                     'class'   => 'btn btn-primary',
+                     'onclick' => "gestion_loadCriForm('showCriForm', '$blId', " . json_encode($params) . "); return false;"
+                  ]);
+               }
                $out .= "</td></tr>";
-               
             }
-            
+
             $out .= $header_begin.$header_bottom.$header_end;
-            $out .= "</table>";
+            $out .= "</table>";          // ferme le tableau
+            $out .= "</div>";            // ferme le wrapper scrollable
 
             if(Session::haveRight("plugin_gestion_sign", PURGE)){
                if ($canedit) {
@@ -223,174 +246,9 @@ class PluginGestionTicket extends CommonDBTM {
             $out .= "<p class='center b'>".__('Aucun BL / BC associé', 'gestion')."</p>";
          }
       }
-         echo $out;
+      echo $out;
    }
 
-   static function postShowItemNewTaskGESTION($params) {
-      global $DB, $gestion;
-      $config = new PluginGestionConfig();
-      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
-      $sharepoint = new PluginGestionSharepoint();
-  
-      if (Session::haveRight("plugin_gestion_add", READ)) {
-          if (strpos($_SERVER['REQUEST_URI'], 'ticket.form.php') !== false) {
-              $ticketId = $_GET['id'];
-              if ($gestion == 0 && $ticketId != 0 && !empty($ticketId)) {
-                  $gestion = 1;
-
-                  // Récupérer toutes les valeurs 'bl' pour le ticket spécifié
-                  $result = $DB->query("SELECT * FROM glpi_plugin_gestion_surveys WHERE tickets_id = $ticketId AND signed = 0");
-
-                  $groups = [];
-                  $selected_ids = [];
-                  while ($data = $result->fetch_assoc()) {
-                        $groups[$data['bl']] = $data['bl']; // Utiliser 'bl' comme clé et valeur
-                        $url_bl = ""; // Par défaut, $folderPath est vide
-                        if (!empty($data['url_bl'])){
-                           $url_bl = $data['url_bl']."/";
-                        }
-                        $selected_ids[] = $url_bl.$data['bl'];
-                  }
-
-                  $groups = [];
-                  // On parcourt le tableau $selected_ids
-                  foreach ($selected_ids as $item) {
-                     // On récupère la dernière partie après le dernier "/"
-                     $last_part = basename($item); // Utilisation de basename pour obtenir la dernière partie
-
-                     // On ajoute dans $groups avec la clé étant l'élément complet et la valeur étant la dernière partie
-                     $groups[$item] = $last_part;
-                  }
-  
-                  // CSRF Token
-                  $selected_values_json = json_encode($selected_ids);
-                  $csrf_token = Session::getNewCSRFToken();
-   
-                  if (Session::haveRight("plugin_gestion_add", UPDATE)) {
-                      $disabled = false;
-                  } else {
-                      $disabled = true;
-                  }   
-                   
-                  // Modal HTML
-                  echo <<<HTML
-                  <div class="modal fade" id="AddGestionModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-                      <div class="modal-dialog modal-lg">
-                          <div class="modal-content">
-                              <div class="modal-header">
-                                  <h5 class="modal-title" id="AddGestionModalLabel">Ajouter un BC / BL</h5>
-                                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                              </div>
-                              <div class="modal-body">
-                                 <!-- Rond de chargement -->
-                                 <div id="loading-spinner" style="display:none; text-align:center;">
-                                    <div class="spinner-border text-info" role="status" style="width: 3rem; height: 3rem; border-width: 0.4rem;">
-                                          <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                 </div>
-                  HTML;
-                  // Fermeture temporaire de HTML pour inclure du PHP
-                  echo '<form method="post" action="' . Toolbox::getItemTypeFormURL('PluginGestionTicket') . '">';
-                  echo '<input type="hidden" name="_glpi_csrf_token" value="' . $csrf_token . '">';
-                  echo '<input type="hidden" name="tickets_id" value="' . $ticketId . '">';
-            
-                  // Affichage du dropdown
-                  Dropdown::showFromArray("groups_id", $groups, [
-                     'multiple'     => true,
-                     'width'        => '100%',
-                     'values'       => json_decode($selected_values_json, true),
-                     'disabled'     => $disabled,
-                  ]);
-                  echo <<<HTML
-
-                                      <div class="modal-footer" style="margin-top: 55px;">
-                                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                                          <button type="submit" name="save_selection" class="btn btn-primary">Sauvegarder</button>
-                                      </div>
-                                  </form>
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-                  HTML;
-  
-                  // Bouton d'ouverture du modal avec style ajusté
-                  $entitie = "<div class='d-inline-block' style='margin-left: 0px; margin-top: 7px;'><button id='add_gestion' type='button' style='border: 1px solid; padding: 2px 10px;' class='btn-sm btn-outline-secondary' data-bs-toggle='modal' data-bs-target='#AddGestionModal'><i class='fas fa-plus'></i> Lié des documents</button></div>";
-  
-                  // Script pour ajouter dynamiquement le bouton et gérer le clic
-                  $script = <<<JAVASCRIPT
-                  $(document).ready(function() {
-                     var categorieContainer = $("select[name='itilcategories_id']").closest("div.field-container");
-                     var boutonExist = document.getElementById('add_gestion');
-
-                     // Si le bouton n'existe pas déjà, on l'ajoute
-                     if (categorieContainer.length > 0 && boutonExist === null) {
-                        categorieContainer.append("{$entitie}");
-                     }
-
-                     // Clic sur le bouton pour ouvrir le modal
-                     $('#add_gestion').click(function() {
-                        // Affichage du rond de chargement
-                        $('#loading-spinner').show();
-
-                        // Requête AJAX pour charger les données
-                        $.ajax({
-                              url: '../plugins/gestion/front/charger_dropdown.php',  // Chemin vers le fichier PHP
-                              method: 'GET',
-                              data: { ticketId: {$ticketId} },  // Passer le ticketId dans la requête
-                              dataType: 'json',  // Assurez-vous que jQuery gère la réponse comme JSON
-                              success: function(response) {
-                                 console.log('Réponse brute du serveur:', response);
-
-                                 if (response.error) {
-                                    alert('Erreur : ' + response.error);
-                                    return;
-                                 }
-
-                                 if (response.data) {
-                                    // Ajouter les options au dropdown sans doublons
-                                    $.each(response.data, function(index, value) {
-                                          // Vérifier si l'option est déjà présente avant de l'ajouter
-                                          if ($('[name="groups_id[]"] option[value="' + index + '"]').length === 0) {
-                                             $('[name="groups_id[]"]').append('<option value="' + index + '">' + value + '</option>');
-                                          }
-                                    });
-
-                                    // Réinitialiser Select2 après avoir ajouté les options
-                                    $('[name="groups_id[]"]').trigger('change');
-
-                                    // Réinitialiser Select2
-                                    $('[name="groups_id[]"]').select2({
-                                          //width: '650',
-                                          dropdownAutoWidth: true,
-                                          dropdownParent: $('[name="groups_id[]"]').closest('div.modal, div.dropdown-menu, body'),
-                                          quietMillis: 100,
-                                          minimumResultsForSearch: 10
-                                    });
-                                 } else {
-                                    alert('Aucune donnée à afficher.');
-                                 }
-
-                                 // Masquer le rond de chargement
-                                 $('#loading-spinner').hide();
-                              },
-                              error: function(xhr, status, error) {
-                                 console.error('Erreur AJAX:', error);
-                                 $('#loading-spinner').hide();
-                                 alert('Erreur lors du chargement des données.');
-                              }
-                        });
-                     });
-                  });
-                  JAVASCRIPT;  
-
-                  // Inclure le script dans la page
-                  echo Html::scriptBlock($script);
-              }
-          }
-      }
-  }
-    
    static function install(Migration $migration) { // fonction intsllation de la table en BDD
       global $DB;
 
@@ -419,7 +277,7 @@ class PluginGestionTicket extends CommonDBTM {
                      KEY `tickets_id` (`tickets_id`),
                      KEY `entities_id` (`entities_id`)
                   ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
-         $DB->query($query) or die($DB->error());
+         $DB->doQuery($query) or die($DB->error());
       }
    }
 
