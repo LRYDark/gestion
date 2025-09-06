@@ -11,7 +11,8 @@ class PluginGestionProfile extends Profile {
 
    function getTabNameForItem(CommonGLPI $item, $withtemplate = 0) {
       if ($item->getType() == 'Profile') {
-         return __('GESTION', 'gestion');
+         //return __('GESTION', 'gestion');
+         return __('<span class="d-flex align-items-center"><i class="fa-solid fa-file-contract me-2"></i>GESTION</span>', "gestion");
       }
       return '';
    }
