@@ -2,7 +2,7 @@ function gestion_loadCriForm(action, modal, params) {
    var formInput;
 
    if (params.form != undefined) {
-      formInput = getRpFormData($('form[name="' + params.form + '"]'));
+      formInput = getGestionFormData($('form[name="' + params.form + '"]'));
    }
 
    $.ajax({
@@ -20,7 +20,7 @@ function gestion_loadCriForm(action, modal, params) {
          try {
             var json = $.parseJSON(response);
             if (!json.success) {
-               $("#rp_cri_error").html(json.message).show().delay(2000).fadeOut('slow');
+               $("#gestion_cri_error").html(json.message).show().delay(2000).fadeOut('slow');
             }
 
          } catch (err) {
@@ -276,7 +276,7 @@ function gestion_loadCriForm(action, modal, params) {
 })(window);
 
 // Fonction d'initialisation globale appelée depuis le PHP
-function initializeSignature(uniqId) {
+function initializeSignatureGestion(uniqId) {
   // ---------- Capture photo (si présente) ----------
   const capturePhoto = document.getElementById("capture-photo");
   if (capturePhoto) {

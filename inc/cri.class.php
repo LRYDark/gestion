@@ -12,12 +12,12 @@ class PluginGestionCri extends CommonDBTM {
       $uniq = 'cri'.mt_rand(10000,99999);
 
       // Inclure les fichiers CSS et JS externes
-      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/css/signature.css">';
+      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css">';
       // Remote signature additions
       echo '<script>
          window.GLPI_PLUG_GESTION = "' . PLUGIN_GESTION_WEBDIR . '";
       </script>';
-      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/js/scripts.js?v=' . time() . '" defer></script>';
+      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . time() . '" defer></script>';
 
       // Style CSS inline pour hauteur responsive
          $responsiveIframeStyle = "
@@ -752,13 +752,13 @@ class PluginGestionCri extends CommonDBTM {
             }
  
             // Vérifier que la fonction existe avant de l'appeler
-            if (typeof initializeSignature === 'function') {
-               initializeSignature('<?php echo $uniq; ?>');
+            if (typeof initializeSignatureGestion === 'function') {
+               initializeSignatureGestion('<?php echo $uniq; ?>');
             } else {
                // Si la fonction n'existe pas encore, attendre un peu
                setTimeout(function() {
-                  if (typeof initializeSignature === 'function') {
-                        initializeSignature('<?php echo $uniq; ?>');
+                  if (typeof initializeSignatureGestion === 'function') {
+                        initializeSignatureGestion('<?php echo $uniq; ?>');
                   }
                }, 500);
             }

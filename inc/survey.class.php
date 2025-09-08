@@ -250,8 +250,13 @@ class PluginGestionSurvey extends CommonDBTM {
       global $DB, $CFG_GLPI;
       $config = new PluginGestionConfig();
 
-      // AJOUTER CETTE LIGNE pour charger votre fichier JS
-      echo "<script src='" . Plugin::getWebDir('gestion') . "/public/js/scripts.js'></script>";
+      // Inclure les fichiers CSS et JS externes
+      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css">';
+      // Remote signature additions
+      echo '<script>
+         window.GLPI_PLUG_GESTION = "' . PLUGIN_GESTION_WEBDIR . '";
+      </script>';
+      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . time() . '" defer></script>';
 
       $params = ['job'           => $ID,
                  'root_doc'      => PLUGIN_GESTION_WEBDIR,

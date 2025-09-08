@@ -24,8 +24,8 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
       if (Session::getLoginUserID()) {
          Plugin::registerClass('PluginGestionProfile', ['addtabon' => 'Profile']);
 
-         $PLUGIN_HOOKS['add_css']['rp'] = ["css/signature.css"];
-         $PLUGIN_HOOKS['add_javascript']['gestion'] = ['js/scripts.js'];
+         $PLUGIN_HOOKS['add_css']['rp'] = ["css/signature_gestion.css"];
+         $PLUGIN_HOOKS['add_javascript']['gestion'] = ['js/scripts_gestion.js'];
       }
 
       if (Session::haveRight('plugin_gestion_survey', READ)) {

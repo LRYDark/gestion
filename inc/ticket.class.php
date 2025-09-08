@@ -81,8 +81,13 @@ class PluginGestionTicket extends CommonDBTM {
    static function showForTicket(Ticket $ticket) { // formulaire sur le ticket
       global $DB, $CFG_GLPI;
 
-      // AJOUTER CETTE LIGNE pour charger votre fichier JS
-      echo "<script src='" . Plugin::getWebDir('gestion') . "/public/js/scripts.js'></script>";
+      // Inclure les fichiers CSS et JS externes
+      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css">';
+      // Remote signature additions
+      echo '<script>
+         window.GLPI_PLUG_GESTION = "' . PLUGIN_GESTION_WEBDIR . '";
+      </script>';
+      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . time() . '" defer></script>';
 
       function isMobile() {
          return preg_match('/(android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)/i', $_SERVER['HTTP_USER_AGENT']);
