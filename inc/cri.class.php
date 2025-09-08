@@ -12,8 +12,8 @@ class PluginGestionCri extends CommonDBTM {
       $uniq = 'cri'.mt_rand(10000,99999);
 
       // Inclure les fichiers CSS et JS externes
-      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/css/signature.css">';
-      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/scripts/signature.js" defer></script>';
+      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/css/signature_gestion.css">';
+      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/scripts/signature_gestion.js" defer></script>';
       // Remote signature additions
       echo '<script>const GLPI_PLUG_GESTION = "'.PLUGIN_GESTION_WEBDIR.'";</script>';
       echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/scripts/remote_signature.js?v=' . time() . '" defer></script>';

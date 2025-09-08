@@ -515,12 +515,7 @@
     
     .document-info {
         flex-wrap: nowrap;
-    }
-    
-    /* Masquer les anciens tableaux sur desktop */
-    .table-responsive {
-        display: none !important;
-    }
+    }    
 }
 
 /* Desktop */
