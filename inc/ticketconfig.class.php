@@ -25,6 +25,7 @@ class PluginGestionTicketConfig extends CommonDBTM
      */
     public static function showForTicket($ticket, bool $embed_in_ticket_form = true, bool $uncollapsed = true)
     {
+      global $DB, $CFG_GLPI;
         if (!($ticket instanceof Ticket)) {
             return;
         }
@@ -34,14 +35,17 @@ class PluginGestionTicketConfig extends CommonDBTM
         $gestion_js_block       = '';
         $linked_docs            = [];
 
-        if (Session::haveRight('plugin_gestion_add', READ)) {
+        if (Session::haveRight('plugin_gestion_add', READ) || Session::haveRight('plugin_gestion_add', UPDATE)){
             $ticketId = (int)$ticket->getID();
             if ($ticketId > 0) {
+
+              if (Session::haveRight('plugin_gestion_add', UPDATE)) {
                 $gestion_button_enabled = true;
-
-                global $DB, $CFG_GLPI;
-
-                // ---------------- Connexions (Sage / SharePoint / Local) ----------------
+              }else{
+                $gestion_button_enabled = false;
+              }
+              
+              // ---------------- Connexions (Sage / SharePoint / Local) ----------------
                 $config = new PluginGestionConfig();
                 require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
                 $sharepoint = new PluginGestionSharepoint();
@@ -382,7 +386,6 @@ class PluginGestionTicketConfig extends CommonDBTM
             'uncollapsed'              => $uncollapsed ?? false,
             'type_name'                => self::getTypeName(),
             'ticket'                   => $ticket,
-
             'gestion_button_enabled'   => $gestion_button_enabled,
             'gestion_modal_html'       => $gestion_modal_html,
             'gestion_js_block'         => $gestion_js_block,

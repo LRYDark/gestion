@@ -33,10 +33,6 @@
              aria-labelledby="heading-plugin-gestion-ticket-config">
 
             <div class="accordion-body row m-0 mt-n2">
-                <div class="text-muted small mb-2">
-                    <em>Cliquez sur “Lier des documents” pour ajouter des documents depuis Sage / SharePoint / Dossier local.</em>
-                </div>
-
                 {# Liste des documents liés (non signés) #}
                 {% if linked_docs is defined and linked_docs|length > 0 %}
                     <ul class="mb-0 ps-4">
@@ -72,10 +68,6 @@
         </div>
 
         <div class="card-body">
-            <div class="text-muted small mb-2">
-                <em>Cliquez sur “Lier des documents” pour ajouter des documents depuis Sage / SharePoint / Dossier local.</em>
-            </div>
-
             {% if linked_docs is defined and linked_docs|length > 0 %}
                 <ul class="mb-0 ps-4">
                     {% for doc in linked_docs %}

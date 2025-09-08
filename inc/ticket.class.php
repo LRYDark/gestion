@@ -72,9 +72,11 @@ class PluginGestionTicket extends CommonDBTM {
 
       $item = $params['item'];
 
-      if ($item instanceof Ticket) {
-         echo PluginGestionTicketConfig::showForTicket($item, true);
-         return;
+      if(Session::haveRight("plugin_gestion_add", READ) || Session::haveRight("plugin_gestion_add", UPDATE)){
+         if ($item instanceof Ticket) {
+            echo PluginGestionTicketConfig::showForTicket($item, true);
+            return;
+         }
       }
    }
 
