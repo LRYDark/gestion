@@ -619,6 +619,20 @@ class PluginGestionCri extends CommonDBTM {
          });
          </script>
          <?php
+
+         // === Facturation comptoir (si activée) ===
+         if ($config->fields['CounterInvoice'] == 1 && isCurrentUserAuthorized($config->fields['CounterInvoiceUsers'])) { // NEW
+            echo '<div class="form-card">';
+               echo '<div class="form-label">Règlement effectué au comptoir</div>';
+               echo '<div class="form-content">';
+                     echo '<div class="checkbox-group">';
+                        echo '<input type="checkbox" name="CounterInvoiceClient" value="1" id="CounterInvoiceClient">';
+                        echo '<label for="CounterInvoiceClient">Règlement effectué</label>';
+                     echo '</div>';                     
+               echo '</div>';
+            echo '</div>';
+         }
+
          // === CARTE EMAIL (si activée) ===
          if ($config->fields['MailTo'] == 1) {
             // Traitement de la variable $email pour créer un tableau

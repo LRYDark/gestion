@@ -17,21 +17,6 @@ class PluginGestionConfig extends CommonDBTM
       }
    }
 
-   static function canCreate()
-   {
-      return Session::haveRight('config', UPDATE);
-   }
-
-   static function canView()
-   {
-      return Session::haveRight('config', READ);
-   }
-
-   static function canUpdate()
-   {
-      return Session::haveRight('config', UPDATE);
-   }
-
    static function getTypeName($nb = 0)
    {
       return __("Gestion Bl ", "gestion");
@@ -892,6 +877,52 @@ class PluginGestionConfig extends CommonDBTM
       </style><?php
 
       
+      // Facture au comptoire NEW VERSION
+      echo "<tr><th colspan='2'>" . __("Facturation comptoir", 'gestion') . "</th></tr>"; // NEW
+
+      // ON/OFF
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Activer la facturation comptoir sur BL", "gestion") . "</td><td>";
+            $CounterInvoice = $config->CounterInvoice();
+            echo '<input type="hidden" name="CounterInvoice" value="0">';
+            echo '<label class="switch">';
+               echo '<input type="checkbox" id="CounterInvoice_switch" name="CounterInvoice" value="1" ' . ($CounterInvoice == 1 ? 'checked' : '') . '>';
+               echo '<span class="slider round"></span>';
+            echo '</label>';
+         echo "</td>";
+      echo "</tr>";
+
+      // Utilisateurs autorisés
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Utilisateurs GLPI autorisés", "gestion") . "</td><td>";
+            $selected = $config->CounterInvoiceUsers();
+            Dropdown::show('User', [
+               'name'     => 'CounterInvoiceUsers[]',
+               'multiple' => true,
+               'value'    => $selected,
+               'width'    => '60%'
+            ]);
+         echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Mail interne de configation de payement comptoir", "gestion") . "</td><td>";
+            echo Html::input('CounterInvoiceMail', ['value' => $config->CounterInvoiceMail(), 'size' => 60]);// bouton configuration du bas de page line 1
+         echo "</td>";
+      echo "</tr>";
+
+      // ON/OFF
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Libelé 'Payé Comptoir' sur le BL", "gestion") . "</td><td>";
+            $CounterInvoicePdf = $config->CounterInvoicePdf();
+            echo '<input type="hidden" name="CounterInvoicePdf" value="0">';
+            echo '<label class="switch">';
+               echo '<input type="checkbox" id="CounterInvoicePdf_switch" name="CounterInvoicePdf" value="1" ' . ($CounterInvoicePdf == 1 ? 'checked' : '') . '>';
+               echo '<span class="slider round"></span>';
+            echo '</label>';
+         echo "</td>";
+      echo "</tr>";
+
       // --------------------- SECTION : SIGNATURE DÉPORTÉE (tablette) ---------------------
       echo "<tr><th colspan='2'>" . __("Signature déportée (tablette)", 'gestion') . "</th></tr>";
 
@@ -1047,7 +1078,23 @@ class PluginGestionConfig extends CommonDBTM
       return false;
    }
 
-   // return fonction (retourn les values enregistrées en bdd)
+   // --- Counter Invoice ---
+   function CounterInvoice() { // NEW
+      return isset($this->fields['CounterInvoice']) ? (int)$this->fields['CounterInvoice'] : 0;
+   }
+   function CounterInvoiceUsers() {
+      $raw = $this->fields['CounterInvoiceUsers'] ?? '[]';
+      $arr = json_decode($raw, true);
+      return is_array($arr) ? $arr : [];
+   }
+   function CounterInvoicePdf() {
+      return isset($this->fields['CounterInvoicePdf']) ? (int)$this->fields['CounterInvoicePdf'] : 0;
+   }
+   function CounterInvoiceMail(){
+      return isset($this->fields['CounterInvoiceMail']) ? (int)$this->fields['CounterInvoiceMail'] : '';
+   } 
+
+   // old
    function formulaire(){
       return ($this->fields['formulaire']);
    }
@@ -1299,7 +1346,10 @@ class PluginGestionConfig extends CommonDBTM
          include(PLUGIN_GESTION_DIR . "/install/update_150_remote.php");
          update_150_remote(); 
       }
-
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.5.0'){ // NEW
+         include(PLUGIN_GESTION_DIR . "/install/update_151_next.php");
+         update_151_next(); 
+      }
    }
 
    static function uninstall(Migration $migration)
