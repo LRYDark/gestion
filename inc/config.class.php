@@ -1091,7 +1091,7 @@ class PluginGestionConfig extends CommonDBTM
       return isset($this->fields['CounterInvoicePdf']) ? (int)$this->fields['CounterInvoicePdf'] : 0;
    }
    function CounterInvoiceMail(){
-      return isset($this->fields['CounterInvoiceMail']) ? (int)$this->fields['CounterInvoiceMail'] : '';
+      return isset($this->fields['CounterInvoiceMail']) ? (string)$this->fields['CounterInvoiceMail'] : '';
    } 
 
    // old
