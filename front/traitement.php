@@ -177,6 +177,48 @@ try {
         $tplIdx = $pdf->importPage($i);
         $pdf->useTemplate($tplIdx, 0, 0);
 
+        // --- Tampon "Facture payée en magasin" sur chaque page si réglée en comptoir ---
+        if (!empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1) { // NEW
+            if (!empty($config->fields['CounterInvoicePdf']) && (int)$config->fields['CounterInvoicePdf'] === 1 && !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1) {
+                // Date/heure du règlement : utilise ta valeur si dispo, sinon l'instant
+            $paymentDateTime = isset($paymentDateTime) && $paymentDateTime ? $paymentDateTime : date('d/m/Y H:i');
+
+                // Libellé en UTF-8 → converti pour FPDF
+                $label_utf8 = 'Facture payée en magasin — ' . $paymentDateTime;
+                if (function_exists('iconv')) {
+                    // Windows-1252 garde « — » et les accents
+                    $label = iconv('UTF-8', 'windows-1252//TRANSLIT', $label_utf8);
+                } else {
+                    // Fallback ISO-8859-1 : remplace l’em-dash
+                    $label = utf8_decode(str_replace(['–','—'], '-', $label_utf8));
+                }
+
+                // Style vert
+                $pdf->SetFont('Arial', 'B', 11);
+                $pdf->SetTextColor(46, 204, 113);
+                $pdf->SetDrawColor(46, 204, 113);
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->SetLineWidth(0.6);
+
+                // Dimensions/position
+                $w = $pdf->GetStringWidth($label) + 10;
+                $h = 8;
+                $x = $pdf->GetPageWidth() - $w - 12;  // coin haut droit
+                $y = 14;
+
+                // Tampon
+                $pdf->SetXY($x, $y);
+                $pdf->Cell($w, $h, $label, 1, 1, 'C', true);
+
+                // ➜ Repasser les couleurs à noir (et traits par défaut)
+                $pdf->SetTextColor(0, 0, 0);
+                $pdf->SetDrawColor(0, 0, 0);
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->SetLineWidth(0.2);
+            }
+        }
+        // --- fin tampon ---
+
         // Si c'est la page cible, ajoutez la signature
         if ($i === $targetPage) {
             // Ajouter la signature en bas à gauche
@@ -297,9 +339,18 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     $tech_id = Session::getLoginUserID();
     $DB->doQuery("UPDATE glpi_plugin_gestion_surveys SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
 
-    if (!empty($config->fields['ZenDocMail'])){ 
+    /*if (!empty($config->fields['ZenDocMail'])){ 
         $sharepoint->MailSend($config->fields['ZenDocMail'], $config->fields['gabarit'], $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
-    }  
+    }*/
+    if (!empty($config->fields['ZenDocMail'])){ 
+        $sharepoint->MailSend($config->fields['ZenDocMail'], "Bon de Livraison signé : $DOC_NAME", $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
+    }
+    // NEW -- Facture comptoir
+    if (!empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1 && !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1) {
+        if (!empty($config->fields['CounterInvoiceMail'])){  
+            $sharepoint->MailSend($config->fields['CounterInvoiceMail'], "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME", $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
+        }  
+    }
     if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){        
         $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
     }

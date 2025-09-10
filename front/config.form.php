@@ -140,6 +140,13 @@ if (isset($_POST["update"])) {
       }
    }
 
+   // ===== AJOUTS POUR SIGNATURE FACTURE COMPTOIR =====
+
+   // Encoder en JSON la liste des utilisateurs autorisés (si fournie)
+   if (isset($encrypted_post['CounterInvoiceUsers']) && is_array($encrypted_post['CounterInvoiceUsers'])) { // NEW
+      $ids = array_map('intval', $encrypted_post['CounterInvoiceUsers']);
+      $encrypted_post['CounterInvoiceUsers'] = json_encode(array_values($ids));
+   }
    
    // ===== AJOUTS POUR SIGNATURE DÉPORTÉE =====
 
