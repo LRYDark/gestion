@@ -4,9 +4,10 @@ $vendor = dirname(__DIR__) . '/vendor/autoload.php';  //  __DIR__ = .../gestion/
 if (file_exists($vendor)) {
     require_once $vendor;
 } else {
-    throw new RuntimeException(
+    /*throw new RuntimeException(
         "[Plugin Gestion] vendor/autoload.php introuvable : exécutez `composer install` dans plugins/gestion"
-    );
+    );*/
+    Session::addMessageAfterRedirect(__("[Plugin Gestion] vendor/autoload.php introuvable : exécutez `composer install` dans plugins/gestion"), true, ERROR);
 }
 // ---------------------------------------------------------------------------
 
@@ -125,7 +126,8 @@ function downloadDocument(string $docId, string $destinationFile): string
 
     $fp = fopen($destinationFile, 'wb');
     if ($fp === false) {
-        throw new RuntimeException("Impossible d'ouvrir le fichier en écriture : $destinationFile");
+        //throw new RuntimeException("Impossible d'ouvrir le fichier en écriture : $destinationFile");
+        Session::addMessageAfterRedirect(__("Impossible d'ouvrir le fichier en écriture : $destinationFile"), true, ERROR);
     }
 
     $ch = curl_init($url);
@@ -148,13 +150,15 @@ function downloadDocument(string $docId, string $destinationFile): string
 
     if ($ok === false) {
         @unlink($destinationFile);
-        throw new RuntimeException("Erreur cURL: $err");
+        //throw new RuntimeException("Erreur cURL: $err");
+        Session::addMessageAfterRedirect(__("Erreur cURL: $err"), true, ERROR);
     }
 
     if ($status >= 400) {
         $body = file_get_contents($destinationFile);
         @unlink($destinationFile);
-        throw new RuntimeException("Erreur API ($status): $body");
+        //throw new RuntimeException("Erreur API ($status): $body");
+        Session::addMessageAfterRedirect(__("Erreur API ($status): $body"), true, ERROR);  
     }
 
     return $destinationFile;
@@ -239,7 +243,8 @@ function documentExiste(string $docId, ?int &$httpStatus = null): bool
     curl_close($ch);
 
     if ($res === false) {
-        throw new RuntimeException("Erreur cURL: $err");
+        //throw new RuntimeException("Erreur cURL: $err");
+        Session::addMessageAfterRedirect(__("Erreur cURL: $err"), true, ERROR);
     }
 
     return $httpStatus === 200;
