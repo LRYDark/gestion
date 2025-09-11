@@ -487,57 +487,55 @@ class PluginGestionCri extends CommonDBTM {
          .email-combo-container {
             position: relative;
             width: 100%;
+            max-width: 400px; /* on garde ta limite */
          }
 
          .email-input {
             width: 100%;
-            padding-right: 28px; 
-            padding: 8px 20px 8px 8px;
+            padding-right: 32px; /* espace pour le bouton */
             border: 1px solid #ddd;
             border-radius: 4px;
-            background: white;
             font-size: 14px;
             box-sizing: border-box;
          }
 
+         /* Bouton flèche collé à droite de l’input */
          .email-dropdown-btn {
             position: absolute;
-            right: 57%;
-            top: 1px;
-            bottom: 1px;
+            right: 8px;                /* toujours au bord droit du conteneur */
+            top: 50%;                  /* centré verticalement */
+            transform: translateY(-50%);
             background: none;
             border: none;
             cursor: pointer;
             color: #666;
-            font-size: 10px;
+            font-size: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 0 3px 3px 0;
-            font-size: 11px; /* Taille pour bien afficher ⌄ */
-            transition: transform 0.3s ease; /* Animation fluide */
+            transition: transform 0.3s ease;
          }
 
-         /* Quand le bouton est actif (dropdown ouvert) */
          .email-dropdown-btn.open {
-            transform: rotate(180deg); /* Rotation de la flèche */
+            transform: translateY(-50%) rotate(180deg);
          }
 
+         /* Menu exactement de la largeur du conteneur (input + bouton) */
          .email-dropdown {
             position: absolute;
-            top: 100%;
+            top: calc(100% + 2px);
             left: 0;
-            width: 44%; 
-            right: auto; /* pour l’aligner avec le bouton */
-            background: white;
+            width: 100%;
+            max-width: 400px;
+            background: #fff;
             border: 1px solid #ddd;
             border-top: none;
             border-radius: 0 0 4px 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             max-height: 200px;
             overflow-y: auto;
             z-index: 1000;
             display: none;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             box-sizing: border-box;
          }
 
