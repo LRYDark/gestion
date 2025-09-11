@@ -984,8 +984,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         return $tracker;
     }
 
-    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL){
-        global $DB, $CFG_GLPI;
+    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL, $SubjectMail = NULL, $BodyMail = NULL) {        global $DB, $CFG_GLPI;
 
         // Validation de l'email
         if (!filter_var($EMAIL, FILTER_VALIDATE_EMAIL)) {
@@ -1010,13 +1009,39 @@ class PluginGestionSharepoint extends CommonDBTM {
         $mmail = new GLPIMailer(); // génération du mail
         $config = new PluginGestionConfig();
     
-        $NotifMailTemplate = $DB->query("SELECT * FROM glpi_notificationtemplatetranslations WHERE notificationtemplates_id=$gabarit_id")->fetch_object();
-        if (!$NotifMailTemplate) {
-            throw new RuntimeException("Aucun template trouvé pour l'ID : $gabarit_id");
-        }    
-            $BodyHtml = html_entity_decode($NotifMailTemplate->content_html, ENT_QUOTES, 'UTF-8');
-            $BodyText = html_entity_decode($NotifMailTemplate->content_text, ENT_QUOTES, 'UTF-8');
-    
+        if ((int)$gabarit_id > 0) {
+            $itTpl = $DB->request([
+                'SELECT' => ['subject', 'content_text', 'content_html', 'language'],
+                'FROM'   => 'glpi_notificationtemplatetranslations',
+                'WHERE'  => [
+                    'notificationtemplates_id' => (int)$gabarit_id,
+                    'language'                 => $langs  // IN (...)
+                ],
+                'ORDER'  => [$order],
+                'LIMIT'  => 1
+            ])->current();
+
+            if (!is_array($itTpl)) {
+                // dernier recours sans filtre de langue
+                $itTpl = $DB->request([
+                    'SELECT' => ['subject', 'content_text', 'content_html', 'language'],
+                    'FROM'   => 'glpi_notificationtemplatetranslations',
+                    'WHERE'  => ['notificationtemplates_id' => (int)$gabarit_id],
+                    'LIMIT'  => 1
+                ])->current();
+            }
+
+            if (is_array($itTpl)) {
+                $Subject  = (string)($itTpl['subject'] ?? '');
+                $BodyText = isset($itTpl['content_text']) ? html_entity_decode((string)$itTpl['content_text'], ENT_QUOTES, 'UTF-8') : '';
+                $BodyHtml = isset($itTpl['content_html']) ? html_entity_decode((string)$itTpl['content_html'], ENT_QUOTES, 'UTF-8') : '';
+            }
+        }elseif($SubjectMail != NULL && $BodyMail != NULL){
+            $Subject  = $SubjectMail ?? '';
+            $BodyText = $BodyMail ?? '';
+            $BodyHtml = $BodyMail ?? '';
+        }
+           
         $footer = $DB->query("SELECT value FROM glpi_configs WHERE name = 'mailing_signature'")->fetch_object();
         if(!empty($footer->value)){$footer = html_entity_decode($footer->value, ENT_QUOTES, 'UTF-8');}else{$footer='';}
     
@@ -1038,7 +1063,9 @@ class PluginGestionSharepoint extends CommonDBTM {
         }
 
         $mmail->isHTML(true);
-        $mmail->Subject = $remplacerBalises($NotifMailTemplate->subject);
+        if ($Subject !== '') {
+            $mmail->Subject = $remplacerBalises($Subject);
+        }
         $mmail->Body = GLPIMailer::normalizeBreaks($remplacerBalises($BodyHtml)) . $footer;
         $mmail->AltBody = GLPIMailer::normalizeBreaks($remplacerBalises($BodyText)) . $footer;
     
