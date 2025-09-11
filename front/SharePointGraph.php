@@ -1014,10 +1014,8 @@ class PluginGestionSharepoint extends CommonDBTM {
                 'SELECT' => ['subject', 'content_text', 'content_html', 'language'],
                 'FROM'   => 'glpi_notificationtemplatetranslations',
                 'WHERE'  => [
-                    'notificationtemplates_id' => (int)$gabarit_id,
-                    'language'                 => $langs  // IN (...)
+                    'notificationtemplates_id' => (int)$gabarit_id
                 ],
-                'ORDER'  => [$order],
                 'LIMIT'  => 1
             ])->current();
 
