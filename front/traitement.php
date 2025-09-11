@@ -184,7 +184,7 @@ try {
             $paymentDateTime = isset($paymentDateTime) && $paymentDateTime ? $paymentDateTime : date('d/m/Y H:i');
 
                 // Libellé en UTF-8 → converti pour FPDF
-                $label_utf8 = 'Facture payée en magasin — ' . $paymentDateTime;
+                $label_utf8 = $config->fields['CounterInvoiceText'] . ' — ' . $paymentDateTime;
                 if (function_exists('iconv')) {
                     // Windows-1252 garde « — » et les accents
                     $label = iconv('UTF-8', 'windows-1252//TRANSLIT', $label_utf8);
@@ -337,18 +337,33 @@ if (!str_ends_with($outputPathTemp, '.pdf')) {
 if ($pdf->Output('F', $outputPathTemp) === '') {
     $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
     $tech_id = Session::getLoginUserID();
-    $DB->doQuery("UPDATE glpi_plugin_gestion_surveys SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
+    //$DB->doQuery("UPDATE glpi_plugin_gestion_surveys SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
+    $ok = $DB->update(
+        'glpi_plugin_gestion_surveys',
+        [
+            'signed'        => 1,
+            'date_creation' => $date,
+            'users_id'      => $tech_id,
+            'users_ext'     => $NAME,
+        ],
+        [
+            'BL'            => $DOC_NAME
+        ]
+    );
+    if ($ok === false) {
+        message("Erreur lors de la mise a jours en Base de donnée.", ERROR);
+    }
 
     /*if (!empty($config->fields['ZenDocMail'])){ 
         $sharepoint->MailSend($config->fields['ZenDocMail'], $config->fields['gabarit'], $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
     }*/
     if (!empty($config->fields['ZenDocMail'])){ 
-        $sharepoint->MailSend($config->fields['ZenDocMail'], "Bon de Livraison signé : $DOC_NAME", $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
+        $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé", "Bon de Livraison signé : $DOC_NAME");
     }
     // NEW -- Facture comptoir
     if (!empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1 && !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1) {
         if (!empty($config->fields['CounterInvoiceMail'])){  
-            $sharepoint->MailSend($config->fields['CounterInvoiceMail'], "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME", $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
+            $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME");
         }  
     }
     if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){        

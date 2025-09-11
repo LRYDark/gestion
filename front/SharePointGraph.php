@@ -1053,7 +1053,7 @@ class PluginGestionSharepoint extends CommonDBTM {
             
         $mmail->ClearAddresses();
     }*/
-    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL) {
+    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL, $SubjectMail = NULL, $BodyMail = NULL) {
         global $DB, $CFG_GLPI;
 
         // --- Validation email ---
@@ -1123,6 +1123,10 @@ class PluginGestionSharepoint extends CommonDBTM {
                 $BodyText = isset($itTpl['content_text']) ? html_entity_decode((string)$itTpl['content_text'], ENT_QUOTES, 'UTF-8') : '';
                 $BodyHtml = isset($itTpl['content_html']) ? html_entity_decode((string)$itTpl['content_html'], ENT_QUOTES, 'UTF-8') : '';
             }
+        }elseif($SubjectMail != NULL && $BodyMail != NULL){
+            $Subject  = $SubjectMail ?? '';
+            $BodyText = $BodyMail ?? '';
+            $BodyHtml = $BodyMail ?? '';
         }
 
         // --- Footer signature ---

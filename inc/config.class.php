@@ -909,6 +909,12 @@ class PluginGestionConfig extends CommonDBTM
             echo Html::input('CounterInvoiceMail', ['value' => $config->CounterInvoiceMail(), 'size' => 60]);// bouton configuration du bas de page line 1
          echo "</td>";
       echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
+         echo "<td>" . __("Titre du réglement comptoir", "gestion") . "</td><td>";
+            echo Html::input('CounterInvoiceText', ['value' => $config->CounterInvoiceText(), 'size' => 80]);// bouton configuration du bas de page line 1
+         echo "</td>";
+      echo "</tr>";
       
       // ON/OFF
       echo "<tr class='tab_bg_1'>";
@@ -1095,6 +1101,9 @@ class PluginGestionConfig extends CommonDBTM
    }
    function CounterInvoiceMail(){
       return isset($this->fields['CounterInvoiceMail']) ? (string)$this->fields['CounterInvoiceMail'] : '';
+   }
+   function CounterInvoiceText(){
+      return isset($this->fields['CounterInvoiceText']) ? (string)$this->fields['CounterInvoiceText'] : '';
    }
 
    // return fonction (retourn les values enregistrées en bdd)

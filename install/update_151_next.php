@@ -10,7 +10,8 @@ function update_151_next() {
       'CounterInvoice',
       'CounterInvoiceUsers',
       'CounterInvoiceMail',
-      'CounterInvoicePdf'
+      'CounterInvoicePdf',
+      'CounterInvoiceText'
    ];
 
    // Liste pour les colonnes manquantes
@@ -21,6 +22,7 @@ function update_151_next() {
                ADD COLUMN `CounterInvoice` TINYINT(4) NOT NULL DEFAULT '0',
                ADD COLUMN `CounterInvoiceUsers` TEXT NULL,
                ADD COLUMN `CounterInvoiceMail` TEXT NULL,
+               ADD COLUMN `CounterInvoiceText` TEXT NOT NULL DEFAULT 'Payée au comptoir',
                ADD COLUMN `CounterInvoicePdf` TINYINT(4) NOT NULL DEFAULT '0';";
       $DB->doQuery($query) or die($DB->error());
    }
