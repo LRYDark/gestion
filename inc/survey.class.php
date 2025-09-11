@@ -150,6 +150,15 @@ class PluginGestionSurvey extends CommonDBTM {
          'massiveaction'      => false
       ];
 
+      $tab[] = [
+         'id'                 => '11',
+         'table'              => $this->getTable(),
+         'field'              => 'relatedInvoiceToBL',
+         'name'               => __('Facture liée '),
+         'datatype'           => 'text',
+         'massiveaction'      => false
+      ];
+
       return $tab;
    }
 
@@ -343,6 +352,12 @@ class PluginGestionSurvey extends CommonDBTM {
                      'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
                   ]);
             echo "</td></tr>";
+         }
+
+         if(!empty($this->fields['relatedInvoiceToBL'])){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Facture liée : <strong>'.$this->fields['relatedInvoiceToBL'].'</strong> ')."</td>";
+            echo "</tr>";
          }
       }else{
          $script = <<<JAVASCRIPT

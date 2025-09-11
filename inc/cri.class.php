@@ -694,6 +694,9 @@ class PluginGestionCri extends CommonDBTM {
                echo '<p><strong>Signé le :</strong> ' . $DOC->date_creation . '</p>';
                echo '<p><strong>Par :</strong> ' . $DOC->users_ext . '</p>';
                echo '<p><strong>Livré par :</strong> ' . getUserName($DOC->users_id) . '</p>';
+               if (!empty($DOC->relatedInvoiceToBL)){
+                  echo '<p><strong>Facture liée :</strong> ' . $DOC->relatedInvoiceToBL . '</p>';
+               }
             echo '</div>';
          echo '</div>';
          
