@@ -338,16 +338,20 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
     $tech_id = Session::getLoginUserID();
     //$DB->query("UPDATE glpi_plugin_gestion_surveys SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
+    $relatedInvoiceToBL = !empty($_POST['relatedInvoiceToBL'])
+                        ? strtoupper($_POST['relatedInvoiceToBL'])
+                        : null;
     $ok = $DB->update(
         'glpi_plugin_gestion_surveys',
         [
-            'signed'        => 1,
-            'date_creation' => $date,
-            'users_id'      => $tech_id,
-            'users_ext'     => $NAME,
+            'signed'             => 1,
+            'date_creation'      => $date,
+            'users_id'           => $tech_id,
+            'users_ext'          => $NAME,
+            'relatedInvoiceToBL' => $relatedInvoiceToBL,
         ],
         [
-            'BL'            => $DOC_NAME
+            'BL' => $DOC_NAME
         ]
     );
     if ($ok === false) {
@@ -363,7 +367,14 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     // NEW -- Facture comptoir
     if (!empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1 && !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1) {
         if (!empty($config->fields['CounterInvoiceMail'])){  
-            $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME");
+
+            if (!empty($_POST['relatedInvoiceToBL'])){
+                $relatedInvoiceToBL = $_POST['relatedInvoiceToBL'];
+                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Facture correspondant au bon de livraison : $relatedInvoiceToBL";
+            }else{
+                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME";
+            }
+            $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
         }  
     }
     if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){        

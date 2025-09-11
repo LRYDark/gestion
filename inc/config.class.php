@@ -1374,6 +1374,10 @@ class PluginGestionConfig extends CommonDBTM
          include(PLUGIN_GESTION_DIR . "/install/update_151_next.php");
          update_151_next(); 
       }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.5.1'){ // NEW
+         include(PLUGIN_GESTION_DIR . "/install/update_152_next.php");
+         update_152_next(); 
+      }
    }
 
    static function uninstall(Migration $migration)

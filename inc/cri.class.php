@@ -626,7 +626,11 @@ class PluginGestionCri extends CommonDBTM {
                      echo '<div class="checkbox-group">';
                         echo '<input type="checkbox" name="CounterInvoiceClient" value="1" id="CounterInvoiceClient">';
                         echo '<label for="CounterInvoiceClient">Règlement effectué</label>';
-                     echo '</div>';                     
+                     echo '</div>';      
+                     
+                     echo '<div class="email-combo-container">'; // new 2
+                        echo '<input type="text" id="mail" name="relatedInvoiceToBL" class="email-input" placeholder="Facture relative au bon de livraison (facultatif)">';
+                     echo '</div>';
                echo '</div>';
             echo '</div>';
          }
