@@ -17,6 +17,21 @@ class PluginGestionConfig extends CommonDBTM
       }
    }
 
+   static function canCreate()
+   {
+      return Session::haveRight('config', UPDATE);
+   }
+
+   static function canView()
+   {
+      return Session::haveRight('config', READ);
+   }
+
+   static function canUpdate()
+   {
+      return Session::haveRight('config', UPDATE);
+   }
+
    static function getTypeName($nb = 0)
    {
       return __("Gestion Bl ", "gestion");
