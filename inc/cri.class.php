@@ -616,7 +616,7 @@ class PluginGestionCri extends CommonDBTM {
                      echo '</div>'; 
                                           
                      echo '<div class="email-combo-container">'; // new 2
-                        echo '<input type="text" id="mail" name="relatedInvoiceToBL" class="email-input" placeholder="Facture relative au bon de livraison (facultatif)">';
+                        echo '<input type="text" id="mail" name="relatedInvoiceToBL" class="email-input" placeholder="Document relative au bon de livraison (facultatif)">';
                      echo '</div>';                    
                echo '</div>';
             echo '</div>';
@@ -695,7 +695,7 @@ class PluginGestionCri extends CommonDBTM {
                echo '<p><strong>Par :</strong> ' . $DOC->users_ext . '</p>';
                echo '<p><strong>Livré par :</strong> ' . getUserName($DOC->users_id) . '</p>';
                if (!empty($DOC->relatedInvoiceToBL)){
-                  echo '<p><strong>Facture liée :</strong> ' . $DOC->relatedInvoiceToBL . '</p>';
+                  echo '<p><strong>Document lié :</strong> ' . $DOC->relatedInvoiceToBL . '</p>';
                }
             echo '</div>';
          echo '</div>';

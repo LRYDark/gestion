@@ -154,7 +154,7 @@ class PluginGestionSurvey extends CommonDBTM {
          'id'                 => '11',
          'table'              => $this->getTable(),
          'field'              => 'relatedInvoiceToBL',
-         'name'               => __('Facture liée '),
+         'name'               => __('Document lié'),
          'datatype'           => 'text',
          'massiveaction'      => false
       ];
@@ -356,7 +356,7 @@ class PluginGestionSurvey extends CommonDBTM {
 
          if(!empty($this->fields['relatedInvoiceToBL'])){
             echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __('Facture liée : <strong>'.$this->fields['relatedInvoiceToBL'].'</strong> ')."</td>";
+               echo "<td>" . __('Document lié : <strong>'.$this->fields['relatedInvoiceToBL'].'</strong> ')."</td>";
             echo "</tr>";
          }
       }else{
