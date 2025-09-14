@@ -48,47 +48,7 @@ class PluginGestionConfig extends CommonDBTM
       return self::$_instance;
    }
 
-   static function showConfigForm() //formulaire de configuration du plugin
-   {
-
-      ?><style>
-         .switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 24px;
-         }
-         .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-         }
-         .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 24px;
-         }
-         .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px; width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-         }
-         input:checked + .slider {
-            background-color: #2196F3;
-         }
-         input:checked + .slider:before {
-            transform: translateX(26px);
-         }
-      </style><?php
-
+   static function showConfigForm(){ //formulaire de configuration du plugin
       global $DB;
       $config = new self();
       $config->getFromDB(1);
@@ -141,193 +101,231 @@ class PluginGestionConfig extends CommonDBTM
       }
 
       $config->showFormHeader(['colspan' => 4]);
-      echo "<tr><th colspan='2'>" . __('Gestion', 'gestion') . "</th></tr>";
+      echo '</table>'; 
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Affichage du PDF après signature", "gestion") . "</td><td>";
-            Dropdown::showYesNo('DisplayPdfEnd', $config->DisplayPdfEnd(), -1);
-         echo "</td>";
-      echo "</tr>";
+   // --- CARD : Gestion ---
+      ?>
+      <div class="card mb-3">
+      <div class="card-header">
+         <h3 class="card-title mb-0"><?php echo __('Gestion', 'gestion'); ?></h3>
+      </div>
+      <div class="card-body">
+         <div class="row g-3">
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Envoie des PDF par mail", "gestion") . "</td><td>";
-            Dropdown::showYesNo('MailTo', $config->MailTo(), -1);
-         echo "</td>";
-      echo "</tr>";
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __('Affichage du PDF après signature', 'gestion'); ?></label>
+            <?php Dropdown::showYesNo('DisplayPdfEnd', $config->DisplayPdfEnd(), -1); ?>
+            </div>
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td> Gabarit : Modèle de notifications </td>";
-         echo "<td>";
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __('Envoie des PDF par mail', 'gestion'); ?></label>
+            <?php Dropdown::showYesNo('MailTo', $config->MailTo(), -1); ?>
+            </div>
 
-         //notificationtemplates_id
-         Dropdown::show('NotificationTemplate', [
-            'name' => 'gabarit',
-            'value' => $config->gabarit(),
-            'display_emptychoice' => 1,
-            'specific_tags' => [],
-            'itemtype' => 'NotificationTemplate',
-            'displaywith' => [],
-            'emptylabel' => "-----",
-            'used' => [],
-            'toadd' => [],
-            'entity_restrict' => 0,
-         ]); 
-      echo "</td></tr>";
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __('Gabarit : Modèle de notifications', 'gestion'); ?></label>
+            <?php
+               Dropdown::show('NotificationTemplate', [
+                  'name'                => 'gabarit',
+                  'value'               => $config->gabarit(),
+                  'display_emptychoice' => 1,
+                  'emptylabel'          => '-----',
+                  'specific_tags'       => [],
+                  'itemtype'            => 'NotificationTemplate',
+                  'displaywith'         => [],
+                  'used'                => [],
+                  'toadd'               => [],
+                  'entity_restrict'     => 0,
+               ]);
+            ?>
+            </div>
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Enregistrement dans ZenDoc par mail", "gestion") . "</td><td>";
-            echo Html::input('ZenDocMail', ['value' => $config->ZenDocMail(), 'size' => 40]);// bouton configuration du bas de page line 1
-         echo "</td>";
-      echo "</tr>";
+            <div class="col-md-6">
+            <label for="ZenDocMail" class="form-label mb-1"><?php echo __('Enregistrement dans ZenDoc par mail', 'gestion'); ?></label>
+            <?php echo Html::input('ZenDocMail', ['value' => $config->ZenDocMail(), 'class' => 'form-control', 'id' => 'ZenDocMail']); ?>
+            </div>
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Conservation du PDF non signé après la signature", "gestion") . "</td><td>";
-            Dropdown::showYesNo('ConfigModes', $config->ConfigModes(), -1);
-         echo "</td>";
-      echo "</tr>";
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __("Conservation du PDF non signé après la signature", 'gestion'); ?></label>
+            <?php Dropdown::showYesNo('ConfigModes', $config->ConfigModes(), -1); ?>
+            </div>
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Autorisé la connexion à Sage local", "gestion") . "</td><td>";
-            Dropdown::showYesNo('SageOn', $config->SageOn(), -1);
-         echo "</td>";
-      echo "</tr>";
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __('Autorisé la connexion à Sage local', 'gestion'); ?></label>
+            <?php Dropdown::showYesNo('SageOn', $config->SageOn(), -1); ?>
+            </div>
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Autorisé la connexion à Sharepoint", "gestion") . "</td><td>";
-            Dropdown::showYesNo('SharePointOn', $config->SharePointOn(), -1);
-         echo "</td>";
-      echo "</tr>";
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __('Autorisé la connexion à Sharepoint', 'gestion'); ?></label>
+            <?php Dropdown::showYesNo('SharePointOn', $config->SharePointOn(), -1); ?>
+            </div>
 
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Recherche de documents dans le dossier local GLPI", "gestion") . "</td><td>";
-         $LocalSearch = $config->LocalSearch(); // Valeur réelle depuis la base (0 ou 1)
-         // Champ caché pour garantir la soumission de 0 si décoché
-         echo '<input type="hidden" name="LocalSearch" value="0">';
-         echo '<label class="switch">';
-            echo '<input type="checkbox" id="LocalSearch_switch" name="LocalSearch" value="1" ' . ($LocalSearch == 1 ? 'checked' : '') . '>';
-            echo '<span class="slider round"></span>';
-         echo '</label>';
-      echo "</td></tr>";
-    
-      // -----------------------------------------------------------------------
-      echo "<tr>";
-         echo "<th colspan='2'>";
-            echo '<button type="button" class="accordion-toggle" onclick="toggleConfigSection(this)">';
-               echo '<span class="arrow">▶</span> ' . __("Positionnement des éléments (Paramétre : 0 pour masqué)", 'gestion');
-            echo '</button>';
-         echo "</th>";
-      echo "</tr>";
+            <div class="col-md-6">
+            <label class="form-label mb-1 d-block"><?php echo __('Recherche de documents dans le dossier local GLPI', 'gestion'); ?></label>
+            <?php $LocalSearch = $config->LocalSearch(); ?>
+            <input type="hidden" name="LocalSearch" value="0">
+            <div class="form-check form-switch">
+               <input class="form-check-input" type="checkbox" id="LocalSearch_switch" name="LocalSearch" value="1" <?php echo ($LocalSearch == 1 ? 'checked' : ''); ?>>
+               <label class="form-check-label" for="LocalSearch_switch"><?php echo __('Activer', 'gestion'); ?></label>
+            </div>
+            </div>
 
-      echo "<tbody class='config-section' style='display: none;'>"; // Début de section masquée
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Position de la signature sur le PDF", "gestion") . "</td><td>";
-               echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                  echo '<label for="SignatureX">Signature X</label>';
-                     echo Html::input('SignatureX', ['value' => $config->SignatureX(), 'size' => 10]);
-                  echo '</div>';
-               echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                  echo '<label for="SignatureY">Signature Y</label>';
-                     echo Html::input('SignatureY', ['value' => $config->SignatureY(), 'size' => 10]);
-                  echo '</div>';
-               echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                  echo '<label for="SignatureSize">Signature taille</label>';
-                     echo Html::input('SignatureSize', ['value' => $config->SignatureSize(), 'size' => 10]);
-                  echo '</div>';
-            echo "</td>";
-         echo "</tr>";
+         </div>
+      </div>
+      </div>
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Position nom du signataire ", "gestion") . "</td><td>";
-               echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                  echo '<label for="SignataireX">Position X</label>';
-                     echo Html::input('SignataireX', ['value' => $config->SignataireX(), 'size' => 10]);
-                  echo '</div>';
-               echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                  echo '<label for="SignataireY">Position Y</label>';
-                     echo Html::input('SignataireY', ['value' => $config->SignataireY(), 'size' => 10]);
-                  echo '</div>';
-            echo "</td>";
-         echo "</tr>";
+      <?php
+      // --- CARD : Positionnement des éléments (Paramètre : 0 pour masqué) ---
+      ?>
+      <div class="card mb-3">
+      <div class="card-header">
+         <h3 class="card-title mb-0">
+            <?php echo __("Positionnement des éléments (Paramétre : 0 pour masqué)", 'gestion'); ?>
+         </h3>
+      </div>
+      <div class="card-body">
+         <!-- Ligne 1 : Signature (3) + Signataire (2) -->
+         <div class="row gy-4 gx-4">
+            <!-- Bloc Signature : ~3/5 de la largeur (7 colonnes Bootstrap) -->
+            <div class="col-12 col-xl-7">
+            <div class="text-muted fw-semibold mb-2">
+               <?php echo __('Position de la signature sur le PDF', 'gestion'); ?>
+            </div>
+            <div class="row g-3">
+               <div class="col-12 col-md-4">
+                  <label for="SignatureX" class="form-label mb-1"><?php echo __('Signature X', 'gestion'); ?></label>
+                  <?php echo Html::input('SignatureX', ['value' => $config->SignatureX(), 'class' => 'form-control', 'id' => 'SignatureX']); ?>
+               </div>
+               <div class="col-12 col-md-4">
+                  <label for="SignatureY" class="form-label mb-1"><?php echo __('Signature Y', 'gestion'); ?></label>
+                  <?php echo Html::input('SignatureY', ['value' => $config->SignatureY(), 'class' => 'form-control', 'id' => 'SignatureY']); ?>
+               </div>
+               <div class="col-12 col-md-4">
+                  <label for="SignatureSize" class="form-label mb-1"><?php echo __('Signature taille', 'gestion'); ?></label>
+                  <?php echo Html::input('SignatureSize', ['value' => $config->SignatureSize(), 'class' => 'form-control', 'id' => 'SignatureSize']); ?>
+               </div>
+            </div>
+            </div>
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Position date de signature", "gestion") . "</td><td>";
-               echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                  echo '<label for="DateX">Position X</label>';
-                     echo Html::input('DateX', ['value' => $config->DateX(), 'size' => 10]);
-                  echo '</div>';
-               echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                  echo '<label for="DateY">Position Y</label>';
-                     echo Html::input('DateY', ['value' => $config->DateY(), 'size' => 10]);
-                  echo '</div>';
-            echo "</td>";
-         echo "</tr>";
+            <!-- Bloc Signataire : ~2/5 de la largeur (5 colonnes Bootstrap) -->
+            <div class="col-12 col-xl-5">
+            <div class="text-muted fw-semibold mb-2">
+               <?php echo __('Position nom du signataire', 'gestion'); ?>
+            </div>
+            <div class="row g-3">
+               <div class="col-6">
+                  <label for="SignataireX" class="form-label mb-1"><?php echo __('Position X', 'gestion'); ?></label>
+                  <?php echo Html::input('SignataireX', ['value' => $config->SignataireX(), 'class' => 'form-control', 'id' => 'SignataireX']); ?>
+               </div>
+               <div class="col-6">
+                  <label for="SignataireY" class="form-label mb-1"><?php echo __('Position Y', 'gestion'); ?></label>
+                  <?php echo Html::input('SignataireY', ['value' => $config->SignataireY(), 'class' => 'form-control', 'id' => 'SignataireY']); ?>
+               </div>
+            </div>
+            </div>
+         </div>
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Position du nom du technicien", "gestion") . "</td><td>";
-               echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                  echo '<label for="TechX">Position X</label>';
-                     echo Html::input('TechX', ['value' => $config->TechX(), 'size' => 10]);
-                  echo '</div>';
-               echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                  echo '<label for="TechY">Position Y</label>';
-                     echo Html::input('TechY', ['value' => $config->TechY(), 'size' => 10]);
-                  echo '</div>';
-            echo "</td>";
-         echo "</tr>";
-      echo "</tbody>"; // Fin de la section masquée
+         <!-- Ligne 2 : Date (2) + Technicien (2) -->
+         <div class="row gy-4 gx-4 mt-2">
+            <!-- Bloc Date -->
+            <div class="col-12 col-xl-6">
+            <div class="text-muted fw-semibold mb-2">
+               <?php echo __('Position date de signature', 'gestion'); ?>
+            </div>
+            <div class="row g-3">
+               <div class="col-6">
+                  <label for="DateX" class="form-label mb-1"><?php echo __('Position X', 'gestion'); ?></label>
+                  <?php echo Html::input('DateX', ['value' => $config->DateX(), 'class' => 'form-control', 'id' => 'DateX']); ?>
+               </div>
+               <div class="col-6">
+                  <label for="DateY" class="form-label mb-1"><?php echo __('Position Y', 'gestion'); ?></label>
+                  <?php echo Html::input('DateY', ['value' => $config->DateY(), 'class' => 'form-control', 'id' => 'DateY']); ?>
+               </div>
+            </div>
+            </div>
 
-      echo "<tr><th colspan='2'>" . __("Configuration de l'affichage et Tâche cron", 'gestion') . "</th></tr>";
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Prévisualisation du PDF avant signature <i class='fa-solid fa-circle-info text-secondary' data-bs-toggle='tooltip' data-bs-placement='top' title=\"(cela peut provoquer des ralentissements). Vérifiez également la configuration de SharePoint pour l'autorisation de partage par lien.\"></i>", "gestion") . "</td><td>";
-            Dropdown::showYesNo('SharePointLinkDisplay', $config->SharePointLinkDisplay(), -1);
-         echo "</td>";
-      echo "</tr>";
+            <!-- Bloc Technicien -->
+            <div class="col-12 col-xl-6">
+            <div class="text-muted fw-semibold mb-2">
+               <?php echo __('Position du nom du technicien', 'gestion'); ?>
+            </div>
+            <div class="row g-3">
+               <div class="col-6">
+                  <label for="TechX" class="form-label mb-1"><?php echo __('Position X', 'gestion'); ?></label>
+                  <?php echo Html::input('TechX', ['value' => $config->TechX(), 'class' => 'form-control', 'id' => 'TechX']); ?>
+               </div>
+               <div class="col-6">
+                  <label for="TechY" class="form-label mb-1"><?php echo __('Position Y', 'gestion'); ?></label>
+                  <?php echo Html::input('TechY', ['value' => $config->TechY(), 'class' => 'form-control', 'id' => 'TechY']); ?>
+               </div>
+            </div>
+            </div>
+         </div>
+      </div>
+      </div>
 
-      // Générer les options du menu déroulant
-      $dropdownValues = [];
-      for ($i = 10; $i <= 500; $i += 10) {
-         $dropdownValues[$i] = $i; // La clé et la valeur sont identiques dans ce cas
-      }
-      echo "<tr class='tab_bg_1'>";
-         echo "<td>" . __("Nombre d'éléments maximum à afficher par requête", "gestion") . "</td><td>";
-            // Afficher le menu déroulant avec Dropdown::show()
-            Dropdown::showFromArray(
-               'NumberViews',  // Nom de l'identifiant du champ
-               $dropdownValues,    // Tableau des options
-               [
-                  'value'      => $config->NumberViews(),        // Valeur sélectionnée par défaut (optionnel)
-               ]
-            );
-         echo "</td>";
-      echo "</tr>";
+      <?php
+      // --- CARD : Configuration de l'affichage et Tâche cron ---
+      ?>
+      <div class="card mb-3">
+      <div class="card-header">
+         <h3 class="card-title mb-0"><?php echo __("Configuration de l'affichage et Tâche cron", 'gestion'); ?></h3>
+      </div>
+      <div class="card-body">
+         <div class="row g-3">
 
-      if (Plugin::isPluginActive('formcreator')) {
-         echo "<tr class='tab_bg_1'>";
-            echo "<td> Affichage du formulaire dans un modal (Vide pour désactivé) </td>";
-            echo "<td>";
-            
-            // Récupérer les données depuis la table glpi_plugin_formcreator_forms
-            $formcreator_forms = [];
-            global $DB;
-            $query = "SELECT `id`, `name` FROM `glpi_plugin_formcreator_forms`";
-            $result = $DB->query($query);
-            
-            if ($result) {
-               while ($data = $DB->fetchAssoc($result)) {
-                  $formcreator_forms[$data['id']] = $data['name'];
-               }
-            }
-            
-            // Afficher le dropdown
-            Dropdown::showFromArray('formulaire', $formcreator_forms, [
-               'value' => $config->formulaire(), // ID par défaut sélectionné
-               'display_emptychoice' => 1,
-               'emptylabel' => "-----"
-            ]);
-         echo "</td></tr>";
-      }
-      
-      //--------------------------------------------
+            <div class="col-md-6">
+            <label class="form-label mb-1">
+               <?php echo __("Prévisualisation du PDF avant signature", 'gestion'); ?>
+               <i class='fa-solid fa-circle-info text-secondary ms-1'
+                  data-bs-toggle='tooltip'
+                  data-bs-placement='top'
+                  title="<?php echo __("(cela peut provoquer des ralentissements). Vérifiez également la configuration de SharePoint pour l'autorisation de partage par lien.", 'gestion'); ?>"></i>
+            </label>
+            <?php Dropdown::showYesNo('SharePointLinkDisplay', $config->SharePointLinkDisplay(), -1); ?>
+            </div>
+
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __("Nombre d'éléments maximum à afficher par requête", 'gestion'); ?></label>
+            <div>
+               <?php
+                  $dropdownValues = [];
+                  for ($i = 10; $i <= 500; $i += 10) $dropdownValues[$i] = $i;
+                  Dropdown::showFromArray('NumberViews', $dropdownValues, [
+                  'value' => $config->NumberViews(),
+                  ]);
+               ?>
+            </div>
+            </div>
+
+            <?php if (Plugin::isPluginActive('formcreator')): ?>
+            <div class="col-md-6">
+               <label class="form-label mb-1"><?php echo __('Affichage du formulaire dans un modal (Vide pour désactivé)', 'gestion'); ?></label>
+               <div>
+                  <?php
+                  $formcreator_forms = [];
+                  global $DB;
+                  $result = $DB->query("SELECT `id`, `name` FROM `glpi_plugin_formcreator_forms`");
+                  if ($result) {
+                     while ($data = $DB->fetchAssoc($result)) {
+                        $formcreator_forms[$data['id']] = $data['name'];
+                     }
+                  }
+                  Dropdown::showFromArray('formulaire', $formcreator_forms, [
+                     'value'               => $config->formulaire(),
+                     'display_emptychoice' => 1,
+                     'emptylabel'          => "-----"
+                  ]);
+                  ?>
+               </div>
+            </div>
+            <?php endif; ?>
+
+         </div>
+      </div>
+      </div><?php
+
+      //---------------------------------------------------------------------------------
       $result = [];
       if(!empty($config->TenantID()) && $config->SharePointOn() == 1){
          // Utilisation
@@ -351,385 +349,604 @@ class PluginGestionConfig extends CommonDBTM
          }      
       }
 
-      if($config->SharePointOn() == 1){
-         echo "<tr>";
-            echo "<th colspan='2'>";
-               echo '<button type="button" class="accordion-toggle" onclick="toggleConfigSection1(this)">';
-                  echo '<span class="arrow">▶</span> ' . __('Connexion SharePoint (API Graph) | '.$checkcon . $errorcon, 'gestion');
-               echo '</button>';
-            echo "</th>";
-         echo "</tr>";
+      if ($config->SharePointOn() == 1): ?>
+      <div class="card mb-3">
+         <div class="card-header">
+            <h3 class="card-title mb-0">
+            <?php echo __('Connexion SharePoint (API Graph) | '.$checkcon.$errorcon, 'gestion'); ?>
+            </h3>
+         </div>
+         <div class="card-body">
+            <div class="row g-3">
+            <div class="col-md-6">
+               <label for="TenantID" class="form-label mb-1"><?php echo __('Tenant ID', 'gestion'); ?></label>
+               <?php echo Html::input('TenantID', ['value' => $config->TenantID(), 'class' => 'form-control', 'id' => 'TenantID']); ?>
+            </div>
+            <div class="col-md-6">
+               <label for="ClientID" class="form-label mb-1"><?php echo __('Client ID', 'gestion'); ?></label>
+               <?php echo Html::input('ClientID', ['value' => $config->ClientID(), 'class' => 'form-control', 'id' => 'ClientID']); ?>
+            </div>
 
-         echo "<tbody class='config-section1' style='display: none;'>"; // Début de section masquée
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Tenant ID", "gestion") . "</td><td>";
-                  echo Html::input('TenantID', ['value' => $config->TenantID(), 'size' => 80]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
+            <div class="col-md-6">
+               <label for="ClientSecret" class="form-label mb-1"><?php echo __('Client Secret', 'gestion'); ?></label>
+               <?php echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'class' => 'form-control', 'id' => 'ClientSecret']); ?>
+            </div>
+            <div class="col-md-6">
+               <label for="Hostname" class="form-label mb-1"><?php echo __('Nom d’hôte', 'gestion'); ?></label>
+               <?php echo Html::input('Hostname', ['value' => $config->Hostname(), 'class' => 'form-control', 'id' => 'Hostname']); ?>
+            </div>
 
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Client ID", "gestion") . "</td><td>";
-                  echo Html::input('ClientID', ['value' => $config->ClientID(), 'size' => 80]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
+            <div class="col-md-6">
+               <label for="SitePath" class="form-label mb-1"><?php echo __('Chemin du Site (/sites/XXXX)', 'gestion'); ?></label>
+               <?php echo Html::input('SitePath', ['value' => $config->SitePath(), 'class' => 'form-control', 'id' => 'SitePath']); ?>
+            </div>
 
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Client Secret", "gestion") . "</td><td>";
-                  echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'size' => 80]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
+            <div class="col-md-6">
+               <label class="form-label mb-1 d-block"><?php echo __('Recherche de documents dans SharePoint', 'gestion'); ?></label>
+               <?php
+                  $SharePointSearch = $config->SharePointSearch();
+                  echo '<input type="hidden" name="SharePointSearch" value="0">';
+               ?>
+               <div class="form-check form-switch">
+                  <input class="form-check-input"
+                        type="checkbox"
+                        id="SharePointSearch_switch"
+                        name="SharePointSearch"
+                        value="1" <?php echo ($SharePointSearch == 1 ? 'checked' : ''); ?>>
+                  <label class="form-check-label" for="SharePointSearch_switch"><?php echo __('Activer', 'gestion'); ?></label>
+               </div>
+            </div>
+            </div>
+         </div>
+      </div>
+      <?php endif; ?>
 
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Nom d’hôte", "gestion") . "</td><td>";
-                  echo Html::input('Hostname', ['value' => $config->Hostname(), 'size' => 80]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
+      <?php if ($config->SageOn() == 1): ?>
+      <div class="card mb-3">
+         <div class="card-header">
+            <h3 class="card-title mb-0"><?php echo __('Connexion Sage Local', 'gestion'); ?></h3>
+         </div>
+         <div class="card-body">
+            <div class="row g-3">
+            <div class="col-md-6">
+               <label for="SageUrlApi" class="form-label mb-1"><?php echo __('Url Api Sage', 'gestion'); ?></label>
+               <?php echo Html::input('SageUrlApi', ['value' => $config->SageUrlApi(), 'class' => 'form-control', 'id' => 'SageUrlApi']); ?>
+            </div>
+            <div class="col-md-6">
+               <label for="SageToken" class="form-label mb-1"><?php echo __('Sage Token', 'gestion'); ?></label>
+               <?php echo Html::input('SageToken', ['value' => $config->SageToken(), 'class' => 'form-control', 'id' => 'SageToken']); ?>
+            </div>
 
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Chemin du Site (/sites/XXXX)", "gestion") . "</td><td>";
-                  echo Html::input('SitePath', ['value' => $config->SitePath(), 'size' => 80]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
+            <div class="col-md-6">
+               <label class="form-label mb-1 d-block"><?php echo __('Recherche de documents dans Sage', 'gestion'); ?></label>
+               <?php
+                  $SageSearch = $config->SageSearch();
+                  echo '<input type="hidden" name="SageSearch" value="0">';
+               ?>
+               <div class="form-check form-switch">
+                  <input class="form-check-input"
+                        type="checkbox"
+                        id="SageSearch_switch"
+                        name="SageSearch"
+                        value="1" <?php echo ($SageSearch == 1 ? 'checked' : ''); ?>>
+                  <label class="form-check-label" for="SageSearch_switch"><?php echo __('Activer', 'gestion'); ?></label>
+               </div>
+            </div>
+            </div>
+         </div>
+      </div>
+      <?php endif;
 
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Recherche de documents dans SharePoint", "gestion") . "</td><td>";
-               $SharePointSearch = $config->SharePointSearch(); // Valeur réelle depuis la base (0 ou 1)
-               // Champ caché pour garantir la soumission de 0 si décoché
-               echo '<input type="hidden" name="SharePointSearch" value="0">';
-               echo '<label class="switch">';
-                  echo '<input type="checkbox" id="SharePointSearch_switch" name="SharePointSearch" value="1" ' . ($SharePointSearch == 1 ? 'checked' : '') . '>';
-                  echo '<span class="slider round"></span>';
-               echo '</label>';
-            echo "</td></tr>";
-         echo "</tbody>"; // Fin de la section masquée
-      }
+   // ---------------------------------------------------------------
+   // BIBLIOTHÈQUES (CARTE + TABLEAU ÉDITABLE AVEC AJOUT/SUPPRESSION)
+   // ---------------------------------------------------------------
 
-      if($config->SageOn() == 1){
-         echo "<tr>";
-            echo "<th colspan='2'>";
-               echo '<button type="button" class="accordion-toggle" onclick="toggleConfigSection2(this)">';
-                  echo '<span class="arrow">▶</span> ' . __('Connexion Sage Local', 'gestion');
-               echo '</button>';
-            echo "</th>";
-         echo "</tr>";
+      // Carte — choix du mode par défaut (inchangé)
+      ?>
+      <div class="card mb-3">
+      <div class="card-header">
+         <h3 class="card-title mb-0"><?php echo __('Bibliothèques', 'gestion'); ?></h3>
+      </div>
+      <div class="card-body">
+         <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __('Mode de recheche par defaut :', 'gestion'); ?></label>
+            <div>
+               <?php
+               $values4 = [];
+               if ($config->SharePointOn() == 1)           $values4[0] = 'Sharepoint';
+               if ($config->SageOn() == 1)                 $values4[1] = 'Sage Local';
+               if ($config->mode() != 0 || $mode == false) $values4[2] = 'Local';
 
-         echo "<tbody class='config-section2' style='display: none;'>"; // Début de section masquée
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Url Api Sage", "gestion") . "</td><td>";
-                  echo Html::input('SageUrlApi', ['value' => $config->SageUrlApi(), 'size' => 80]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
+               Dropdown::showFromArray('mode', $values4, [
+                  'value' => $config->mode(),
+               ]);
+               ?>
+            </div>
+            </div>
+         </div>
+      </div>
+      </div>
 
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Sage Token", "gestion") . "</td><td>";
-                  echo Html::input('SageToken', ['value' => $config->SageToken(), 'size' => 80]);// bouton configuration du bas de page line 1
-               echo "</td>";
-            echo "</tr>";
+      <?php
+      // Carte — choix de la bibliothèque SharePoint (inchangé) + tableau des dossiers
+      if ($mode == true && (!empty($config->TenantID()) || !empty($config->SageToken()))) :
 
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Recherche de documents dans Sage", "gestion") . "</td><td>";
-               $SageSearch = $config->SageSearch(); // Valeur réelle depuis la base (0 ou 1)
-               // Champ caché pour garantir la soumission de 0 si décoché
-               echo '<input type="hidden" name="SageSearch" value="0">';
-               echo '<label class="switch">';
-                  echo '<input type="checkbox" id="SageSearch_switch" name="SageSearch" value="1" ' . ($SageSearch == 1 ? 'checked' : '') . '>';
-                  echo '<span class="slider round"></span>';
-               echo '</label>';
-            echo "</td></tr>";
-
-         echo "</tbody>"; // Fin de la section masquée
-      }
-
-      echo "<tr><th colspan='2'>" . __("Bibliothèques", 'gestion') . "</th></tr>";
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Mode de recheche par defaut :", "gestion") ;
-
-            $values4 = [];
-            if($config->SharePointOn() == 1)                $values4[0] = 'Sharepoint';
-            if($config->SageOn() == 1)                      $values4[1] = 'Sage Local';
-            if($config->mode() != 0 || $mode == false)      $values4[2] = 'Local';
-
-            echo  "</td><td>";
-               Dropdown::showFromArray(
-                  'mode',
-                  $values4,
-                  [
-                     'value' => $config->mode(),
-                  ]
-            );
-            echo "</td>";
-         echo "</tr>";
-
-      if($mode == true && !empty($config->TenantID()) || !empty($config->SageToken())){
-         if ($config->SharePointOn() == 1 && (isset($result['status']) && $result['status'] === true)) {
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Bibliothèques SahrePoint : <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip' data-bs-placement='top' title='Attention : toute modification de la bibliothèque après l’utilisation d’une bibliothèque précédent peut entraîner des bugs ou des conflits.'></i>", "gestion") ;
-                  //Récupérer les bibliothèques de documents du site
-                  $drives = $sharepoint->getDrives($siteId);
-                  $values3 = [];
-                  // Afficher toutes les bibliothèques disponibles
-                  foreach ($drives as $drive) {
-                     if ($drive['name'] == 'Documents') {
-                        $drive['name'] = 'Documents partages';
-                     }
-                        $values3[$drive['name']] = $drive['name'];
-                  }
-               echo  "</td><td>";
-                  Dropdown::showFromArray(
-                     'Global',
-                     $values3,
-                     [
-                        'value' => $config->Global(),
-                     ]
-               );
-               echo "</td>";
-            echo "</tr>";
+      // --- Sélection de la bibliothèque SharePoint (inchangé)
+      if ($config->SharePointOn() == 1 && (isset($result['status']) && $result['status'] === true)) {
+         // Récupérer les bibliothèques de documents du site
+         $drives  = $sharepoint->getDrives($siteId);
+         $values3 = [];
+         foreach ($drives as $drive) {
+            $name = ($drive['name'] == 'Documents') ? 'Documents partages' : $drive['name'];
+            $values3[$name] = $name;
          }
+         ?>
+         <div class="card mb-3">
+            <div class="card-header">
+            <h3 class="card-title mb-0">
+               <?php echo __("Bibliothèques SharePoint", "gestion"); ?>
+               <i class='fa-solid fa-circle-exclamation text-warning ms-2'
+                  data-bs-toggle='tooltip' data-bs-placement='top'
+                  title="<?php echo __(
+                     "Attention : toute modification de la bibliothèque après l’utilisation d’une bibliothèque précédente peut entraîner des bugs ou des conflits.",
+                     'gestion'
+                  ); ?>"></i>
+            </h3>
+            </div>
+            <div class="card-body">
+            <?php
+               Dropdown::showFromArray('Global', $values3, [
+                  'value' => $config->Global(),
+               ]);
+            ?>
+            </div>
+         </div>
+         <?php
+      }
 
-         echo "<tr><th colspan='2'>" . __("Dossiers d'enregistrement du Sites (Voir SharePoint le nom des dossiers contenu dans la bibliothèque principale)", 'gestion') . "</th></tr>";
-         
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Ajouter un dossier (Nom du dossier)", "gestion") . "</td><td>";
-               echo Html::input('AddFileSite', ['value' => $config->AddFileSite(), 'size' => 40]);// bouton configuration du bas de page line 1
-            echo "</td>";
-         echo "</tr>";
-         
-         global $DB;
-         // Récupération des lignes (params) de la table
-         $queryRows = "SELECT * FROM `glpi_plugin_gestion_configsfolder`;";
+      // --- TABLEAU des dossiers (remplace l’ancien “Ajouter un dossier”)
+      // Lecture des lignes existantes
+      $rows = [];
+      $res  = $DB->query("SELECT id, folder_name, params FROM glpi_plugin_gestion_configsfolder ORDER BY id ASC");
+      if ($res) {
+         while ($r = $DB->fetchAssoc($res)) {
+            $rows[] = $r;
+         }
+      }
 
-         $resultRows = $DB->query($queryRows);
+      // Construit la liste d’options $values2 selon ta logique existante (sans “Supprimer le dossier” car on a un bouton)
+      if ($config->SageOn() == 1 && $config->SharePointOn() == 0) {
+         $values2 = [
+            2  => __('Dossier de destination (Dépot Local)', 'gestion'),
+            5  => __('Envoyé un mail si visible dans le tracker', 'gestion'),
+            8  => __('__Non attribué__', 'gestion'),
+            10 => __('Eléments de recheche', 'gestion'),
+         ];
+      } elseif ($config->SageOn() == 0 && $config->SharePointOn() == 1) {
+         $values2 = [
+            1  => __('Dossier de récupération (Recursive SharePoint)', 'gestion'),
+            2  => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
+            5  => __('Envoyé un mail si visible dans le tracker', 'gestion'),
+            8  => __('__Non attribué__', 'gestion'),
+            10 => __('Eléments de recheche', 'gestion'),
+         ];
+      } elseif ($config->SageOn() == 1 && $config->SharePointOn() == 1) {
+         if ($config->mode() == 1) {
+            $values2 = [
+            2  => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
+            3  => __('Dossier de destination (Dépot Local)', 'gestion'),
+            5  => __('Envoyé un mail si visible dans le tracker', 'gestion'),
+            8  => __('__Non attribué__', 'gestion'),
+            10 => __('Eléments de recheche', 'gestion'),
+            ];
+         } else {
+            $values2 = [
+            1  => __('Dossier de récupération (Recursive SharePoint)', 'gestion'),
+            2  => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
+            3  => __('Dossier de destination (Dépot Local)', 'gestion'),
+            5  => __('Envoyé un mail si visible dans le tracker', 'gestion'),
+            8  => __('__Non attribué__', 'gestion'),
+            10 => __('Eléments de recheche', 'gestion'),
+            ];
+         }
+      } else {
+         // fallback si rien d'activé (devrait rester vide normalement)
+         $values2 = [
+            8 => __('__Non attribué__', 'gestion'),
+         ];
+      }
+      ?>
 
-         if ($resultRows && $DB->numrows($resultRows) > 0) {
-            while ($row = $DB->fetchAssoc($resultRows)) {
-               $folder_name = $row['folder_name'];
-               $value = $row['params'];
+      <div class="card mb-3">
+         <div class="card-header">
+            <h3 class="card-title mb-0">
+            <?php echo __("Dossiers d'enregistrement du Site", 'gestion'); ?>
+            <small class="text-muted d-block">
+               <?php echo __("Voir SharePoint : le nom des dossiers contenus dans la bibliothèque principale", 'gestion'); ?>
+            </small>
+            </h3>
+         </div>
 
-               // Générer une ligne HTML pour chaque enregistrement
-               echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __($folder_name, "gestion") . "</td><td>";
+         <div class="card-body">
+            <div class="table-responsive">
+            <table class="table table-sm align-middle" id="foldersTable">
+               <thead>
+                  <tr>
+                  <th style="width:45%"><?php echo __('Nom du dossier', 'gestion'); ?></th>
+                  <th style="width:45%"><?php echo __('Action', 'gestion'); ?></th>
+                  <th style="width:10%"></th>
+                  </tr>
+               </thead>
+               <tbody>
+               <?php if (!empty($rows)): ?>
+                  <?php foreach ($rows as $r): ?>
+                  <tr data-id="<?php echo (int)$r['id']; ?>">
+                     <td>
+                        <input type="text"
+                              name="folders[<?php echo (int)$r['id']; ?>][folder_name]"
+                              class="form-control form-control-sm"
+                              value="<?php echo htmlspecialchars($r['folder_name'] ?? '', ENT_QUOTES); ?>"
+                              placeholder="<?php echo __('Ex : Dossiers clients', 'gestion'); ?>">
+                     </td>
+                     <td>
+                        <?php
+                        // on affiche un select simple qui poste folders[id][params]
+                        Dropdown::showFromArray(
+                           "folders[".(int)$r['id']."][params]",
+                           $values2,
+                           [
+                              'value' => (int)($r['params'] ?? 8),
+                              'width' => '100%',
+                              'class' => 'folder-select'
+                           ]
+                        );
+                        ?>
+                     </td>
+                     <td class="text-end">
+                        <button type="button" class="btn btn-outline-danger btn-sm folder-del-row" title="<?php echo __('Supprimer'); ?>">
+                        <i class="fa fa-trash"></i>
+                        </button>
+                        <input type="hidden" name="folders[<?php echo (int)$r['id']; ?>][_delete]" value="0">
+                     </td>
+                  </tr>
+                  <?php endforeach; ?>
+               <?php endif; ?>
+               </tbody>
+            </table>
+            </div>
 
-               if($config->SageOn() == 1 && $config->SharePointOn() == 0){
-                  // Tableau des options pour le champ déroulant
-                     $values2 = [
-                        2 => __('Dossier de destination (Dépot Local)', 'gestion'),
-                        5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
-                        6 => __('Supprimer le dossier', 'gestion'),
-                        8 => __('__Non attribué__', 'gestion'),
-                        10 => __("Eléments de recheche", 'gestion'),
-                     ];
-               }elseif($config->SageOn() == 0 && $config->SharePointOn() == 1){
-                  // Tableau des options pour le champ déroulant
-                     $values2 = [
-                        1 => __('Dossier de récupération (Recursive SharePoint)', 'gestion'),
-                        2 => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
-                        5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
-                        6 => __('Supprimer le dossier', 'gestion'),
-                        8 => __('__Non attribué__', 'gestion'),
-                        10 => __("Eléments de recheche", 'gestion'),
-                     ];
-               }elseif($config->SageOn() == 1 && $config->SharePointOn() == 1){
-                  if($config->mode() == 1){
-                     // Tableau des options pour le champ déroulant
-                     $values2 = [
-                        2 => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
-                        3 => __('Dossier de destination (Dépot Local)', 'gestion'),
-                        5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
-                        6 => __('Supprimer le dossier', 'gestion'),
-                        8 => __('__Non attribué__', 'gestion'),
-                        10 => __("Eléments de recheche", 'gestion'),
-                     ];
-                  }else{
-                     // Tableau des options pour le champ déroulant
-                     $values2 = [
-                        1 => __('Dossier de récupération (Recursive SharePoint)', 'gestion'),
-                        2 => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
-                        3 => __('Dossier de destination (Dépot Local)', 'gestion'),
-                        5 => __('Envoyé un mail si visible dans le tracker', 'gestion'),
-                        6 => __('Supprimer le dossier', 'gestion'),
-                        8 => __('__Non attribué__', 'gestion'),
-                        10 => __("Eléments de recheche", 'gestion'),
-                     ];
-                  }
-               }
+            <button type="button" class="btn btn-outline-primary btn-sm" id="folderAddRow">
+            <i class="fa fa-plus"></i> <?php echo __('Ajouter un dossier', 'gestion'); ?>
+            </button>
 
-               // Générer un champ déroulant avec les options
-               Dropdown::showFromArray(
-                     $folder_name,
-                     $values2,
-                     [
-                        'value' => $value,
-                        'class' => 'folder-dropdown', // Ajouter une classe CSS
-                        'data-folder' => $folder_name // Ajouter un attribut unique pour JS
-                     ]
-               );
-               echo "</td>";
-               echo "</tr>";
+            <input type="hidden" name="save_folders" value="1">
+         </div>
+      </div>
+
+      <script>
+      (function(){
+      const tbody   = document.querySelector('#foldersTable tbody');
+      const addBtn  = document.getElementById('folderAddRow');
+
+      // options pour nouvelles lignes (générées depuis PHP)
+      const options = <?php echo json_encode($values2, JSON_UNESCAPED_UNICODE); ?>;
+
+      function buildSelect(nameAttr, selectedVal) {
+         const sel = document.createElement('select');
+         sel.name  = nameAttr;
+         sel.className = 'form-select form-select-sm folder-select';
+         for (const [val, label] of Object.entries(options)) {
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = label;
+            if (String(selectedVal) === String(val)) opt.selected = true;
+            sel.appendChild(opt);
+         }
+         return sel;
+      }
+
+      // ➜ Exclusivité de groupe: si un select a 2 OU 3, alors 2 ET 3 sont grisés ailleurs
+      function updateUniqueOptions() {
+         // Trouver TOUS les selects (y compris ceux générés par PHP)
+         const selects = tbody.querySelectorAll('select');
+
+         // Réinitialiser tous les selects (activer toutes les options)
+         selects.forEach(sel => {
+            Array.from(sel.options).forEach(opt => {
+            opt.disabled = false;
+            opt.style.display = '';
+            });
+         });
+
+         // Trouver qui détient 2 ou 3 actuellement
+         let ownerSel = null;
+         let ownerValue = null;
+
+         selects.forEach(sel => {
+            // Ignorer les lignes marquées pour suppression
+            const tr = sel.closest('tr');
+            if (!tr) return;
+            
+            const deleteInput = tr.querySelector('input[name*="_delete"]');
+            if (deleteInput && deleteInput.value === '1') {
+            return; // ignorer cette ligne
             }
 
-            ?><script defer>
-               const dropdowns = document.querySelectorAll('.folder-dropdown');
+            if ((sel.value === '2' || sel.value === '3') && !ownerSel) {
+            ownerSel = sel;
+            ownerValue = sel.value;
+            }
+         });
 
-               // Fonction pour désactiver uniquement l'option avec la valeur `2`
-               function updateDropdowns() {
-                  // Récupérer toutes les valeurs actuellement sélectionnées
-                  const selectedValues = Array.from(dropdowns).map(dropdown => dropdown.value);
-
-                  // Vérifier si la valeur `2` est sélectionnée
-                  const isOption2Selected = selectedValues.includes("2");
-
-                  // Si l'option 2 est sélectionnée, désactiver uniquement celle-ci dans les autres dropdowns
-                  dropdowns.forEach(dropdown => {
-                     const options = dropdown.querySelectorAll('option'); // Cibler les <option>
-                     const currentValue = dropdown.value;
-
-                     options.forEach(option => {
-                           const value = option.value;
-
-                           if (value === "2" && isOption2Selected && currentValue !== "2") {
-                              option.disabled = true;
-                           } else {
-                              option.disabled = false; // Réactiver si elle devient disponible
-                           }
-                     });
-
-                     // Rafraîchir le rendu Select2 après modification des options
-                     $(dropdown).select2();
-                  });
+         // Si quelqu'un détient 2 ou 3, griser ces options dans tous les autres
+         if (ownerSel && ownerValue) {
+            selects.forEach(sel => {
+            if (sel !== ownerSel) {
+               // Ignorer les lignes marquées pour suppression
+               const tr = sel.closest('tr');
+               if (!tr) return;
+               
+               const deleteInput = tr.querySelector('input[name*="_delete"]');
+               if (deleteInput && deleteInput.value === '1') {
+                  return;
                }
 
-               // Ajouter les événements sur chaque dropdown pour mettre à jour les options dynamiquement
-               dropdowns.forEach(dropdown => {
-                  $(dropdown).on('select2:select', updateDropdowns); // Lorsqu'une option est sélectionnée
-                  $(dropdown).on('select2:unselect', updateDropdowns); // Si une option est désélectionnée (utile pour multi-sélection)
+               Array.from(sel.options).forEach(opt => {
+                  if (opt.value === '2' || opt.value === '3') {
+                  opt.disabled = true;
+                  }
                });
 
-               // Mise à jour initiale
-               updateDropdowns();
-            </script><?php
+               // Si ce select avait 2 ou 3 mais n'est plus le propriétaire, le remettre à la valeur par défaut
+               if (sel.value === '2' || sel.value === '3') {
+                  const defaultVal = options['8'] ? '8' : Object.keys(options)[0];
+                  sel.value = defaultVal;
+               }
+            }
+            });
+         }
+      }
+
+      addBtn?.addEventListener('click', function () {
+         const uid = 'new_' + Date.now();
+         const tr  = document.createElement('tr');
+         tr.innerHTML = `
+            <td>
+            <input type="text"
+                     name="folders[${uid}][folder_name]"
+                     class="form-control form-control-sm"
+                     placeholder="<?php echo __('Ex : Dossiers clients', 'gestion'); ?>">
+            </td>
+            <td class="folder-select-cell"></td>
+            <td class="text-end">
+            <button type="button" class="btn btn-outline-danger btn-sm folder-del-row" title="<?php echo __('Supprimer'); ?>">
+               <i class="fa fa-trash"></i>
+            </button>
+            <input type="hidden" name="folders[${uid}][_delete]" value="0">
+            </td>`;
+         tbody.appendChild(tr);
+
+         // injecte le select (par défaut "__Non attribué__" = 8 si présent)
+         const cell = tr.querySelector('.folder-select-cell');
+         const defaultVal = options['8'] ? '8' : Object.keys(options)[0];
+         const sel = buildSelect(`folders[${uid}][params]`, defaultVal);
+         cell.appendChild(sel);
+
+         // Mettre à jour l'état après ajout
+         setTimeout(updateUniqueOptions, 100);
+      });
+
+      document.addEventListener('click', function(e){
+         const btn = e.target.closest('.folder-del-row');
+         if (!btn) return;
+         
+         const tr = btn.closest('tr');
+         const hidden = tr.querySelector('input[type="hidden"][name*="_delete"]');
+         
+         if (hidden && tr.dataset.id) {
+            // ligne existante : marquer pour suppression
+            hidden.value = '1';
+            tr.style.opacity = '0.4';
          } else {
-            echo "<tr><td colspan='2'>Aucun paramètre trouvé ou erreur dans la base de données.</td></tr>";
+            // ligne nouvelle : retrait direct
+            tr.remove();
          }
-      }
-   
-      echo "<tr><th colspan='2'>" . __("Entités et Tracker", 'gestion') . "</th></tr>";
-         //--------------------------------------------
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Extraction d'un tracker", "gestion") . "</td><td>";
-               Dropdown::showYesNo('ExtractYesNo', $config->ExtractYesNo(), -1);
-            echo "</td>";
-         echo "</tr>";
+         
+         // Toujours mettre à jour après suppression
+         setTimeout(updateUniqueOptions, 50);
+      });
 
-         if($config->ExtractYesNo() == 1){
-            if ($config->mode() == 0){
-               echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Séparateurs pour l'extraction du tracker", "gestion") . "</td><td>";
-                     echo Html::input('extract', ['value' => $config->extract(), 'size' => 60]);// bouton configuration du bas de page line 1
-                  echo "</td>";
-               echo "</tr>";
+      // Event delegation sur le tbody
+      tbody.addEventListener('change', function(e) {
+         if (e.target.tagName === 'SELECT') {
+            setTimeout(updateUniqueOptions, 50);
+         }
+      });
+
+      // Event delegation global
+      document.addEventListener('change', function(e) {
+         if (e.target.tagName === 'SELECT' && e.target.closest('#foldersTable')) {
+            setTimeout(updateUniqueOptions, 50);
+         }
+      });
+
+      // MutationObserver pour détecter les changements de valeurs
+      const observer = new MutationObserver(function(mutations) {
+         let shouldUpdate = false;
+         mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+            shouldUpdate = true;
             }
+            if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach(function(node) {
+               if (node.nodeType === 1 && (node.tagName === 'SELECT' || node.querySelector('select'))) {
+                  shouldUpdate = true;
+               }
+            });
+            }
+         });
+         if (shouldUpdate) {
+            setTimeout(updateUniqueOptions, 50);
+         }
+      });
 
-            //--------------------------------------------
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Envoyé un mail si le contenu d'un tracker est détécté (Tâche Cron)", "gestion") . "</td><td>";
-                  Dropdown::showYesNo('MailTrackerYesNo', $config->MailTrackerYesNo(), -1);
-               echo "</td>";
-            echo "</tr>";
-            
-            if($config->MailTrackerYesNo() == 1){
-               echo "<tr class='tab_bg_1'>";
-                  echo "<td>" . __("Mail", "gestion") . "</td><td>";
-                     echo Html::input('MailTracker', ['value' => $config->MailTracker(), 'size' => 60]);// bouton configuration du bas de page line 1
-                  echo "</td>";
-               echo "</tr>";
+      observer.observe(tbody, { 
+         childList: true, 
+         subtree: true, 
+         attributes: true,
+         attributeFilter: ['value']
+      });
 
-               echo "<tr class='tab_bg_1'>";
-                  echo "<td> Gabarit : Modèle de notifications pour la Tâche Cron (Tracker) </td>";
-                  echo "<td>";
+      // Polling de secours
+      let lastValues = [];
+      setInterval(function() {
+         const selects = tbody.querySelectorAll('select');
+         const currentValues = Array.from(selects).map(s => s.value);
+         
+         if (JSON.stringify(currentValues) !== JSON.stringify(lastValues)) {
+            lastValues = currentValues;
+            updateUniqueOptions();
+         }
+      }, 500);
 
-                  //notificationtemplates_id
+      // État initial
+      setTimeout(function() {
+         updateUniqueOptions();
+         // Stocker les valeurs initiales pour le polling
+         const selects = tbody.querySelectorAll('select');
+         lastValues = Array.from(selects).map(s => s.value);
+      }, 200);
+      })();
+      </script>
+      <?php endif;
+
+   // --------------------------------------------------------------------- Extraction d'un tracker
+      // -- valeurs actuelles
+      $ExtractYesNo        = (int)$config->ExtractYesNo();
+      $MailTrackerYesNo    = (int)$config->MailTrackerYesNo();
+      $extractSep          = (string)$config->extract();
+      $gabaritTracker      = (int)$config->gabarit_tracker();
+      $EntitiesExtract     = (int)$config->EntitiesExtract();
+      $EntitiesExtractVal  = (string)$config->EntitiesExtractValue();
+      $mode                = (int)$config->mode();
+      ?>
+
+      <div class="card mb-3">
+      <div class="card-header">
+         <h3 class="card-title mb-0"><?php echo __('Entités et Tracker', 'gestion'); ?></h3>
+      </div>
+
+      <div class="card-body">
+         <div class="row g-3">
+
+            <!-- Extraction d'un tracker -->
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __("Extraction d'un tracker", 'gestion'); ?></label>
+            <?php Dropdown::showYesNo('ExtractYesNo', $ExtractYesNo, -1); ?>
+            </div>
+
+            <?php if ($ExtractYesNo === 1): ?>
+            <?php if ($mode === 0): ?>
+               <div class="col-md-6">
+                  <label for="extract" class="form-label mb-1">
+                  <?php echo __("Séparateurs pour l'extraction du tracker", 'gestion'); ?>
+                  </label>
+                  <?php
+                  echo Html::input('extract', [
+                     'value' => $extractSep,
+                     'class' => 'form-control',
+                     'id'    => 'extract'
+                  ]);
+                  ?>
+               </div>
+            <?php endif; ?>
+
+            <div class="col-md-6">
+               <label class="form-label mb-1">
+                  <?php echo __("Envoyé un mail si le contenu d'un tracker est détécté (Tâche Cron)", 'gestion'); ?>
+               </label>
+               <?php Dropdown::showYesNo('MailTrackerYesNo', $MailTrackerYesNo, -1); ?>
+            </div>
+
+            <?php if ($MailTrackerYesNo === 1): ?>
+               <div class="col-md-6">
+                  <label for="MailTracker" class="form-label mb-1"><?php echo __('Mail', 'gestion'); ?></label>
+                  <?php
+                  echo Html::input('MailTracker', [
+                     'value' => $config->MailTracker(),
+                     'class' => 'form-control',
+                     'id'    => 'MailTracker'
+                  ]);
+                  ?>
+               </div>
+
+               <div class="col-md-6">
+                  <label class="form-label mb-1">
+                  <?php echo __('Gabarit : Modèle de notifications pour la Tâche Cron (Tracker)', 'gestion'); ?>
+                  </label>
+                  <?php
                   Dropdown::show('NotificationTemplate', [
-                     'name' => 'gabarit_tracker',
-                     'value' => $config->gabarit_tracker(),
-                     'display_emptychoice' => 1,
-                     'specific_tags' => [],
-                     'itemtype' => 'NotificationTemplate',
-                     'displaywith' => [],
-                     'emptylabel' => "-----",
-                     'used' => [],
-                     'toadd' => [],
-                     'entity_restrict' => 0,
-                  ]); 
-               echo "</td></tr>";
-            }
-         }else{
-            if($config->MailTrackerYesNo() == 1){
-               // Préparer la requête SQL
-               $sql = "UPDATE glpi_plugin_gestion_configs 
-                     SET MailTrackerYesNo = ?
-                     WHERE id = 1";
+                     'name'                 => 'gabarit_tracker',
+                     'value'                => $gabaritTracker,
+                     'display_emptychoice'  => 1,
+                     'emptylabel'           => '-----',
+                     'specific_tags'        => [],
+                     'itemtype'             => 'NotificationTemplate',
+                     'displaywith'          => [],
+                     'used'                 => [],
+                     'toadd'                => [],
+                     'entity_restrict'      => 0,
+                  ]);
+                  ?>
+               </div>
+            <?php endif; ?>
+            <?php endif; ?>
 
-               // Exécution de la requête préparée
-               $stmt = $DB->prepare($sql);
-               $stmt->execute([0]);
-            }
-         }
+            <div class="col-12"><hr class="my-2"></div>
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("_________________________________________________________________________", "gestion") . "</td>";
-         echo "</tr>";
+            <!-- Extraire l'entité du dossier parent -->
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __("Extraire l'entité du dossier parent", 'gestion'); ?></label>
+            <?php Dropdown::showYesNo('EntitiesExtract', $EntitiesExtract, -1); ?>
+            </div>
 
-         echo "<tr class='tab_bg_1'>";
-            echo "<td>" . __("Extraire l'entité du dossier parent", "gestion") . "</td><td>";
-               Dropdown::showYesNo('EntitiesExtract', $config->EntitiesExtract(), -1);
-            echo "</td>";
-         echo "</tr>";
+            <?php if ($EntitiesExtract === 1 && $mode === 0): ?>
+            <div class="col-md-6">
+               <label for="EntitiesExtractValue" class="form-label mb-1">
+                  <?php echo __("Séparateurs pour l'extraction de l'entité depuis la Bibliothèques du site", 'gestion'); ?>
+               </label>
+               <div class="d-flex align-items-center gap-2">
+                  <span><?php echo __('Après le chemin :', 'gestion'); ?></span>
+                  <?php
+                  echo Html::input('EntitiesExtractValue', [
+                     'value' => $EntitiesExtractVal,
+                     'class' => 'form-control',
+                     'id'    => 'EntitiesExtractValue',
+                     'style' => 'max-width:36rem'
+                  ]);
+                  ?>
+               </div>
+            </div>
+            <?php endif; ?>
+         </div>
+      </div>
+      </div>
 
-         if($config->EntitiesExtract() == 1 && $config->mode() == 0){
-            echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __("Séparateurs pour l'extraction de l'entité depuis la Bibliothèques du site", "gestion") . "</td><td>";
-                  echo '<div style="display: flex; align-items: center; gap: 5px;">';
-                     echo '<label for="DateX">Après le chemin : </label>';
-                        echo Html::input('EntitiesExtractValue', ['value' => $config->EntitiesExtractValue(), 'size' => 60]);// bouton configuration du bas de page line 1
-                  echo '</div>';
-               echo "</td>";
-            echo "</tr>";
-         }
-      ?><style>
-      .accordion-toggle {
-         all: unset;
-         background-color: #f0f0f0;
-         border: 1px solid #ccc;
-         border-radius: 5px;
-         padding: 8px 12px;
-         font-size: 14px;
-         font-weight: bold;
-         cursor: pointer;
-         display: inline-flex;
-         align-items: center;
-         gap: 8px;
-         transition: background-color 0.3s ease;
+      <?php
+      // On conserve ta logique: si l'extraction tracker est OFF, on force MailTrackerYesNo à 0
+      if ($ExtractYesNo !== 1 && $MailTrackerYesNo === 1) {
+      $sql  = "UPDATE glpi_plugin_gestion_configs SET MailTrackerYesNo = ? WHERE id = 1";
+      $stmt = $DB->prepare($sql);
+      $stmt->execute([0]);
       }
-
-      .accordion-toggle:hover {
-         background-color: #e0e0e0;
-      }
-
-      .accordion-toggle .arrow {
-         display: inline-block;
-         transition: transform 0.2s ease;
-      }
-      </style><?php
-      echo '</table>'; 
-
-
 
 //------------------------------------------------------------------- Dernière synchronisation Cron
       $lastrun = $DB->query("SELECT lastrun FROM glpi_crontasks WHERE name = 'GestionPdf'")->fetch_object();
       $lastRunText = isset($lastrun->lastrun) ? $lastrun->lastrun : '';
       ?>
 
-      <div class="card">
+      <div class="card mb-3">
       <div class="card-header">
          <h3 class="card-title mb-0">
             <?php echo sprintf(__('Dernière synchronisation Cron : %s', 'gestion'), Html::entities_deep($lastRunText)); ?>
@@ -772,7 +989,7 @@ class PluginGestionConfig extends CommonDBTM
 
       // ---------- CARD: Connexion ----------
       ?>
-      <div class="card">
+      <div class="card mb-3">
       <div class="card-header d-flex align-items-center justify-content-between">
          <h3 class="card-title mb-0"><?php echo __('Connexion', 'gestion'); ?></h3>
          <button type="button"
@@ -964,7 +1181,7 @@ class PluginGestionConfig extends CommonDBTM
       $CounterInvoicePdf   = (int)$config->CounterInvoicePdf();
       ?>
 
-      <div class="card">
+      <div class="card mb-3">
       <div class="card-header">
          <h3 class="card-title"><?php echo __('Facturation comptoir', 'gestion'); ?></h3>
       </div>
@@ -1079,7 +1296,7 @@ class PluginGestionConfig extends CommonDBTM
       $jsBase   = $protocol . $domain . $rootdoc . '/plugins/gestion/front/device_sign.php';
       ?>
 
-      <div class="card">
+      <div class="card mb-3">
          <div class="card-header">
             <h3 class="card-title"><?php echo __('Signature déportée (tablette)', 'gestion'); ?></h3>
          </div>
@@ -1325,132 +1542,98 @@ class PluginGestionConfig extends CommonDBTM
       <?php
       //---------------------------------------------------------------------------------------------------------------------
 
+      // Charger la liste des items existants
+      $items = $DB->request([
+         'FROM'  => 'glpi_plugin_gestion_baseitems',
+         'ORDER' => 'id ASC'
+      ]);
+      ?>
 
+         <div class="card mb-3">
+            <div class="card-header">
+               <h3 class="card-title"><?php echo __('Base Description / Info', 'gestion'); ?></h3>
+            </div>
+            <div class="card-body">
 
-// Charger la liste des items existants
-$items = $DB->request([
-   'FROM'  => 'glpi_plugin_gestion_baseitems',
-   'ORDER' => 'id ASC'
-]);
-?>
+               <div class="table-responsive">
+                  <table class="table table-sm align-middle" id="biTable">
+                     <thead>
+                        <tr>
+                           <th style="width:50%"><?php echo __('Description', 'gestion'); ?></th>
+                           <th style="width:45%"><?php echo __('Information', 'gestion'); ?></th>
+                           <th style="width:5%"></th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                     <?php foreach ($items as $row): ?>
+                        <tr data-id="<?php echo (int)$row['id']; ?>">
+                           <td>
+                              <input type="text"
+                                    name="bi[<?php echo (int)$row['id']; ?>][description]"
+                                    class="form-control form-control-sm"
+                                    value="<?php echo htmlspecialchars($row['description'], ENT_QUOTES); ?>">
+                           </td>
+                           <td>
+                              <input type="text"
+                                    name="bi[<?php echo (int)$row['id']; ?>][info]"
+                                    class="form-control form-control-sm"
+                                    value="<?php echo htmlspecialchars($row['info'], ENT_QUOTES); ?>">
+                           </td>
+                           <td class="text-end">
+                              <button type="button" class="btn btn-outline-danger btn-sm bi-del-row" title="<?php echo __('Supprimer'); ?>">
+                                 <i class="ti ti-trash"></i>
+                              </button>
+                              <input type="hidden" name="bi[<?php echo (int)$row['id']; ?>][_delete]" value="0">
+                           </td>
+                        </tr>
+                     <?php endforeach; ?>
+                     </tbody>
+                  </table>
+               </div>
 
-   <div class="card">
-      <div class="card-header">
-         <h3 class="card-title"><?php echo __('Base Description / Info', 'gestion'); ?></h3>
-      </div>
-      <div class="card-body">
+               <button type="button" class="btn btn-outline-primary btn-sm" id="biAddRow">
+                  <i class="ti ti-plus"></i> <?php echo __('Ajouter une ligne', 'gestion'); ?>
+               </button>
 
-         <div class="table-responsive">
-            <table class="table table-sm align-middle" id="biTable">
-               <thead>
-                  <tr>
-                     <th style="width:50%"><?php echo __('Description', 'gestion'); ?></th>
-                     <th style="width:45%"><?php echo __('Information', 'gestion'); ?></th>
-                     <th style="width:5%"></th>
-                  </tr>
-               </thead>
-               <tbody>
-               <?php foreach ($items as $row): ?>
-                  <tr data-id="<?php echo (int)$row['id']; ?>">
-                     <td>
-                        <input type="text"
-                               name="bi[<?php echo (int)$row['id']; ?>][description]"
-                               class="form-control form-control-sm"
-                               value="<?php echo htmlspecialchars($row['description'], ENT_QUOTES); ?>">
-                     </td>
-                     <td>
-                        <input type="text"
-                               name="bi[<?php echo (int)$row['id']; ?>][info]"
-                               class="form-control form-control-sm"
-                               value="<?php echo htmlspecialchars($row['info'], ENT_QUOTES); ?>">
-                     </td>
-                     <td class="text-end">
-                        <button type="button" class="btn btn-outline-danger btn-sm bi-del-row" title="<?php echo __('Supprimer'); ?>">
-                           <i class="ti ti-trash"></i>
-                        </button>
-                        <input type="hidden" name="bi[<?php echo (int)$row['id']; ?>][_delete]" value="0">
-                     </td>
-                  </tr>
-               <?php endforeach; ?>
-               </tbody>
-            </table>
-         </div>
+            </div>
 
-         <button type="button" class="btn btn-outline-primary btn-sm" id="biAddRow">
-            <i class="ti ti-plus"></i> <?php echo __('Ajouter une ligne', 'gestion'); ?>
-         </button>
+      <script>
+      (function(){
+      const tbody = document.querySelector('#biTable tbody');
+      const addBtn = document.getElementById('biAddRow');
 
-      </div>
+      addBtn?.addEventListener('click', function(){
+         const uid = 'new_' + Date.now();
+         const tr = document.createElement('tr');
+         tr.innerHTML = `
+            <td><input type="text" name="bi[${uid}][description]" class="form-control form-control-sm" placeholder="<?php echo __('Ex: Clavier AZERTY', 'gestion'); ?>"></td>
+            <td><input type="text" name="bi[${uid}][info]" class="form-control form-control-sm" placeholder="<?php echo __('Ex: FR / rétroéclairé', 'gestion'); ?>"></td>
+            <td class="text-end">
+            <button type="button" class="btn btn-outline-danger btn-sm bi-del-row" title="<?php echo __('Supprimer'); ?>">
+               <i class="ti ti-trash"></i>
+            </button>
+            <input type="hidden" name="bi[${uid}][_delete]" value="0">
+            </td>`;
+         tbody.appendChild(tr);
+      });
 
-<script>
-(function(){
-  const tbody = document.querySelector('#biTable tbody');
-  const addBtn = document.getElementById('biAddRow');
-
-  addBtn?.addEventListener('click', function(){
-    const uid = 'new_' + Date.now();
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input type="text" name="bi[${uid}][description]" class="form-control form-control-sm" placeholder="<?php echo __('Ex: Clavier AZERTY', 'gestion'); ?>"></td>
-      <td><input type="text" name="bi[${uid}][info]" class="form-control form-control-sm" placeholder="<?php echo __('Ex: FR / rétroéclairé', 'gestion'); ?>"></td>
-      <td class="text-end">
-        <button type="button" class="btn btn-outline-danger btn-sm bi-del-row" title="<?php echo __('Supprimer'); ?>">
-          <i class="ti ti-trash"></i>
-        </button>
-        <input type="hidden" name="bi[${uid}][_delete]" value="0">
-      </td>`;
-    tbody.appendChild(tr);
-  });
-
-  document.addEventListener('click', function(e){
-    const btn = e.target.closest('.bi-del-row');
-    if (!btn) return;
-    const tr = btn.closest('tr');
-    const hidden = tr.querySelector('input[type="hidden"][name*="_delete"]');
-    if (hidden && tr.dataset.id) {
-      // ligne existante : on marque pour suppression, visuel grisé
-      hidden.value = '1';
-      tr.style.opacity = '0.4';
-    } else {
-      // ligne nouvelle non encore en base : suppression directe du DOM
-      tr.remove();
-    }
-  });
-})();
-</script>
-<?php
-
-
-//-------------------------------------------------------------------------------------------------- NEW
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      
+      document.addEventListener('click', function(e){
+         const btn = e.target.closest('.bi-del-row');
+         if (!btn) return;
+         const tr = btn.closest('tr');
+         const hidden = tr.querySelector('input[type="hidden"][name*="_delete"]');
+         if (hidden && tr.dataset.id) {
+            // ligne existante : on marque pour suppression, visuel grisé
+            hidden.value = '1';
+            tr.style.opacity = '0.4';
+         } else {
+            // ligne nouvelle non encore en base : suppression directe du DOM
+            tr.remove();
+         }
+      });
+      })();
+      </script>
+      <?php     
 
       $config->showFormButtons(['candel' => false]);
       return false;
