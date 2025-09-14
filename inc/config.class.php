@@ -401,6 +401,189 @@ class PluginGestionConfig extends CommonDBTM
       </div>
       <?php endif; ?>
 
+      <div class="card mb-3">
+         <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title mb-0"><?php echo __('Connexion SharePoint', 'gestion'); ?></h3>
+            <button type="button"
+                     class="btn btn-outline-primary btn-sm"
+                     data-bs-toggle="modal"
+                     data-bs-target="#customModal">
+               <?php echo __('Statut de connexion SharePoint', 'gestion'); ?>
+            </button>
+         </div>
+
+         <div class="card-body">
+            <p class="text-muted mb-0">
+               <?php echo __('Cliquez sur "Statut de connexion SharePoint" pour afficher le détail des vérifications.', 'gestion'); ?>
+            </p>
+         </div>
+      </div>
+
+      <?php
+
+      // ---------- MODAL ----------
+      $result = $sharepoint->checkSharePointAccess();
+
+      $statusIcons = [
+      1 => '<i class="fa fa-check-circle text-success"></i>', // ✅ Succès
+      0 => '<i class="fa fa-times-circle text-danger"></i>'   // ❌ Échec
+      ];
+
+      $fields = [
+      'accessToken'      => __('Token d\'accès', 'gestion'),
+      'sharePointAccess' => __('Accès SharePoint', 'gestion'),
+      'siteID'           => __('Site ID', 'gestion'),
+      'graphQuery'       => __('Microsoft Graph Query', 'gestion'),
+      'driveAccess'      => sprintf(__('Accès au Drive : <br> - %s', 'gestion'), Html::entities_deep($config->Global())),
+      'permissions'      => sprintf(__('Permissions SharePoint : <br> - %s', 'gestion'), Html::entities_deep($config->Global()))
+      ];
+      ?>
+
+      <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+         <div class="modal-content">
+
+            <div class="modal-header">
+            <h5 class="modal-title" id="AddGestionModalLabel">
+               <?php echo __('Statut de connexion SharePoint', 'gestion'); ?>
+               <i class="fa-solid fa-circle-info text-secondary ms-1"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  title="<?php echo __(
+                     "Pensez à vérifier les droits de suppression, de lecture et d'écriture sur le site SharePoint afin d'assurer son bon fonctionnement et une récupération optimale des métadonnées.",
+                     'gestion'
+                  ); ?>"></i>
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<?php echo __('Fermer', 'gestion'); ?>"></button>
+            </div>
+
+            <div class="modal-body">
+            <ul class="list-group">
+
+               <!-- En-tête -->
+               <li class="list-group-item">
+                  <div class="row fw-bold">
+                  <div class="col-4"><?php echo __('Champ', 'gestion'); ?></div>
+                  <div class="col-6"><?php echo __('Statut', 'gestion'); ?></div>
+                  <div class="col-2 text-center"><?php echo __('Validation', 'gestion'); ?></div>
+                  </div>
+               </li>
+
+               <?php
+               foreach ($fields as $key => $label) {
+                  if (!isset($result[$key])) {
+                  continue;
+                  }
+                  $status  = (int)($result[$key]['status'] ?? 0);
+                  $message = (string)($result[$key]['message'] ?? '');
+                  $icon    = ($key !== 'permissions') ? ($statusIcons[$status] ?? $statusIcons[0]) : '';
+
+                  echo "<li class='list-group-item'>";
+                  echo "<div class='row align-items-center gy-1'>";
+
+                     // Colonne Champ
+                     echo "<div class='col-4'><strong>$label</strong></div>";
+
+                     // Colonne Statut (message + cas particuliers)
+                     echo "<div class='col-6'>";
+                        if ($key === 'permissions' && !empty($result[$key]['roles'])) {
+                        echo "<ul class='list-unstyled mb-0'>";
+                        foreach ($result[$key]['roles'] as $group => $roles) {
+                           $roleList = implode(', ', array_map('Html::entities_deep', $roles));
+                           echo "<li><strong>".Html::entities_deep($group)." :</strong> $roleList</li>";
+                        }
+                        echo "</ul>";
+                        } else {
+                        $safeMsg = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
+
+                        // Ajout d'une icône d'information uniquement pour driveAccess
+                        if ($key === 'driveAccess') {
+                           if (strpos($message, 'modifier des fichiers') !== false) {
+                              $safeMsg .= " <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip'
+                                             data-bs-placement='top'
+                                             title='".__(
+                                                "Le plugin ne pourra pas supprimer ou télécharger automatiquement les documents après signature, il ne sera pas fonctionnel à 100%",
+                                                'gestion'
+                                             )."'></i>";
+                           } elseif (strpos($message, 'uniquement lire les fichiers') !== false) {
+                              $safeMsg .= " <i class='fa-solid fa-circle-info text-secondary' data-bs-toggle='tooltip'
+                                             data-bs-placement='top'
+                                             title='".__(
+                                                "Le plugin ne pourra pas supprimer, télécharger ou modifier automatiquement les documents après signature",
+                                                'gestion'
+                                             )."'></i>";
+                           }
+                        }
+
+                        echo $safeMsg;
+                        }
+                     echo "</div>";
+
+                     // Colonne Validation (icône)
+                     echo "<div class='col-2 text-center'>$icon</div>";
+
+                  echo "</div>";
+                  echo "</li>";
+               }
+               ?>
+
+            </ul>
+            </div>
+
+            <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('Fermer', 'gestion'); ?></button>
+            </div>
+
+         </div>
+      </div>
+      </div>
+
+      <script>
+         // Bootstrap 5 : init tooltips quand le DOM est prêt
+         document.addEventListener('DOMContentLoaded', function () {
+         document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            new bootstrap.Tooltip(el);
+         });
+         });
+
+         // (Optionnel) conserve tes helpers d'accordion si utilisés ailleurs
+         function toggleConfigSection(btn)  {
+         const section = btn.closest('table').querySelector('.config-section');
+         const arrow = btn.querySelector('.arrow');
+         const isVisible = section.style.display === 'table-row-group';
+         section.style.display = isVisible ? 'none' : 'table-row-group';
+         arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
+         }
+         function toggleConfigSection1(btn) {
+         const section = btn.closest('table').querySelector('.config-section1');
+         const arrow = btn.querySelector('.arrow');
+         const isVisible = section.style.display === 'table-row-group';
+         section.style.display = isVisible ? 'none' : 'table-row-group';
+         arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
+         }
+         function toggleConfigSection2(btn) {
+         const section = btn.closest('table').querySelector('.config-section2');
+         const arrow = btn.querySelector('.arrow');
+         const isVisible = section.style.display === 'table-row-group';
+         section.style.display = isVisible ? 'none' : 'table-row-group';
+         arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
+         }
+         function toggleConfigSection3(btn) {
+         const section = btn.closest('table').querySelector('.config-section3');
+         const arrow = btn.querySelector('.arrow');
+         const isVisible = section.style.display === 'table-row-group';
+         section.style.display = isVisible ? 'none' : 'table-row-group';
+         arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
+         }
+      </script>
+
+      <style>
+      /* Alignement propre dans la liste du modal */
+      #customModal .list-group-item .row > [class^="col-"] { display: flex; align-items: center; }
+      /* Optionnel : renforce l’alignement vertical */
+      #customModal .list-group-item { padding-top: .6rem; padding-bottom: .6rem; }
+      </style>
+
       <?php if ($config->SageOn() == 1): ?>
       <div class="card mb-3">
          <div class="card-header">
@@ -985,191 +1168,7 @@ class PluginGestionConfig extends CommonDBTM
 
       </div>
       </div>
-      <?php
-
-      // ---------- CARD: Connexion ----------
-      ?>
-      <div class="card mb-3">
-      <div class="card-header d-flex align-items-center justify-content-between">
-         <h3 class="card-title mb-0"><?php echo __('Connexion', 'gestion'); ?></h3>
-         <button type="button"
-                  class="btn btn-outline-primary btn-sm"
-                  data-bs-toggle="modal"
-                  data-bs-target="#customModal">
-            <?php echo __('Statut de connexion', 'gestion'); ?>
-         </button>
-      </div>
-
-      <div class="card-body">
-         <p class="text-muted mb-0">
-            <?php echo __('Cliquez sur "Statut de connexion" pour afficher le détail des vérifications.', 'gestion'); ?>
-         </p>
-      </div>
-      </div>
-
-      <?php
-      // ---------- MODAL ----------
-      $result = $sharepoint->checkSharePointAccess();
-
-      $statusIcons = [
-      1 => '<i class="fa fa-check-circle text-success"></i>', // ✅ Succès
-      0 => '<i class="fa fa-times-circle text-danger"></i>'   // ❌ Échec
-      ];
-
-      $fields = [
-      'accessToken'      => __('Token d\'accès', 'gestion'),
-      'sharePointAccess' => __('Accès SharePoint', 'gestion'),
-      'siteID'           => __('Site ID', 'gestion'),
-      'graphQuery'       => __('Microsoft Graph Query', 'gestion'),
-      'driveAccess'      => sprintf(__('Accès au Drive : <br> - %s', 'gestion'), Html::entities_deep($config->Global())),
-      'permissions'      => sprintf(__('Permissions SharePoint : <br> - %s', 'gestion'), Html::entities_deep($config->Global()))
-      ];
-      ?>
-
-      <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-lg">
-         <div class="modal-content">
-
-            <div class="modal-header">
-            <h5 class="modal-title" id="AddGestionModalLabel">
-               <?php echo __('Statut de connexion', 'gestion'); ?>
-               <i class="fa-solid fa-circle-info text-secondary ms-1"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  title="<?php echo __(
-                     "Pensez à vérifier les droits de suppression, de lecture et d'écriture sur le site SharePoint afin d'assurer son bon fonctionnement et une récupération optimale des métadonnées.",
-                     'gestion'
-                  ); ?>"></i>
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<?php echo __('Fermer', 'gestion'); ?>"></button>
-            </div>
-
-            <div class="modal-body">
-            <ul class="list-group">
-
-               <!-- En-tête -->
-               <li class="list-group-item">
-                  <div class="row fw-bold">
-                  <div class="col-4"><?php echo __('Champ', 'gestion'); ?></div>
-                  <div class="col-6"><?php echo __('Statut', 'gestion'); ?></div>
-                  <div class="col-2 text-center"><?php echo __('Validation', 'gestion'); ?></div>
-                  </div>
-               </li>
-
-               <?php
-               foreach ($fields as $key => $label) {
-                  if (!isset($result[$key])) {
-                  continue;
-                  }
-                  $status  = (int)($result[$key]['status'] ?? 0);
-                  $message = (string)($result[$key]['message'] ?? '');
-                  $icon    = ($key !== 'permissions') ? ($statusIcons[$status] ?? $statusIcons[0]) : '';
-
-                  echo "<li class='list-group-item'>";
-                  echo "<div class='row align-items-center gy-1'>";
-
-                     // Colonne Champ
-                     echo "<div class='col-4'><strong>$label</strong></div>";
-
-                     // Colonne Statut (message + cas particuliers)
-                     echo "<div class='col-6'>";
-                        if ($key === 'permissions' && !empty($result[$key]['roles'])) {
-                        echo "<ul class='list-unstyled mb-0'>";
-                        foreach ($result[$key]['roles'] as $group => $roles) {
-                           $roleList = implode(', ', array_map('Html::entities_deep', $roles));
-                           echo "<li><strong>".Html::entities_deep($group)." :</strong> $roleList</li>";
-                        }
-                        echo "</ul>";
-                        } else {
-                        $safeMsg = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
-
-                        // Ajout d'une icône d'information uniquement pour driveAccess
-                        if ($key === 'driveAccess') {
-                           if (strpos($message, 'modifier des fichiers') !== false) {
-                              $safeMsg .= " <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip'
-                                             data-bs-placement='top'
-                                             title='".__(
-                                                "Le plugin ne pourra pas supprimer ou télécharger automatiquement les documents après signature, il ne sera pas fonctionnel à 100%",
-                                                'gestion'
-                                             )."'></i>";
-                           } elseif (strpos($message, 'uniquement lire les fichiers') !== false) {
-                              $safeMsg .= " <i class='fa-solid fa-circle-info text-secondary' data-bs-toggle='tooltip'
-                                             data-bs-placement='top'
-                                             title='".__(
-                                                "Le plugin ne pourra pas supprimer, télécharger ou modifier automatiquement les documents après signature",
-                                                'gestion'
-                                             )."'></i>";
-                           }
-                        }
-
-                        echo $safeMsg;
-                        }
-                     echo "</div>";
-
-                     // Colonne Validation (icône)
-                     echo "<div class='col-2 text-center'>$icon</div>";
-
-                  echo "</div>";
-                  echo "</li>";
-               }
-               ?>
-
-            </ul>
-            </div>
-
-            <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('Fermer', 'gestion'); ?></button>
-            </div>
-
-         </div>
-      </div>
-      </div>
-
-      <script>
-      // Bootstrap 5 : init tooltips quand le DOM est prêt
-      document.addEventListener('DOMContentLoaded', function () {
-      document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
-         new bootstrap.Tooltip(el);
-      });
-      });
-
-      // (Optionnel) conserve tes helpers d'accordion si utilisés ailleurs
-      function toggleConfigSection(btn)  {
-      const section = btn.closest('table').querySelector('.config-section');
-      const arrow = btn.querySelector('.arrow');
-      const isVisible = section.style.display === 'table-row-group';
-      section.style.display = isVisible ? 'none' : 'table-row-group';
-      arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
-      }
-      function toggleConfigSection1(btn) {
-      const section = btn.closest('table').querySelector('.config-section1');
-      const arrow = btn.querySelector('.arrow');
-      const isVisible = section.style.display === 'table-row-group';
-      section.style.display = isVisible ? 'none' : 'table-row-group';
-      arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
-      }
-      function toggleConfigSection2(btn) {
-      const section = btn.closest('table').querySelector('.config-section2');
-      const arrow = btn.querySelector('.arrow');
-      const isVisible = section.style.display === 'table-row-group';
-      section.style.display = isVisible ? 'none' : 'table-row-group';
-      arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
-      }
-      function toggleConfigSection3(btn) {
-      const section = btn.closest('table').querySelector('.config-section3');
-      const arrow = btn.querySelector('.arrow');
-      const isVisible = section.style.display === 'table-row-group';
-      section.style.display = isVisible ? 'none' : 'table-row-group';
-      arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
-      }
-      </script>
-
-      <style>
-      /* Alignement propre dans la liste du modal */
-      #customModal .list-group-item .row > [class^="col-"] { display: flex; align-items: center; }
-      /* Optionnel : renforce l’alignement vertical */
-      #customModal .list-group-item { padding-top: .6rem; padding-bottom: .6rem; }
-      </style>
+   
       <?php
 
       // Facture au comptoire NEW VERSION
