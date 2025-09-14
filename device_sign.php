@@ -528,130 +528,19 @@ $plugin_base = $rootdoc . '/plugins/gestion';
 
   <div class="main-container">
     <div class="card">
-        <?php
-          $plugin_base = $rootdoc . '/plugins/gestion';
-
-          // >>> AJOUT : lecture des éléments à afficher pendant l'attente
-          $baseitems = [];
-          try {
-            // Vous pouvez limiter/ordonner si besoin (ex: 'LIMIT' => 100)
-            foreach ($DB->request([
-                'SELECT' => ['id','description','info'],
-                'FROM'   => 'glpi_plugin_gestion_baseitems',
-                'ORDER'  => 'id ASC',
-            ]) as $row) {
-                $baseitems[] = $row;
-            }
-          } catch (Throwable $e) {
-            // En cas d’erreur DB, on garde le comportement standard (message d’attente)
-            $baseitems = [];
-          }
-        ?>
-        <style>
-          /* S'APPLIQUE UNIQUEMENT si des lignes existent (classe .has-infos ajoutée côté PHP) */
-
-          /* Agrandir toute la card */
-          .has-infos .card {
-            max-width: 1200px;   /* largeur plus grande */
-            margin: 0 auto;      /* centré */
-            font-size: 20px;     /* taille de texte globale */
-          }
-
-          /* Header plus grand */
-          .has-infos .card-header {
-            padding: 20px 24px;      /* header plus grand */
-            min-height: 20px;
-          }
-          .has-infos .card-title {
-            font-size: 32px;         /* titre très lisible */
-            margin: 0;
-            font-weight: 700;
-          }
-
-          /* Tableau : lisible sur tablette (tarifs visibles) */
-          .has-infos .table-modern {
-            width: 100%;
-            border-collapse: collapse;
-            background: #fff;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid #e9ecef;
-          }
-          .has-infos .table-modern thead th {
-            background: #f7f8fa;
-            font-weight: 700;
-            color: #1f2937;
-            border-bottom: 1px solid #e5e7eb;
-            text-align: left;
-            padding: 18px 20px;      /* plus grand */
-            font-size: 20px;
-          }
-          .has-infos .table-modern td {
-            text-align: left;
-            padding: 8px 16px;    /* <-- réduit verticalement (avant 18px) */
-            font-size: 24px;      /* un peu plus petit que 30px pour resserrer */
-            color: #111827;
-            border-bottom: 1px solid #f1f3f5;
-            word-break: break-word;
-            line-height: 1.2;     /* réduit la hauteur de ligne */
-          }
-          .waiting-content {padding: 0px 24px;}
-          .has-infos .table-modern tbody tr:hover {
-            background: #fafbfc;
-          }
-
-          /* Ajustement responsif (tablette et petits écrans paysage) */
-          @media (max-width: 1280px) {
-            .has-infos .card { max-width: 100%; font-size: 18px; }
-            .has-infos .card-title { font-size: 32px; }
-            .has-infos .table-modern thead th,
-            .has-infos .table-modern td { font-size: 32px; padding: 16px 18px; }
-            .card-content {padding: 10px;}
-            .waiting-content {padding: 0px 24px;}
-          }
-          @media (max-width: 768px) {
-            .has-infos .card { font-size: 17px; }
-            .has-infos .card-title { font-size: 24px; }
-            .has-infos .table-modern thead th,
-            .has-infos .table-modern td { font-size: 24px; padding: 14px 16px; }
-            .card-content {padding: 5px;}
-            .waiting-content {padding: 0px 24px;}
-          }
-        </style>
-
-            <!-- ÉTAPE 1: ATTENTE -->
-            <div id="waiting" class="step show <?= !empty($baseitems) ? 'has-infos' : '' ?>">
-              <div class="card-header">
-                <?php if (!empty($baseitems)) : ?>
-                  <h2 class="card-title">Informations :</h2>
-                <?php else: ?>
-                  <h2 class="card-title">Terminal de signature</h2>
-                  <p class="card-subtitle">Appareil : <?= htmlspecialchars($device_id, ENT_QUOTES, 'UTF-8') ?></p>
-                <?php endif; ?>
-              </div>
-              <div class="card-content">
-                <div class="waiting-content">
-                  <?php if (!empty($baseitems)) : ?>
-              <table class="table-modern no-head">
-                <tbody>
-                  <?php foreach ($baseitems as $item): ?>
-                    <tr>
-                      <td><?= htmlspecialchars((string)($item['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                      <td><?= htmlspecialchars((string)($item['info'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-              <div id="waitErr" class="alert alert-error" style="display:none;"></div>
-            <?php else: ?>
-              <div class="waiting-icon">⏳</div>
-              <div class="waiting-title">En attente d'une demande de signature</div>
-              <div class="waiting-subtitle">
-                Le système attend qu’un technicien déclenche une demande de signature depuis un ticket.
-              </div>
-              <div class="waiting-hint">Cette page se met à jour automatiquement.</div>
-              <div id="waitErr" class="alert alert-error" style="display:none;"></div>
-            <?php endif; ?>
+      
+      <!-- ÉTAPE 1: ATTENTE -->
+      <div id="waiting" class="step show">
+        <div class="card-header">
+          <h2 class="card-title">Terminal de signature</h2>
+          <p class="card-subtitle">Appareil : <?php echo htmlspecialchars($device_id, ENT_QUOTES, 'UTF-8'); ?></p>
+        </div>
+        <div class="card-content">
+          <div class="waiting-content">
+            <div class="waiting-icon">⏳</div>
+            <div class="waiting-title">En attente d'une demande de signature</div>
+            <div class="waiting-subtitle">Le système attend qu'un technicien déclenche une demande de signature depuis un ticket.</div>
+            <div id="waitErr" class="alert alert-error" style="display:none;"></div>
           </div>
         </div>
       </div>
