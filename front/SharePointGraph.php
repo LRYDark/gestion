@@ -984,38 +984,70 @@ class PluginGestionSharepoint extends CommonDBTM {
         return $tracker;
     }
 
-    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL, $SubjectMail = NULL, $BodyMail = NULL) {        global $DB, $CFG_GLPI;
+    public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL, $SubjectMail = NULL, $BodyMail = NULL) {
+        global $DB, $CFG_GLPI;
 
-        // Validation de l'email
-        if (!filter_var($EMAIL, FILTER_VALIDATE_EMAIL)) {
-            throw new InvalidArgumentException("L'adresse email est invalide : $EMAIL");
+        // --- Parsing + validation des emails (multi) ---
+        if (!function_exists('parse_emails')) {
+            function parse_emails($emails): array {
+                // $emails peut être une chaîne "a@x, b@y; c@z" ou un array
+                $items = is_array($emails)
+                    ? $emails
+                    : preg_split('/[,\s;]+/u', (string)$emails, -1, PREG_SPLIT_NO_EMPTY);
+
+                $valid = [];
+                foreach ($items as $e) {
+                    $e = trim((string)$e);
+                    if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                        $valid[strtolower($e)] = $e; // dédoublonnage case-insensitive
+                    }
+                }
+                return array_values($valid);
+            }
         }
 
-        //BALISES
-        $Balises = array(
-            array('Balise' => '##gestion.id##'             , 'Value' => $id_survey),
-            array('Balise' => '##gestion.tracker##'        , 'Value' => $tracker),
-            array('Balise' => '##gestion.url##'            , 'Value' => "<a href='$url'>$fileName</a>"),
-        );
+        $emails = parse_emails($EMAIL); // <- la colonne BDD telle quelle (peut contenir plusieurs adresses)
+        if (!$emails) {
+            throw new InvalidArgumentException("Aucune adresse email valide trouvée.");
+        }
+
+        // Premier mail en To, les autres en Cc
+        $to = array_shift($emails);
+        $cc = $emails; // peut être vide
+
+        // --- BALISES ---
+        $Balises = [
+            ['Balise' => '##gestion.id##'     , 'Value' => (string)$id_survey],
+            ['Balise' => '##gestion.tracker##', 'Value' => (string)$tracker],
+            ['Balise' => '##gestion.url##'    , 'Value' => ($url && $fileName) ? "<a href='$url'>$fileName</a>" : ""],
+        ];
 
         // Fonction pour remplacer les balises
         $remplacerBalises = function($corps) use ($Balises) {
-            foreach ($Balises as $balise) {
-                $corps = str_replace($balise['Balise'], $balise['Value'], $corps);
+            if ($corps === null) return '';
+            foreach ($Balises as $b) {
+                $tag = isset($b['Balise']) ? (string)$b['Balise'] : '';
+                if ($tag === '') continue;
+                $val = array_key_exists('Value', $b) ? (string)$b['Value'] : '';
+                $corps = str_replace($tag, $val, (string)$corps);
             }
             return $corps;
         };
 
-        $mmail = new GLPIMailer(); // génération du mail
+        // --- Préparation mailer ---
+        $mmail  = new GLPIMailer(); // génération du mail
         $config = new PluginGestionConfig();
-    
+
+        // --- Lecture gabarit (v1 simple, comme ton ancienne version) ---
+        $Subject = '';
+        $BodyText = '';
+        $BodyHtml = '';
+
         if ((int)$gabarit_id > 0) {
             $itTpl = $DB->request([
                 'SELECT' => ['subject', 'content_text', 'content_html', 'language'],
                 'FROM'   => 'glpi_notificationtemplatetranslations',
-                'WHERE'  => [
-                    'notificationtemplates_id' => (int)$gabarit_id
-                ],
+                'WHERE'  => ['notificationtemplates_id' => (int)$gabarit_id],
                 'LIMIT'  => 1
             ])->current();
 
@@ -1034,48 +1066,59 @@ class PluginGestionSharepoint extends CommonDBTM {
                 $BodyText = isset($itTpl['content_text']) ? html_entity_decode((string)$itTpl['content_text'], ENT_QUOTES, 'UTF-8') : '';
                 $BodyHtml = isset($itTpl['content_html']) ? html_entity_decode((string)$itTpl['content_html'], ENT_QUOTES, 'UTF-8') : '';
             }
-        }elseif($SubjectMail != NULL && $BodyMail != NULL){
-            $Subject  = $SubjectMail ?? '';
-            $BodyText = $BodyMail ?? '';
-            $BodyHtml = $BodyMail ?? '';
-        }
-           
-        $footer = $DB->query("SELECT value FROM glpi_configs WHERE name = 'mailing_signature'")->fetch_object();
-        if(!empty($footer->value)){$footer = html_entity_decode($footer->value, ENT_QUOTES, 'UTF-8');}else{$footer='';}
-    
-        // For exchange
-            $mmail->AddCustomHeader("X-Auto-Response-Suppress: OOF, DR, NDR, RN, NRN");
-    
-        if (empty($CFG_GLPI["from_email"])){
-            // si mail expediteur non renseigné    
-            $mmail->SetFrom($CFG_GLPI["admin_email"], $CFG_GLPI["admin_email_name"], false);
-        }else{
-            //si mail expediteur renseigné  
-            $mmail->SetFrom($CFG_GLPI["from_email"], $CFG_GLPI["from_email_name"], false);
-        }
-    
-        $mmail->AddAddress($EMAIL);
-        
-        if($outputPath != NULL){
-            $mmail->addAttachment($outputPath); // Ajouter un attachement (documents)
+        } elseif ($SubjectMail !== NULL && $BodyMail !== NULL) {
+            $Subject  = (string)$SubjectMail;
+            $BodyText = (string)$BodyMail;
+            $BodyHtml = (string)$BodyMail;
         }
 
+        // --- Footer signature ---
+        $footerRow = $DB->query("SELECT value FROM glpi_configs WHERE name = 'mailing_signature'")->fetch_object();
+        $footer    = (!empty($footerRow->value)) ? html_entity_decode($footerRow->value, ENT_QUOTES, 'UTF-8') : '';
+
+        // --- Headers anti-réponses automatiques (Exchange etc.) ---
+        $mmail->AddCustomHeader("X-Auto-Response-Suppress: OOF, DR, NDR, RN, NRN");
+
+        // --- From sécurisé ---
+        if (empty($CFG_GLPI["from_email"])) {
+            // Mail expéditeur non renseigné : fallback admin
+            $mmail->SetFrom($CFG_GLPI["admin_email"], $CFG_GLPI["admin_email_name"], false);
+        } else {
+            // Mail expéditeur renseigné
+            $mmail->SetFrom($CFG_GLPI["from_email"], $CFG_GLPI["from_email_name"], false);
+        }
+
+        // --- Destinataires (To + Cc)
+        $mmail->AddAddress($to);
+        if (!empty($cc)) {
+            foreach ($cc as $addr) {
+                $mmail->AddCC($addr);
+            }
+        }
+
+        // --- Pièce jointe optionnelle ---
+        if ($outputPath !== NULL && is_string($outputPath) && file_exists($outputPath)) {
+            $mmail->addAttachment($outputPath);
+        }
+
+        // --- Sujet / Corps (HTML + Texte) avec remplacement de balises ---
         $mmail->isHTML(true);
         if ($Subject !== '') {
             $mmail->Subject = $remplacerBalises($Subject);
         }
-        $mmail->Body = GLPIMailer::normalizeBreaks($remplacerBalises($BodyHtml)) . $footer;
+        $mmail->Body    = GLPIMailer::normalizeBreaks($remplacerBalises($BodyHtml)) . $footer;
         $mmail->AltBody = GLPIMailer::normalizeBreaks($remplacerBalises($BodyText)) . $footer;
-    
-            // envoie du mail
-            if(!$mmail->send()) {
-                Session::addMessageAfterRedirect(__("Erreur lors de l'envoi du mail : " . $mmail->ErrorInfo, 'gestion'), true, ERROR);
-            }else{
-                if($gabarit_id == $config->fields['gabarit'] && $message != NULL){
-                    Session::addMessageAfterRedirect(__($message, 'gestion'), true, INFO);
-                }
+
+        // --- Envoi + messages ---
+        if (!$mmail->send()) {
+            Session::addMessageAfterRedirect(__("Erreur lors de l'envoi du mail : " . $mmail->ErrorInfo, 'gestion'), true, ERROR);
+        } else {
+            if ((int)$gabarit_id === (int)($config->fields['gabarit'] ?? 0) && $message !== NULL) {
+                Session::addMessageAfterRedirect(__($message, 'gestion'), true, INFO);
             }
-            
+        }
+
+        // --- Nettoyage adresses ---
         $mmail->ClearAddresses();
     }
 
