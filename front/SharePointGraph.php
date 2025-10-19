@@ -1056,11 +1056,34 @@ class PluginGestionSharepoint extends CommonDBTM {
     public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL, $SubjectMail = NULL, $BodyMail = NULL) {
         global $DB, $CFG_GLPI;
 
-        // --- Validation email ---
-        $EMAIL = trim((string)$EMAIL);
-        if (!filter_var($EMAIL, FILTER_VALIDATE_EMAIL)) {
-            throw new InvalidArgumentException("L'adresse email est invalide : $EMAIL");
+    // --- Parsing + validation des emails en base --- #GLPI11#
+    if (!function_exists('parse_emails')) {
+        function parse_emails($emails): array {
+            // $emails peut être une chaîne "a@x, b@y; c@z" ou un array
+            $items = is_array($emails)
+                ? $emails
+                : preg_split('/[,\s;]+/u', (string)$emails, -1, PREG_SPLIT_NO_EMPTY);
+
+            $valid = [];
+            foreach ($items as $e) {
+                $e = trim((string)$e);
+                if ($e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL)) {
+                    $valid[strtolower($e)] = $e; // dédoublonnage case-insensitive
+                }
+            }
+            return array_values($valid);
         }
+    }
+
+    // On nettoie et valide la liste
+    $EMAILS = parse_emails($EMAIL /* <- ta colonne BDD telle quelle */);
+    if (!$EMAILS) {
+        throw new InvalidArgumentException("Aucune adresse email valide trouvée.");
+    }
+
+    // Premier mail = TO, les suivants = CC
+    $to = array_shift($EMAILS); // retire le premier et le retourne
+    $cc = $EMAILS;              // reste du tableau (possiblement vide)
 
         // --- Balises ---
         $Balises = [
@@ -1153,9 +1176,13 @@ class PluginGestionSharepoint extends CommonDBTM {
         $fromName = $CFG_GLPI['from_email_name'] ?? $CFG_GLPI['admin_email_name'] ?? null;
         $fromName = (is_string($fromName) && $fromName !== '') ? $fromName : 'GLPI';
 
-        $emailObj = $mmail->getEmail();
-        $emailObj->from(new \Symfony\Component\Mime\Address($fromEmail, $fromName));
-        $emailObj->to($EMAIL); // pas de "name" → évite null
+    // Affectation dans le mail #GLPI11#
+    $emailObj = $mmail->getEmail();
+    $emailObj->from(new \Symfony\Component\Mime\Address($fromEmail, $fromName));
+    $emailObj->to($to);
+    if (!empty($cc)) {
+        $emailObj->cc(...$cc);
+    }
 
         // Pièce jointe optionnelle (vérif + taille)
         if (!empty($outputPath) && is_string($outputPath) && file_exists($outputPath)) {

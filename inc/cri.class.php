@@ -82,6 +82,34 @@ class PluginGestionCri extends CommonDBTM {
       echo Html::hidden('id_document', ['value' => $id]);
       
       $baseUrl = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/') . '/front';
+
+      //Si le plugin est actif, lire la config et poser la clause #GLPI11#
+      if (Plugin::isPluginActive('rp') && class_exists('PluginRpConfig')) {
+         $configRp = PluginRpConfig::getInstance();
+
+         // Sécuriser l'accès au champ
+         $use_publictask = 0;
+         if (isset($configRp->fields['use_publictask'])) {
+            $use_publictask = (int)$configRp->fields['use_publictask'];
+         }
+
+         if ($use_publictask === 1) {
+            $is_private = "AND is_private = 0";
+         } else {
+            $is_private = "";
+         }
+      }else {
+         $is_private = "";
+      }
+
+      // Requête pour les tâches #GLPI11#
+      $querytask = "SELECT glpi_tickettasks.id FROM glpi_tickettasks INNER JOIN glpi_users ON glpi_tickettasks.users_id = glpi_users.id WHERE tickets_id = $ID $is_private";
+      $resulttask = $DB->doQuery($querytask);
+      $numbertask = $DB->numrows($resulttask);
+      if($numbertask == 0){
+            echo "<div class='alert alert-important alert-warning d-flex'>";
+            echo "<b>" . __("Attention : vous êtes sur le point de signer un bon de livraison sans avoir ajouté de tâche au ticket associé.") . "</b></div>";
+      }
  
       if($DOC->signed == 0){ // ----------------------------------- NON SIGNÉ -----------------------------------         
          echo '<div class="form-container">';

@@ -5,7 +5,7 @@ $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 // Minimal GLPI version,
 define("PLUGIN_GESTION_MIN_GLPI", "11.0.0");
 // Maximum GLPI version,
-define("PLUGIN_GESTION_MAX_GLPI", "11.0.1");
+define("PLUGIN_GESTION_MAX_GLPI", "11.1.0");
 
 define("PLUGIN_GESTION_WEBDIR", Plugin::getWebDir("gestion"));
 define("PLUGIN_GESTION_DIR", Plugin::getPhpDir("gestion"));

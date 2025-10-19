@@ -87,7 +87,7 @@ $DOC_NAME = $_POST['DOC'];
 $NAME = $_POST['name'];
 $id_document = $_POST['id_document'];
 
-if (empty($_POST['email'])) $_POST['email'] = " ";
+if (empty($_POST['email'])) $_POST['email'] = "vide"; // #GLPI11#
 $EMAIL = $_POST["email"];
 
 if (empty($_POST['mailtoclient'])) $_POST['mailtoclient'] = 0;
@@ -358,28 +358,32 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         message("Erreur lors de la mise a jours en Base de donnée.", ERROR);
     }
 
-    /*if (!empty($config->fields['ZenDocMail'])){ 
-        $sharepoint->MailSend($config->fields['ZenDocMail'], $config->fields['gabarit'], $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
-    }*/
-    if (!empty($config->fields['ZenDocMail'])){ 
-        $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé", "Bon de Livraison signé : $DOC_NAME");
+    // ENVOIE DES MAILS #GLPI11#
+    if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1 && $EMAIL != 'vide'){        
+        $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
     }
-    // NEW -- Facture comptoir
+
     if (!empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1 && !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1) {
         if (!empty($config->fields['CounterInvoiceMail'])){  
 
             if (!empty($_POST['relatedInvoiceToBL'])){
                 $relatedInvoiceToBL = $_POST['relatedInvoiceToBL'];
-                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Facture correspondant au bon de livraison : $relatedInvoiceToBL";
+                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL <br><br> Mail client : $EMAIL";
             }else{
-                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME";
+                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Mail client : $EMAIL";
             }
-            $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
+                if (!empty($config->fields['ZenDocMail'])){ 
+                    $sharepoint->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
+                }else{
+                    $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
+                }
         } 
+    }else{
+        if (!empty($config->fields['ZenDocMail'])){ 
+            $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé", "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL");
+        }
     }
-    if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1){        
-        $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
-    }
+    // ENVOIE DES MAILS
     
     if($config->ConfigModes() == 0){
         if($DOC->save == "SharePoint"){
