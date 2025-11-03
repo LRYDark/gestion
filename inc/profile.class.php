@@ -72,7 +72,7 @@ class PluginGestionProfile extends Profile {
          ['itemtype' => 'PluginGestionSurvey',
             'label'    => PluginGestionSurvey::getTypeName(2),
             'field'    => 'plugin_gestion_survey',
-            'rights'   => [READ    => __('Read'), UPDATE  => __('Update'), PURGE  => __('Purge')]
+            'rights'   => [READ    => __('Read'), UPDATE  => __('Update'), CREATE  => __('Create'), PURGE  => __('Purge')] // 1.5.5
          ],
       ];
 

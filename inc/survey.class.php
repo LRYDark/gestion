@@ -501,7 +501,7 @@ class PluginGestionSurvey extends CommonDBTM {
          echo "</td><td colspan='2'></td></tr>";
       }
          
-      if (Session::haveRight('plugin_gestion_survey', UPDATE)) {
+      if (Session::haveRightsOr('plugin_gestion_survey', [CREATE, UPDATE])) {
          $this->showFormButtons($options);
       }
       Html::closeForm();
