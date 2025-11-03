@@ -31,14 +31,6 @@ require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
 
 Session::checkLoginUser();
 
-$surveyRight = PluginGestionSurvey::$rightname;
-
-if (!Session::haveRight($surveyRight, READ) 
-    && !Session::haveRight($surveyRight, CREATE)
-    && !Session::haveRight($surveyRight, UPDATE)) {
-   Html::displayRightError(true);
-}
-
 if (!isset($_GET["id"])) {
    $_GET["id"] = "";
 }
@@ -139,14 +131,7 @@ if (isset($_POST["add"])) {
 
 } else {
    $survey->checkGlobal(READ);
-   if (Session::haveRight($surveyRight, READ)) { 
-   $survey->checkGlobal(READ); 
-      } else if (Session::haveRight($surveyRight, UPDATE)) {
-         $survey->checkGlobal(UPDATE);
-      } else {
-         $survey->checkGlobal(CREATE);
-      }
-   Html::header(PluginGestionSurvey::getTypeName(2), '', "management", "plugingestionmenu", "gestion"); 
-   $survey->display(['id'=> $_GET['id']]); 
+   Html::header(PluginGestionSurvey::getTypeName(2), '', "management", "plugingestionmenu", "gestion");
+   $survey->display(['id' => $_GET['id']]);
    Html::footer();
 }
