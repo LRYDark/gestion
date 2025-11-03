@@ -361,15 +361,16 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
     }
 
+    if ($DOC->tickets_id == 0) {$IdTicket = "Aucun ticket lié";} else { $IdTicket = $DOC->tickets_id; }
     if (!empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1 && !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1) {
         if (!empty($config->fields['CounterInvoiceMail'])){              
             if (empty($DOC->doc_id)) {$DOC->doc_id = "Aucun ticket lié";}
 
             if (!empty($_POST['relatedInvoiceToBL'])){
                 $relatedInvoiceToBL = $_POST['relatedInvoiceToBL'];
-                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL <br><br> Mail client : $EMAIL <br><br> Ticket ID : $DOC->doc_id";
+                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
             }else{
-                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $DOC->doc_id";
+                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
             }
                 if (!empty($config->fields['ZenDocMail'])){ 
                     $sharepoint->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
@@ -379,7 +380,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         } 
     }else{
         if (!empty($config->fields['ZenDocMail'])){ 
-            $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé", "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL");
+            $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé", "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket");
         }
     }
     // ENVOIE DES MAILS
