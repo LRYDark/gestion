@@ -119,7 +119,7 @@ class PluginGestionProfile extends Profile {
       foreach ($DB->request("SELECT *
                            FROM `glpi_profilerights` 
                            WHERE `profiles_id`='" . $_SESSION['glpiactiveprofile']['id'] . "' 
-                              AND `name` LIKE '%plugin_rp%'") as $prof) {
+                              AND `name` LIKE '%plugin_gestion%'") as $prof) {
          $_SESSION['glpiactiveprofile'][$prof['name']] = $prof['rights'];
       }
    }
@@ -133,7 +133,7 @@ class PluginGestionProfile extends Profile {
       foreach ($DB->request("SELECT *
                            FROM `glpi_profilerights` 
                            WHERE `profiles_id`='" . $_SESSION['glpiactiveprofile']['id'] . "' 
-                              AND `name` LIKE '%plugin_rp%'") as $prof) {
+                              AND `name` LIKE '%plugin_gestion%'") as $prof) {
          $_SESSION['glpiactiveprofile'][$prof['name']] = $prof['rights'];
       }
 

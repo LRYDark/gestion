@@ -48,7 +48,7 @@ function message($msg, $msgtype){
 }
 
 if (isset($_POST["add"])) {
-   $survey->check(-1, CREATE, $_POST);
+   $survey->check(-1, UPDATE, $_POST);
  
    $valid = false;
    $NewDoc = 0;
