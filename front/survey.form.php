@@ -31,6 +31,14 @@ require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
 
 Session::checkLoginUser();
 
+$surveyRight = PluginGestionSurvey::$rightname;
+
+if (!Session::haveRight($surveyRight, READ) 
+    && !Session::haveRight($surveyRight, CREATE)
+    && !Session::haveRight($surveyRight, UPDATE)) {
+   Html::displayRightError(true);
+}
+
 if (!isset($_GET["id"])) {
    $_GET["id"] = "";
 }
@@ -48,7 +56,7 @@ function message($msg, $msgtype){
 }
 
 if (isset($_POST["add"])) {
-   $survey->check(-1, UPDATE, $_POST); // 1.5.5
+   $survey->check(-1, CREATE, $_POST); // 1.5.5
  
    $valid = false;
    $NewDoc = 0;
@@ -131,7 +139,14 @@ if (isset($_POST["add"])) {
 
 } else {
    $survey->checkGlobal(READ);
-   Html::header(PluginGestionSurvey::getTypeName(2), '', "management", "plugingestionmenu", "gestion");
-   $survey->display(['id' => $_GET['id']]);
+   if (Session::haveRight($surveyRight, READ)) { 
+   $survey->checkGlobal(READ); 
+      } else if (Session::haveRight($surveyRight, UPDATE)) {
+         $survey->checkGlobal(UPDATE);
+      } else {
+         $survey->checkGlobal(CREATE);
+      }
+   Html::header(PluginGestionSurvey::getTypeName(2), '', "management", "plugingestionmenu", "gestion"); 
+   $survey->display(['id'=> $_GET['id']]); 
    Html::footer();
 }
