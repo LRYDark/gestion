@@ -105,6 +105,8 @@ class PluginGestionCri extends CommonDBTM {
       $querytask = "SELECT glpi_tickettasks.id FROM glpi_tickettasks INNER JOIN glpi_users ON glpi_tickettasks.users_id = glpi_users.id WHERE tickets_id = $ID $is_private";
       $resulttask = $DB->doQuery($querytask);
       $numbertask = $DB->numrows($resulttask);
+      // Si le document est déjà signé, ne pas afficher l'avertissement lié aux tâches
+      if ($DOC->signed != 0) { $numbertask = 1; }
       if($numbertask == 0){
             echo "<div class='alert alert-important alert-warning d-flex'>";
             echo "<b>" . __("Attention : vous êtes sur le point de signer un bon de livraison sans avoir ajouté de tâche au ticket associé.") . "</b></div>";
@@ -715,7 +717,14 @@ class PluginGestionCri extends CommonDBTM {
             echo '<div class="signed-details">';
                echo '<p><strong>Signé le :</strong> ' . $DOC->date_creation . '</p>';
                echo '<p><strong>Par :</strong> ' . $DOC->users_ext . '</p>';
-               echo '<p><strong>Livré par :</strong> ' . getUserName($DOC->users_id) . '</p>';
+               // Quick-sign may store a free-text technician in tech_ext
+               $tech_display = '';
+               if (isset($DOC->tech_ext) && strlen(trim((string)$DOC->tech_ext)) > 0) {
+                  $tech_display = $DOC->tech_ext;
+               } else {
+                  $tech_display = getUserName($DOC->users_id);
+               }
+               echo '<p><strong>Livré par :</strong> ' . $tech_display . '</p>';
                if (!empty($DOC->relatedInvoiceToBL)){
                   echo '<p><strong>Document lié :</strong> ' . $DOC->relatedInvoiceToBL . '</p>';
                }

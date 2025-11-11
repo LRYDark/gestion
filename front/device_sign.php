@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Minimal tablette page: waits for a pending request, then shows a recap, then signature pad.
  * Public page (no login). Validates device_id + token from the plugin's devices table.
@@ -629,6 +629,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
                   <p class="card-subtitle">Appareil : <?= htmlspecialchars($device_id, ENT_QUOTES, 'UTF-8') ?></p>
                 <?php endif; ?>
               </div>
+
               <div class="card-content">
                 <div class="waiting-content">
                   <?php if (!empty($baseitems)) : ?>
@@ -924,6 +925,8 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   const BASE = <?php echo json_encode($plugin_base, JSON_UNESCAPED_SLASHES); ?>;
   const DEVICE_ID = <?php echo json_encode($device_id, JSON_UNESCAPED_UNICODE); ?>;
   const TOKEN = <?php echo json_encode($token, JSON_UNESCAPED_UNICODE); ?>;
+  // expose for code executed outside initial scope
+  window.BASE = BASE; window.DEVICE_ID = DEVICE_ID; window.TOKEN = TOKEN;
 
   const waitingEl = document.getElementById('waiting');
   const waitErr = document.getElementById('waitErr');
@@ -1094,8 +1097,8 @@ $plugin_base = $rootdoc . '/plugins/gestion';
           'X-Requested-With': 'XMLHttpRequest'
         },
         body: new URLSearchParams({
-          device_id: DEVICE_ID,
-          token: TOKEN,
+          device_id: ((typeof DEVICE_ID!=='undefined'&&DEVICE_ID)?DEVICE_ID:(window.DEVICE_ID||'')),
+          token: ((typeof TOKEN!=='undefined'&&TOKEN)?TOKEN:(window.TOKEN||'')),
           request_id: requestId
         }).toString(),
         credentials: 'same-origin'
@@ -1267,7 +1270,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       html += `  <div class="section-title">📄 Document</div>`;
       html += `  <div class="section-content">`;
       
-      html += `    <div style="font-weight: 600; margin-bottom: 8px;">${escapeHtml(parameters.document_name)}</div>`;
+      //html += `    <div style="font-weight: 600; margin-bottom: 8px;">${escapeHtml(parameters.document_name)}</div>`;
       
       if (parameters.document_url) {
         // Fonction robuste de décodage HTML
@@ -1462,7 +1465,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     if (!polling) return;
     try {
       const params = new URLSearchParams({ 
-        device_id: DEVICE_ID, 
+        device_id: ((typeof DEVICE_ID!=='undefined'&&DEVICE_ID)?DEVICE_ID:(window.DEVICE_ID||'')), 
         token: TOKEN 
       });
       
@@ -1524,6 +1527,349 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   
   // NOUVEAU : Démarrer le refresh initial
   startAutoRefresh();
+ 
+  // --- Quick Sign (BL) ---
+  let quickMode = false;
+  let quickDoc = null;      // { save, filename, folder, signed }
+  let quickSurveyId = null; // id_document dans glpi_plugin_gestion_surveys
+  let quickPreviewUrl = null;
+
+  const quickModal    = document.getElementById('quickBlModal');
+  const quickInput    = document.getElementById('modalQuickBlInput');
+  const quickResults  = document.getElementById('modalQuickBlResults');
+  const quickErr      = document.getElementById('modalQuickBlErr');
+  const quickCloseBtn = document.getElementById('closeQuickBlBtn');
+
+  // Hook existing "Signature BL" button if present; otherwise inject it into waiting view
+  (function addQuickButton(){
+    try {
+      const existing = document.getElementById('openQuickBlBtn');
+      if (existing) {
+        existing.addEventListener('click', openQuickModal);
+        return;
+      }
+      const waiting = document.querySelector('#waiting .waiting-content');
+      if (!waiting) return;
+      const btn = document.createElement('button');
+      btn.id = 'openQuickBlBtn';
+      btn.className = 'btn';
+      btn.textContent = 'Signature BL';
+      btn.style.marginTop = '10px';
+      waiting.appendChild(btn);
+      btn.addEventListener('click', openQuickModal);
+    } catch(e) { console.warn('Quick BL button failed', e); }
+  })();
+
+  function openQuickModal(){
+    const modal    = document.getElementById('quickBlModal');
+    const inputEl  = document.getElementById('modalQuickBlInput');
+    const resEl    = document.getElementById('modalQuickBlResults');
+    const errEl    = document.getElementById('modalQuickBlErr');
+    const closeEl  = document.getElementById('closeQuickBlBtn');
+    if (!modal) return;
+    modal.style.display = 'block';
+    if (inputEl) {
+      inputEl.value = inputEl.value || '';
+      setTimeout(()=>inputEl.focus(), 50);
+    }
+    if (resEl) resEl.innerHTML = '';
+    if (errEl) errEl.style.display = 'none';
+    if (closeEl) closeEl.onclick = closeQuickModal;
+    modal.onclick = (e)=>{ if (e.target === modal) closeQuickModal(); };
+  }
+  function closeQuickModal(){
+    const modal   = document.getElementById('quickBlModal');
+    const resEl   = document.getElementById('modalQuickBlResults');
+    const errEl   = document.getElementById('modalQuickBlErr');
+    if (modal) modal.style.display = 'none';
+    if (errEl) errEl.style.display = 'none';
+    if (resEl) resEl.innerHTML = '';
+  }
+
+  // Recherche en temps r?el dans le modal
+  if (quickInput) {
+    let _qTimer;
+    quickInput.addEventListener('input', () => {
+      clearTimeout(_qTimer);
+      _qTimer = setTimeout(() => {
+        const q = (quickInput.value || '').trim();
+        searchQuickBL(q);
+      }, 300);
+    });
+  }
+
+  function renderQuickResults(items){
+    const resultsEl = document.getElementById('modalQuickBlResults'); if (!resultsEl) return;
+    resultsEl.innerHTML = '';
+    if (!items || items.length === 0) {
+      resultsEl.style.display = 'none';
+      return;
+    }
+    resultsEl.style.display = 'block';
+    items.forEach(it => {
+      const row = document.createElement('div');
+      row.style.padding = '6px 8px';
+      row.style.cursor = 'pointer';
+      row.style.borderBottom = '1px solid #f0f0f0';
+      row.innerHTML = it.html || it.text || (it.filename || '');
+      row.addEventListener('click', () => window.selectQuickResult2 && window.selectQuickResult2(it));
+      resultsEl.appendChild(row);
+    });
+  }
+
+  async function searchQuickBL(q){
+    const errEl = document.getElementById('modalQuickBlErr');
+    if (errEl) errEl.style.display = 'none';
+    quickSurveyId = null;
+    quickPreviewUrl = null;
+    quickDoc = null;
+
+    if (!q || q.length < 2) {
+      if (errEl) { errEl.textContent = 'Veuillez saisir au moins 2 caract?res.';
+      errEl.style.display = 'block'; }
+      return;
+    }
+    try {
+      const url = BASE + '/ajax/ajax_search_pdf.php?q=' + encodeURIComponent(q);
+      const res = await fetch(url, { method: 'GET', credentials:'same-origin', headers: {'X-Requested-With':'XMLHttpRequest'} });
+      const data = await res.json();
+      renderQuickResults(Array.isArray(data) ? data : []);
+    } catch(e){
+      if (errEl) { errEl.textContent = 'Erreur de recherche: ' + e.message;
+      errEl.style.display = 'block'; }
+    }
+  }
+
+  // Quick select handler (used by modal results)
+  window.selectQuickResult2 = async function(item){
+    const errEl = document.getElementById('modalQuickBlErr');
+    const resultsEl = document.getElementById('modalQuickBlResults');
+    if (errEl) errEl.style.display = 'none';
+    if (resultsEl) resultsEl.style.display = 'none';
+    const devId = ((typeof DEVICE_ID!=='undefined'&&DEVICE_ID)?DEVICE_ID:(window.DEVICE_ID||''));
+    const tok   = ((typeof TOKEN!=='undefined'&&TOKEN)?TOKEN:(window.TOKEN||''));
+    if (!devId || !tok) { if (errEl) { errEl.textContent = 'Paramètres tablette manquants (device_id/token)'; errEl.style.display = 'block'; } return; }
+
+    quickDoc = {
+      save: (item.save || '').trim(),
+      filename: (item.filename || item.text || '').trim(),
+      folder: (item.folder || '').trim(),
+      signed: parseInt(item.signed || 0, 10)
+    };
+    if (!quickDoc.save || !quickDoc.filename || !quickDoc.folder) {
+      if (errEl) { errEl.textContent = 'Résultat incomplet.'; errEl.style.display = 'block'; }
+      return;
+    }
+    try {
+      const body = new URLSearchParams({
+        device_id: devId,
+        token: tok,
+        save: quickDoc.save,
+        filename: quickDoc.filename,
+        folder: quickDoc.folder,
+        signed: String(quickDoc.signed)
+      }).toString();
+      const res = await fetch(BASE + '/ajax/quick_add_survey.php', {
+        method: 'POST',
+        headers: {'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','X-Requested-With':'XMLHttpRequest'},
+        body,
+        credentials: 'same-origin'
+      });
+      const txt = await res.text();
+      let j;
+      try { j = JSON.parse(txt); } catch(parseErr) { throw new Error('Serveur: ' + txt.substring(0,200)); }
+      if (!res.ok || !j.ok) throw new Error(j.error || ('HTTP '+res.status));
+      quickSurveyId = j.id;
+      quickPreviewUrl = j.preview_url || null;
+      quickMode = true;
+      // Prefer BL returned by server (may include client suffix)
+      if (j.bl) { quickDoc.bl = String(j.bl).trim(); }
+      var docDisplay2 = quickDoc.bl ? (/(\.pdf)$/i.test(quickDoc.bl) ? quickDoc.bl : (quickDoc.bl + '.pdf')) : (quickDoc.filename || '');
+      recapTicketInfoEl.textContent = 'Document: ' + docDisplay2;
+      const params2 = { document_name: docDisplay2 };
+      if (quickPreviewUrl) params2.document_url = quickPreviewUrl;
+      recapContentEl.innerHTML = generateRecapContent(params2);
+      if (typeof closeQuickModal === 'function') closeQuickModal();
+      showStep('recap');
+    } catch(e){
+      if (errEl) { errEl.textContent = 'Création impossible: ' + e.message; errEl.style.display = 'block'; }
+      quickMode = false;
+    }
+  };
+
+  async function selectQuickResult(item){
+        const errEl = document.getElementById('modalQuickBlErr');
+        const resultsEl = document.getElementById('modalQuickBlResults');
+    if (errEl) errEl.style.display = 'none';
+    if (resultsEl) resultsEl.style.display = 'none';
+    quickDoc = {
+      save: (item.save || '').trim(),
+      filename: (item.filename || item.text || '').trim(),
+      folder: (item.folder || '').trim(),
+      signed: parseInt(item.signed || 0, 10)
+    };
+    if (!quickDoc.save || !quickDoc.filename || !quickDoc.folder) {
+      if (errEl) { errEl.textContent = 'Résultat incomplet.'; errEl.style.display = 'block'; }
+      return;
+    }
+
+    try {
+      const body = new URLSearchParams({
+        device_id: ((typeof DEVICE_ID!=='undefined'&&DEVICE_ID)?DEVICE_ID:(window.DEVICE_ID||'')),
+        token: ((typeof TOKEN!=='undefined'&&TOKEN)?TOKEN:(window.TOKEN||'')),
+        save: quickDoc.save,
+        filename: quickDoc.filename,
+        folder: quickDoc.folder,
+        signed: String(quickDoc.signed)
+      }).toString();
+      const res = await fetch(BASE + '/ajax/quick_add_survey.php', {
+        method: 'POST',
+        headers: {'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','X-Requested-With':'XMLHttpRequest'},
+        body,
+        credentials: 'same-origin'
+      });
+      const txt = await res.text();
+      let j;
+      try { j = JSON.parse(txt); } catch(parseErr) { throw new Error('Serveur: ' + txt.substring(0,200)); }
+      if (!res.ok || !j.ok) throw new Error(j.error || ('HTTP '+res.status));
+      quickSurveyId = j.id;
+      quickPreviewUrl = j.preview_url || null;
+
+      // Etape signature en mode rapide
+      quickMode = true;
+      // Prefer BL returned by server (may include client suffix)
+      if (j.bl) { quickDoc.bl = String(j.bl).trim(); }
+      const docName = quickDoc.bl ? (/(\.pdf)$/i.test(quickDoc.bl) ? quickDoc.bl : (quickDoc.bl + '.pdf')) : (quickDoc.filename || '');
+      ticketInfoEl.textContent = 'Document: ' + docName;
+      recapTicketInfoEl.textContent = 'Document: ' + docName;
+
+      try {
+        if (quickPreviewUrl) {
+          const previewHolderId = 'quickPreviewHolder';
+          let holder = document.getElementById(previewHolderId);
+          if (!holder) {
+            holder = document.createElement('div');
+            holder.id = previewHolderId;
+            holder.style.margin = '10px 0 20px 0';
+            const cardContent = document.querySelector('#pad .card-content');
+            cardContent.insertBefore(holder, cardContent.firstChild);
+          }
+          holder.innerHTML =
+            '<div class=\"form-card\">'+
+              '<div class=\"form-label\">Aperçu du document</div>'+
+              '<div class=\"form-content\">'+
+                '<object data=\"' + quickPreviewUrl.replace(/\"/g,'&quot;') + '#view=FitH\" type=\"application/pdf\" style=\"width:100%;height:420px;border:1px solid #e9ecef;border-radius:6px;\">'+
+                  'Prévisualisation indisponible'+
+                '</object>'+
+              '</div>'+
+            '</div>';
+        }
+      } catch(_e) {}
+
+      // Quick mode: show recap step with preview instead of going directly to pad
+      recapTicketInfoEl.textContent = 'Document: ' + docName; 
+      const params = { document_name: docName };
+      if (quickPreviewUrl) params.document_url = quickPreviewUrl;
+      recapContentEl.innerHTML = generateRecapContent(params);
+      if (typeof closeQuickModal === 'function') closeQuickModal();
+      showStep('recap');
+    } catch(e){
+      if (quickErr) { if (errEl) { errEl.textContent = 'Création impossible: ' + e.message; errEl.style.display = 'block'; } }
+      quickMode = false;
+    }
+  }
+
+  // Fallback: delegate click on any visible button labeled "Signature BL"
+  document.addEventListener('click', function(ev){
+    try {
+      const tgt = ev.target;
+      if (!tgt) return;
+      const el = tgt.closest ? (tgt.closest('button, a, [data-action="openQuickBl"]')) : null;
+      if (!el) return;
+      const label = (el.textContent || el.innerText || '').replace(/\s+/g,' ').trim().toLowerCase();
+      if (el.id === 'openQuickBlBtn' || el.getAttribute('data-action') === 'openQuickBl' || label === 'signature bl') {
+        ev.preventDefault();
+        // Open modal even if variables were null at load
+        const modal    = document.getElementById('quickBlModal');
+        const inputEl  = document.getElementById('modalQuickBlInput');
+        const resEl    = document.getElementById('modalQuickBlResults');
+        const errEl    = document.getElementById('modalQuickBlErr');
+        if (modal) {
+          modal.style.display = 'block';
+          if (inputEl) { inputEl.value = inputEl.value || ''; setTimeout(()=>inputEl.focus(), 50); }
+          if (resEl) resEl.innerHTML = '';
+          if (errEl) errEl.style.display = 'none';
+          // Attach search handler once
+          if (inputEl && !window.__quickInputHandlerAttached) {
+            let _qTimer;
+            inputEl.addEventListener('input', () => {
+              clearTimeout(_qTimer);
+              _qTimer = setTimeout(() => searchQuickBL((inputEl.value || '').trim()), 300);
+            });
+            window.__quickInputHandlerAttached = true;
+          }
+        }
+      }
+    } catch(_e) {}
+  });
+
+  // Capture en phase de capture pour intercepter le click quand quickMode est actif
+  // et éviter l'ancien flux (demande distante). Cela permet de ne pas modifier l'écouteur existant.
+  if (typeof sendBtn !== 'undefined' && sendBtn && sendBtn.addEventListener) {
+    sendBtn.addEventListener('click', async function(ev){
+      if (!quickMode) return; // laisser l'autre handler gérer
+
+      ev.preventDefault();
+      if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+      if (ev.stopPropagation) ev.stopPropagation();
+
+      // Validations de base
+      const blank = document.createElement('canvas');
+      blank.width = canvas.width; blank.height = canvas.height;
+      if (canvas.toDataURL() === blank.toDataURL()){
+        sendErr.textContent = 'Veuillez signer dans la zone.';
+        sendErr.style.display = 'block';
+        return;
+      }
+      const signerInput = document.getElementById('signer');
+      if (!signerInput.value.trim()) {
+        sendErr.textContent = 'Veuillez saisir votre nom et prénom.';
+        sendErr.style.display = 'block';
+        return;
+      }
+
+      try {
+        const png = canvas.toDataURL('image/png');
+        const signer = document.getElementById('signer').value || '';
+        const signerEmail = document.getElementById('signerEmail').value || '';
+        if (!quickSurveyId || !quickDoc) {
+          throw new Error('Document non initialisé.');
+        }
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = BASE + '/front/traitement.php';
+        const addField = (name, val) => { const i = document.createElement('input'); i.type='hidden'; i.name=name; i.value=val; form.appendChild(i); };
+        addField('REPORT_ID', '0');
+        // For quick-sign, use BL from server (may include client suffix like survey.form.php)
+        var __doc_for_save = (quickDoc && quickDoc.bl) ? quickDoc.bl : (quickDoc && quickDoc.filename ? quickDoc.filename.replace(/\.pdf$/i,'') : '');
+        addField('DOC', __doc_for_save);
+        addField('id_document', String(quickSurveyId));
+        addField('url', png);
+        addField('name', signer);
+        addField('email', signerEmail);
+        const techVal = (document.getElementById("modalTechnician") ? document.getElementById("modalTechnician").value : (document.getElementById("technician") ? document.getElementById("technician").value : ""));
+        addField("technician", techVal);
+        addField('mailtoclient', '1');
+        if (window.GLPI_CSRF_TOKEN) addField('_glpi_csrf_token', window.GLPI_CSRF_TOKEN);
+        document.body.appendChild(form);
+        form.submit();
+      } catch(e) {
+        console.error('Quick send error:', e);
+        sendErr.textContent = 'Envoi impossible (rapide): ' + e.message;
+        sendErr.style.display = 'block';
+      }
+    }, true); // phase de capture
+  }
 
   sendBtn.addEventListener('click', async () => {
     sendErr.style.display = 'none'; 
@@ -1567,8 +1913,8 @@ $plugin_base = $rootdoc . '/plugins/gestion';
           'X-Requested-With': 'XMLHttpRequest'
         },
         body: new URLSearchParams({
-          device_id: DEVICE_ID,
-          token: TOKEN,
+          device_id: ((typeof DEVICE_ID!=='undefined'&&DEVICE_ID)?DEVICE_ID:(window.DEVICE_ID||'')),
+          token: ((typeof TOKEN!=='undefined'&&TOKEN)?TOKEN:(window.TOKEN||'')),
           request_id: requestId,
           signer_name: signer,
           signer_email: signerEmail,
@@ -1606,6 +1952,28 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   });
 })();
 </script>
+  <!-- Quick BL Modal -->
+  <div id="quickBlModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000;">
+    <div style="max-width:700px; margin:60px auto; background:#fff; border-radius:8px; padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:600; font-size:16px;">Signature BL rapide</div>
+        <button type="button" id="closeQuickBlBtn" class="btn">Fermer</button>
+      </div>
+      <div class="form-card">
+        <div class="form-label">Technicien</div>
+        <div class="form-content" style="margin-bottom:10px;">
+          <input id="modalTechnician" type="text" class="form-input" placeholder="Nom du technicien">
+        </div>
+        <div class="form-label">Recherche BL (ex: BL199550)</div>
+        <div class="form-content">
+          <input id="modalQuickBlInput" type="text" class="form-input" placeholder="Ex: BL199550" style="width:100%;">
+          <div id="modalQuickBlErr" class="alert alert-error" style="display:none; margin-top:8px;"></div>
+          <div id="modalQuickBlResults" style="border:1px solid #e9ecef;border-radius:8px;padding:8px;max-height:280px;overflow:auto; margin-top:10px;"></div>
+          
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
 
@@ -1673,3 +2041,9 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   });
 })();
 </script>
+
+
+
+
+
+
