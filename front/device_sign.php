@@ -923,6 +923,26 @@ $plugin_base = $rootdoc . '/plugins/gestion';
 <script>
 (() => {
   const BASE = <?php echo json_encode($plugin_base, JSON_UNESCAPED_SLASHES); ?>;
+  // RP plugin context (for quick ticket report)
+  window.RP_ACTIVE = <?php echo json_encode(Plugin::isPluginActive('rp')); ?>;
+  window.RP_WEBDIR = <?php echo json_encode(defined('PLUGIN_RP_WEBDIR') ? PLUGIN_RP_WEBDIR : (($CFG_GLPI['root_doc'] ?? '/glpi') . '/plugins/rp'), JSON_UNESCAPED_SLASHES); ?>;
+  // Expose allowed technicians (from Gestion config RemoteSignatureUsers)
+  <?php
+    $allowedTechs = [];
+    try {
+      $ids = PluginGestionConfig::getInstance()->RemoteSignatureUsers();
+      if (is_string($ids)) { $tmp = json_decode($ids, true); if (is_array($tmp)) $ids = $tmp; }
+      if (is_array($ids) && count($ids) > 0) {
+        $ids_int = array_filter(array_map('intval', $ids));
+        if (!empty($ids_int)) {
+          $in = implode(',', $ids_int);
+          $resU = $DB->query("SELECT id, name, realname, firstname FROM glpi_users WHERE is_deleted = 0 AND id IN ($in) ORDER BY realname, firstname, name");
+          if ($resU) { while ($u = $DB->fetchassoc($resU)) { $allowedTechs[] = $u; } }
+        }
+      }
+    } catch (Throwable $e) {}
+  ?>
+  window.ALLOWED_REMOTE_USERS = <?php echo json_encode($allowedTechs, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
   const DEVICE_ID = <?php echo json_encode($device_id, JSON_UNESCAPED_UNICODE); ?>;
   const TOKEN = <?php echo json_encode($token, JSON_UNESCAPED_UNICODE); ?>;
   // expose for code executed outside initial scope
@@ -1122,7 +1142,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       sendOk.style.display = 'block';
       
       // Après refus, attendre 3 secondes puis retourner à l'écran d'attente
-      setTimeout(resetToWaiting, 3000);
+      setTimeout(function(){ resetToWaiting(true); }, 3000);
       
     } catch (e) {
       console.error('Refuse error:', e);
@@ -1416,7 +1436,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   }
 
   // Fonction pour réinitialiser l'interface après envoi (MODIFIÉE pour le refresh)
-  function resetToWaiting() {
+  function resetToWaiting(fullReload) {
     document.getElementById('signer').value = '';
     document.getElementById('signerEmail').value = '';
     ctx.clearRect(0,0,canvas.width, canvas.height);
@@ -1435,6 +1455,9 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     
     // NOUVEAU : Redémarrer le refresh après reset
     startAutoRefresh();
+    if (fullReload === true) {
+      setTimeout(function(){ try { location.replace(location.href.split('#')[0]); } catch(e){ location.reload(); } }, 500);
+    }
   }
 
   async function post(url, data){
@@ -1534,11 +1557,24 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   let quickSurveyId = null; // id_document dans glpi_plugin_gestion_surveys
   let quickPreviewUrl = null;
 
+  // --- Quick Sign (Ticket) ---
+  let quickTicketMode = false;
+  let quickTicketId = null;       // Ticket GLPI id
+  let quickTicketInfo = null;     // { ticket_title, ticket_description, ticket_tasks:[], entity_name, client_email }
+
   const quickModal    = document.getElementById('quickBlModal');
   const quickInput    = document.getElementById('modalQuickBlInput');
   const quickResults  = document.getElementById('modalQuickBlResults');
   const quickErr      = document.getElementById('modalQuickBlErr');
   const quickCloseBtn = document.getElementById('closeQuickBlBtn');
+
+  // Ticket modal elements (will be queried on demand; may not exist at script load)
+  let quickTicketModal   = null;
+  let quickTicketInput   = null;
+  let quickTicketErr     = null;
+  let quickTicketPreview = null;
+  let quickTicketClose   = null;
+  let quickTicketTechSel = null;
 
   // Hook existing "Signature BL" button if present; otherwise inject it into waiting view
   (function addQuickButton(){
@@ -1560,6 +1596,23 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     } catch(e) { console.warn('Quick BL button failed', e); }
   })();
 
+  // Add "Signature Ticket" button if RP plugin is active
+  (function addQuickTicketButton(){
+    try {
+      if (!window.RP_ACTIVE) return;
+      const waiting = document.querySelector('#waiting .waiting-content');
+      if (!waiting) return;
+      const btn = document.createElement('button');
+      btn.id = 'openQuickTicketBtn';
+      btn.className = 'btn';
+      btn.textContent = 'Signature Ticket';
+      btn.style.marginTop = '10px';
+      btn.style.marginLeft = '10px';
+      waiting.appendChild(btn);
+      btn.addEventListener('click', openQuickTicketModal);
+    } catch(e) { console.warn('Quick Ticket button failed', e); }
+  })();
+
   function openQuickModal(){
     const modal    = document.getElementById('quickBlModal');
     const inputEl  = document.getElementById('modalQuickBlInput');
@@ -1569,13 +1622,18 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     if (!modal) return;
     modal.style.display = 'block';
     if (inputEl) {
-      inputEl.value = inputEl.value || '';
+      // Prefill with 'BL' prefix and show numeric keyboard
+      if (!inputEl.value || !/^BL/i.test(inputEl.value)) inputEl.value = 'BL';
       setTimeout(()=>inputEl.focus(), 50);
+      // Place caret at end
+      try { const len = inputEl.value.length; inputEl.setSelectionRange(len, len); } catch(e){}
     }
     if (resEl) resEl.innerHTML = '';
     if (errEl) errEl.style.display = 'none';
     if (closeEl) closeEl.onclick = closeQuickModal;
     modal.onclick = (e)=>{ if (e.target === modal) closeQuickModal(); };
+    // Ensure strong BL guards are attached each time modal opens
+    attachQuickBlGuards();
   }
   function closeQuickModal(){
     const modal   = document.getElementById('quickBlModal');
@@ -1586,15 +1644,185 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     if (resEl) resEl.innerHTML = '';
   }
 
+  // ----- Quick Ticket modal helpers -----
+  function openQuickTicketModal(){
+    if (!window.RP_ACTIVE) return;
+    // query fresh elements (modal is declared later in DOM)
+    quickTicketModal   = document.getElementById('quickTicketModal');
+    quickTicketInput   = document.getElementById('modalQuickTicketInput');
+    quickTicketErr     = document.getElementById('modalQuickTicketErr');
+    quickTicketPreview = document.getElementById('modalQuickTicketPreview');
+    quickTicketClose   = document.getElementById('closeQuickTicketBtn');
+    quickTicketTechSel = document.getElementById('modalTicketTechnicianSelect');
+    if (!quickTicketModal) return;
+    quickTicketMode = false;
+    quickTicketId = null;
+    quickTicketInfo = null;
+    quickTicketModal.style.display = 'block';
+    if (quickTicketInput) {
+      quickTicketInput.value = quickTicketInput.value || '';
+      setTimeout(()=>quickTicketInput.focus(), 50);
+      // attach Enter handler once
+      if (!quickTicketInput.__enterHandler) {
+        quickTicketInput.addEventListener('keydown', (ev)=>{
+          if (ev.key === 'Enter') { ev.preventDefault(); const v = (quickTicketInput.value||'').trim(); if (v) loadTicketInfo(v); }
+        });
+        quickTicketInput.__enterHandler = true;
+      }
+    }
+    if (quickTicketErr) { quickTicketErr.style.display = 'none'; quickTicketErr.textContent=''; }
+    if (quickTicketPreview) { quickTicketPreview.innerHTML = ''; quickTicketPreview.style.display='none'; }
+    if (quickTicketClose) quickTicketClose.onclick = closeQuickTicketModal;
+    quickTicketModal.onclick = (e)=>{ if (e.target === quickTicketModal) closeQuickTicketModal(); };
+  }
+  function closeQuickTicketModal(){
+    // re-query in case of DOM changes
+    const modal = document.getElementById('quickTicketModal');
+    const err   = document.getElementById('modalQuickTicketErr');
+    const prev  = document.getElementById('modalQuickTicketPreview');
+    if (modal) modal.style.display = 'none';
+    if (err) { err.style.display='none'; err.textContent=''; }
+    if (prev) { prev.innerHTML=''; prev.style.display='none'; }
+  }
+
+  async function loadTicketInfo(id){
+    if (!id) return;
+    try {
+      const errEl = document.getElementById('modalQuickTicketErr');
+      if (errEl) { errEl.style.display='none'; errEl.textContent=''; }
+      const params = new URLSearchParams({ id: String(id), device_id: ((typeof DEVICE_ID!=='undefined'&&DEVICE_ID)?DEVICE_ID:(window.DEVICE_ID||'')), token: ((typeof TOKEN!=='undefined'&&TOKEN)?TOKEN:(window.TOKEN||'')) });
+      const res = await fetch(BASE + '/ajax/ajax_ticket_info.php?' + params.toString(), { method: 'GET', headers: {'X-Requested-With':'XMLHttpRequest'}, credentials: 'same-origin' });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || ('HTTP '+res.status));
+      quickTicketId = data.ticket_id;
+      quickTicketInfo = data;
+
+      // Prepare recap
+      const ticketText = quickTicketId ? ('Ticket #' + quickTicketId) : '';
+      ticketInfoEl.textContent = ticketText;
+      recapTicketInfoEl.textContent = ticketText;
+      const params2 = {
+        entity_name: data.entity_name || '',
+        ticket_title: data.ticket_title || '',
+        ticket_description: data.ticket_description || '',
+        ticket_tasks: Array.isArray(data.tasks) ? data.tasks : []
+      };
+      recapContentEl.innerHTML = generateRecapContent(params2);
+      if (data.client_email) { window.TABLET_CLIENT_EMAIL = data.client_email; }
+
+      // Close modal and go to recap
+      closeQuickTicketModal();
+      quickTicketMode = true;
+      showStep('recap');
+    } catch (e) {
+      const errEl = document.getElementById('modalQuickTicketErr');
+      if (errEl) {
+        errEl.textContent = 'Chargement impossible: ' + e.message;
+        errEl.style.display = 'block';
+      }
+    }
+  }
+  // Expose for inline button handler
+  window.loadTicketInfo = loadTicketInfo;
+
+  // Trigger loading on Enter will be attached when modal opens
+
   // Recherche en temps r?el dans le modal
   if (quickInput) {
     let _qTimer;
+    // Empêcher la suppression du préfixe 'BL' et caler le curseur après
+    const enforceCaret = () => {
+      try {
+        const pos = Math.max(2, quickInput.selectionStart || 0);
+        if ((quickInput.selectionStart || 0) < 2) quickInput.setSelectionRange(pos, pos);
+      } catch(e) {}
+    };
+    quickInput.addEventListener('focus', enforceCaret);
+    quickInput.addEventListener('click', enforceCaret);
+    quickInput.addEventListener('keyup', enforceCaret);
+    quickInput.addEventListener('beforeinput', (e)=>{
+      const s = quickInput.selectionStart || 0;
+      const epos = quickInput.selectionEnd || 0;
+      const type = e.inputType || '';
+      // Bloquer les suppressions qui touchent le préfixe
+      if ((type === 'deleteContentBackward' && s <= 2 && epos <= 2) ||
+          (type === 'deleteContentForward' && s < 2) ||
+          (type === 'deleteByCut' && s < 2)) {
+        e.preventDefault();
+        enforceCaret();
+      }
+    });
+    quickInput.addEventListener('keydown', (e)=>{
+      const s = quickInput.selectionStart || 0;
+      const epos = quickInput.selectionEnd || 0;
+      if ((e.key === 'Backspace' && s <= 2 && epos <= 2) ||
+          (e.key === 'Delete' && s < 2)) {
+        e.preventDefault();
+        enforceCaret();
+      }
+      if (e.key === 'ArrowLeft' && s <= 2) {
+        e.preventDefault();
+        try { quickInput.setSelectionRange(2,2); } catch(_e) {}
+      }
+    });
     quickInput.addEventListener('input', () => {
       clearTimeout(_qTimer);
       _qTimer = setTimeout(() => {
-        const q = (quickInput.value || '').trim();
+        // Enforce 'BL' prefix and numeric suffix for comfort
+        let v = (quickInput.value || '').toString();
+        v = v.toUpperCase();
+        if (!v.startsWith('BL')) v = 'BL' + v.replace(/[^0-9]/g, '');
+        else v = 'BL' + v.slice(2).replace(/[^0-9]/g, '');
+        if (quickInput.value !== v) quickInput.value = v;
+        const q = v.trim();
         searchQuickBL(q);
+        enforceCaret();
       }, 300);
+    });
+  }
+
+  // Strong guards to keep 'BL' prefix non-removable across devices/keyboards
+  function attachQuickBlGuards(){
+    const qi = document.getElementById('modalQuickBlInput');
+    if (!qi || qi.dataset.blGuard === '1') return;
+    qi.dataset.blGuard = '1';
+    const normalize = ()=>{
+      let v = (qi.value || '').toString().toUpperCase();
+      if (!v.startsWith('BL')) v = 'BL' + v.replace(/[^0-9]/g,'');
+      else v = 'BL' + v.slice(2).replace(/[^0-9]/g,'');
+      if (qi.value !== v) {
+        qi.value = v;
+        try { const len = v.length; qi.setSelectionRange(len, len); } catch(e){}
+      }
+    };
+    const ensureCaret = ()=>{
+      try {
+        if ((qi.selectionStart||0) < 2) qi.setSelectionRange(2,2);
+      } catch(e){}
+    };
+    qi.addEventListener('focus', ()=>{ normalize(); setTimeout(ensureCaret, 0); });
+    qi.addEventListener('click', ensureCaret);
+    qi.addEventListener('keyup', ensureCaret);
+    qi.addEventListener('paste', (e)=>{
+      e.preventDefault();
+      const txt = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+      qi.value = 'BL' + String(txt).replace(/[^0-9]/g,'');
+      normalize(); ensureCaret();
+    });
+    qi.addEventListener('beforeinput', (e)=>{
+      const s = qi.selectionStart||0, epos = qi.selectionEnd||0; const t = e.inputType||'';
+      if ((t==='deleteContentBackward' && s<=2 && epos<=2) || (t==='deleteContentForward' && s<2) || (t==='deleteByCut' && s<2)) {
+        e.preventDefault(); ensureCaret();
+      }
+    });
+    qi.addEventListener('keydown', (e)=>{
+      const s = qi.selectionStart||0, epos = qi.selectionEnd||0;
+      if ((e.key==='Backspace' && s<=2 && epos<=2) || (e.key==='Delete' && s<2)) { e.preventDefault(); ensureCaret(); }
+      if (e.key==='ArrowLeft' && s<=2) { e.preventDefault(); try { qi.setSelectionRange(2,2); } catch(e){} }
+    });
+    qi.addEventListener('input', ()=>{ normalize(); ensureCaret(); });
+    document.addEventListener('selectionchange', function selGuard(){
+      if (document.activeElement === qi) ensureCaret();
     });
   }
 
@@ -1679,6 +1907,11 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       let j;
       try { j = JSON.parse(txt); } catch(parseErr) { throw new Error('Serveur: ' + txt.substring(0,200)); }
       if (!res.ok || !j.ok) throw new Error(j.error || ('HTTP '+res.status));
+      if (j.already_signed) {
+        if (errEl) { errEl.textContent = 'Ce BL est déjà signé.'; errEl.style.display = 'block'; }
+        quickMode = false;
+        return;
+      }
       quickSurveyId = j.id;
       quickPreviewUrl = j.preview_url || null;
       quickMode = true;
@@ -1732,6 +1965,11 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       let j;
       try { j = JSON.parse(txt); } catch(parseErr) { throw new Error('Serveur: ' + txt.substring(0,200)); }
       if (!res.ok || !j.ok) throw new Error(j.error || ('HTTP '+res.status));
+      if (j.already_signed) {
+        if (errEl) { errEl.textContent = 'Ce BL est déjà signé.'; errEl.style.display = 'block'; }
+        quickMode = false;
+        return;
+      }
       quickSurveyId = j.id;
       quickPreviewUrl = j.preview_url || null;
 
@@ -1845,9 +2083,19 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         if (!quickSurveyId || !quickDoc) {
           throw new Error('Document non initialisé.');
         }
+        // Submit in hidden iframe to keep kiosk page
+        let blFrame = document.getElementById('blSubmitFrame');
+        if (!blFrame) {
+          blFrame = document.createElement('iframe');
+          blFrame.id = 'blSubmitFrame';
+          blFrame.name = 'blSubmitFrame';
+          blFrame.style.display = 'none';
+          document.body.appendChild(blFrame);
+        }
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = BASE + '/front/traitement.php';
+        form.target = 'blSubmitFrame';
         const addField = (name, val) => { const i = document.createElement('input'); i.type='hidden'; i.name=name; i.value=val; form.appendChild(i); };
         addField('REPORT_ID', '0');
         // For quick-sign, use BL from server (may include client suffix like survey.form.php)
@@ -1857,18 +2105,130 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         addField('url', png);
         addField('name', signer);
         addField('email', signerEmail);
-        const techVal = (document.getElementById("modalTechnician") ? document.getElementById("modalTechnician").value : (document.getElementById("technician") ? document.getElementById("technician").value : ""));
+        let techVal = '';
+        const blSel = document.getElementById('modalBlTechnicianSelect');
+        if (blSel && blSel.value) {
+          techVal = blSel.value; // login (u.name) to match RP/GLPI exact lookups
+        } else {
+          const tTxt = document.getElementById('modalTechnician');
+          const tFallback = document.getElementById('technician');
+          if (tTxt && tTxt.value) techVal = tTxt.value; else if (tFallback && tFallback.value) techVal = tFallback.value;
+        }
         addField("technician", techVal);
         addField('mailtoclient', '1');
         if (window.GLPI_CSRF_TOKEN) addField('_glpi_csrf_token', window.GLPI_CSRF_TOKEN);
         document.body.appendChild(form);
         form.submit();
+        // Feedback + reset
+        sendOk.textContent = 'Signature enregistrée avec succès.';
+        sendOk.style.display = 'block';
+        setTimeout(function(){ resetToWaiting(true); }, 3000);
       } catch(e) {
         console.error('Quick send error:', e);
         sendErr.textContent = 'Envoi impossible (rapide): ' + e.message;
         sendErr.style.display = 'block';
       }
     }, true); // phase de capture
+  }
+
+  // Capture for Quick Ticket mode -> submit to RP plugin without leaving page
+  if (typeof sendBtn !== 'undefined' && sendBtn && sendBtn.addEventListener) {
+    sendBtn.addEventListener('click', async function(ev){
+      if (!quickTicketMode) return;
+      ev.preventDefault();
+      if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+      if (ev.stopPropagation) ev.stopPropagation();
+
+      // Validations
+      const blank = document.createElement('canvas'); blank.width = canvas.width; blank.height = canvas.height;
+      if (canvas.toDataURL() === blank.toDataURL()){
+        sendErr.textContent = 'Veuillez signer dans la zone.';
+        sendErr.style.display = 'block';
+        return;
+      }
+      const signerInput = document.getElementById('signer');
+      if (!signerInput.value.trim()) {
+        sendErr.textContent = 'Veuillez saisir votre nom et prénom.';
+        sendErr.style.display = 'block';
+        return;
+      }
+      if (!quickTicketId || !quickTicketInfo) {
+        sendErr.textContent = 'Ticket non initialisé.';
+        sendErr.style.display = 'block';
+        return;
+      }
+
+      try {
+        const png = canvas.toDataURL('image/png');
+        const signer = document.getElementById('signer').value || '';
+        const signerEmailRaw = document.getElementById('signerEmail').value || (window.TABLET_CLIENT_EMAIL || '');
+        const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(signerEmailRaw).trim());
+        const signerEmail = emailOk ? String(signerEmailRaw).trim() : '';
+        let techId = '';
+        if (quickTicketTechSel && quickTicketTechSel.value) techId = quickTicketTechSel.value;
+
+        // Build form targeting hidden iframe
+        let frame = document.getElementById('rpSubmitFrame');
+        if (!frame) {
+          frame = document.createElement('iframe');
+          frame.id = 'rpSubmitFrame';
+          frame.name = 'rpSubmitFrame';
+          frame.style.display = 'none';
+          document.body.appendChild(frame);
+        }
+        const form = document.createElement('form');
+        form.method = 'POST';
+        // Post directly to RP generator (restores previous working flow)
+        form.action = (window.RP_WEBDIR || '/glpi/plugins/rp') + '/front/cripdf.form.php';
+        form.target = 'rpSubmitFrame';
+        const addField = (name, val) => { const i = document.createElement('input'); i.type='hidden'; i.name=name; i.value=(val==null?'':String(val)); form.appendChild(i); };
+        // (no device fields needed for direct RP post)
+        addField('REPORT_ID', String(quickTicketId));
+        addField('Form', 'FormRapport');
+        addField('url', png);
+        addField('name', signer);
+        addField('email', signerEmail);
+        // Only send mail when email provided
+        addField('mailtoclient', signerEmail ? '1' : '0');
+        // RP color scheme selection requires this; default to first palette
+        addField('entity_parrent', 'entity_parrent1');
+        if (window.GLPI_CSRF_TOKEN) addField('_glpi_csrf_token', window.GLPI_CSRF_TOKEN);
+        if (techId) {
+          addField('technician', techId);
+          addField('users_id_tech', techId);
+        }
+        // Description
+        addField('CHECK_DESCRIPTION_TICKET', 'check');
+        if (quickTicketInfo.ticket_description) {
+          addField('DESCRIPTION_TICKET', quickTicketInfo.ticket_description);
+        } else if (quickTicketInfo.ticket_title) {
+          addField('DESCRIPTION_TICKET', quickTicketInfo.ticket_title);
+        } else {
+          addField('DESCRIPTION_TICKET', '');
+        }
+        // Tasks (include all we received)
+        if (Array.isArray(quickTicketInfo.tasks)) {
+          quickTicketInfo.tasks.forEach(t => {
+            const tid = t.id; if (!tid) return;
+            addField('tasks_pdf_' + tid, 'check');
+            if (t.content) addField('TASKS_DESCRIPTION' + tid, t.content);
+            if (t.date) addField('tasks_date_' + tid, t.date);
+            if (t.author) addField('tasks_name_' + tid, t.author);
+            if (typeof t.time !== 'undefined') addField('tasks_time_' + tid, String(t.time || 0));
+          });
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+
+        sendOk.style.display = 'block';
+        setTimeout(function(){ resetToWaiting(true); }, 3000);
+      } catch(e) {
+        console.error('Quick ticket send error:', e);
+        sendErr.textContent = 'Envoi impossible (ticket): ' + e.message;
+        sendErr.style.display = 'block';
+      }
+    }, true);
   }
 
   sendBtn.addEventListener('click', async () => {
@@ -1940,7 +2300,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       sendOk.style.display = 'block';
       
       // Après succès, attendre 3 secondes puis retourner à l'écran d'attente
-      setTimeout(resetToWaiting, 3000);
+      setTimeout(function(){ resetToWaiting(true); }, 3000);
       
     } catch (e) {
       console.error('Send error:', e);
@@ -1962,14 +2322,85 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       <div class="form-card">
         <div class="form-label">Technicien</div>
         <div class="form-content" style="margin-bottom:10px;">
-          <input id="modalTechnician" type="text" class="form-input" placeholder="Nom du technicien">
+          <select id="modalBlTechnicianSelect" class="form-input" style="width:100%">
+            <option value="">— Sélectionner —</option>
+            <?php
+              try {
+                $ids = PluginGestionConfig::getInstance()->RemoteSignatureUsers();
+                if (is_array($ids) && count($ids) > 0) {
+                  $ids = array_filter(array_map('intval', $ids));
+                  if (!empty($ids)) {
+                    $in = implode(',', $ids);
+                    $resU = $DB->query("SELECT id, name, realname, firstname FROM glpi_users WHERE is_deleted = 0 AND id IN ($in) ORDER BY realname, firstname, name");
+                    if ($resU) {
+                      while ($u = $DB->fetchassoc($resU)) {
+                        $label = trim(($u['realname'] ?? '') . ' ' . ($u['firstname'] ?? ''));
+                        if ($label === '') { $label = $u['name'] ?? ('#'.$u['id']); }
+                        $uidlogin = htmlspecialchars((string)($u['name'] ?? ''), ENT_QUOTES, 'UTF-8');
+                        $labelOut = Html::entities_deep($label . ($u['name'] ? ' ('.$u['name'].')' : ''));
+                        echo '<option value="'.$uidlogin.'">'.$labelOut.'</option>';
+                      }
+                    }
+                  }
+                }
+              } catch (Throwable $e) {}
+            ?>
+          </select>
         </div>
         <div class="form-label">Recherche BL (ex: BL199550)</div>
         <div class="form-content">
-          <input id="modalQuickBlInput" type="text" class="form-input" placeholder="Ex: BL199550" style="width:100%;">
+          <input id="modalQuickBlInput" type="text" inputmode="numeric" pattern="[0-9]*" value="BL" class="form-input" placeholder="Ex: BL199550" style="width:100%;">
           <div id="modalQuickBlErr" class="alert alert-error" style="display:none; margin-top:8px;"></div>
           <div id="modalQuickBlResults" style="border:1px solid #e9ecef;border-radius:8px;padding:8px;max-height:280px;overflow:auto; margin-top:10px;"></div>
           
+        </div>
+  </div>
+  </div>
+  </div>
+  <!-- Quick Ticket Modal -->
+  <div id="quickTicketModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000;">
+    <div style="max-width:700px; margin:60px auto; background:#fff; border-radius:8px; padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:600; font-size:16px;">Signature Ticket</div>
+        <button type="button" id="closeQuickTicketBtn" class="btn">Fermer</button>
+      </div>
+      <div class="form-card">
+        <div class="form-label">Technicien</div>
+        <div class="form-content" style="margin-bottom:10px;">
+          <select id="modalTicketTechnicianSelect" class="form-input" style="width:100%">
+            <option value="">— Sélectionner —</option>
+            <?php
+              try {
+                $ids = PluginGestionConfig::getInstance()->RemoteSignatureUsers();
+                if (is_array($ids) && count($ids) > 0) {
+                  $ids = array_filter(array_map('intval', $ids));
+                  if (!empty($ids)) {
+                    $in = implode(',', $ids);
+                    $resU = $DB->query("SELECT id, name, realname, firstname FROM glpi_users WHERE is_deleted = 0 AND id IN ($in) ORDER BY realname, firstname, name");
+                    if ($resU) {
+                      while ($u = $DB->fetchassoc($resU)) {
+                        $label = trim(($u['realname'] ?? '') . ' ' . ($u['firstname'] ?? ''));
+                        $login = (string)($u['name'] ?? '');
+                        if ($label === '') $label = $login !== '' ? $login : ('#'.$u['id']);
+                        $uid = (int)$u['id'];
+                        $labelOut = Html::entities_deep($label . ($login ? ' ('.$login.')' : ''));
+                        echo '<option value="'.$uid.'">'.$labelOut.'</option>';
+                      }
+                    }
+                  }
+                }
+              } catch (Throwable $e) {}
+            ?>
+          </select>
+        </div>
+        <div class="form-label">ID du Ticket</div>
+        <div class="form-content" style="margin-bottom:10px;">
+          <input id="modalQuickTicketInput" type="number" inputmode="numeric" pattern="[0-9]*" step="1" min="1" class="form-input" placeholder="Ex: 1234" style="width:100%;" />
+          <div id="modalQuickTicketErr" class="alert alert-error" style="display:none; margin-top:8px;"></div>
+          <div id="modalQuickTicketPreview" style="border:1px solid #e9ecef;border-radius:8px;padding:8px;max-height:280px;overflow:auto; margin-top:10px; display:none;"></div>
+        </div>
+        <div class="form-content" style="text-align:right;">
+          <button type="button" class="btn" onclick="(function(){ var v=document.getElementById('modalQuickTicketInput').value.trim(); if(v){ (window.loadTicketInfo||function(){}) (v); } })();">Charger</button>
         </div>
       </div>
     </div>
@@ -2041,9 +2472,3 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   });
 })();
 </script>
-
-
-
-
-
-

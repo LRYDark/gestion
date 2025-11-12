@@ -108,14 +108,21 @@ if ($save === 'Sage') {
 
 // Déduplication par BL
 $bl_esc = $DB->escape($pdf_filename);
-$check = $DB->query("SELECT id, doc_url FROM `glpi_plugin_gestion_surveys` WHERE bl = '$bl_esc' LIMIT 1");
+$check = $DB->query("SELECT id, doc_url, signed FROM `glpi_plugin_gestion_surveys` WHERE bl = '$bl_esc' LIMIT 1");
 if ($check && $DB->numrows($check) === 1) {
    $row = $DB->fetchassoc($check);
    $preview = $row['doc_url'] ?? '';
    if ($preview && strpos($preview, 'document.send.php') !== false) {
       $preview = rtrim($rootdoc, '/') . '/front/' . ltrim($preview, '/');
    }
-   q_json_end(200, ['ok' => true, 'exists' => true, 'id' => (int)$row['id'], 'preview_url' => $preview]);
+   $already = (int)($row['signed'] ?? 0) === 1;
+   q_json_end(200, [
+      'ok' => true,
+      'exists' => true,
+      'already_signed' => $already,
+      'id' => (int)$row['id'],
+      'preview_url' => $preview
+   ]);
 }
 
 // Insertion identique à survey.form.php
