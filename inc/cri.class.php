@@ -317,10 +317,10 @@ class PluginGestionCri extends CommonDBTM {
                   echo '        <option value="'.$did.'" data-token="'.$tok.'" data-has-token="'.(!empty($tok) ? '1' : '0').'">'.$label.'</option>';
                }
                
+               echo '      </select>';
                // expose ticket id for JS in a robust way
                $ticket_id_js = isset($ID) ? (int)$ID : 0;
                echo '<input type="hidden" id="remote-ticket-id" value="'.$ticket_id_js.'">';
-               echo '      </select>';
 
                // Alerts after actual DB-backed tokens
                $no_rows = (count($rows) === 0);
