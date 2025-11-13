@@ -368,15 +368,34 @@ function initializeSignature(uniqId) {
         modalIsOpen = true;
         document.documentElement.classList.add("no-scroll");
         modalOverlay.classList.add("active");
+        // A11y: rendre la modale interactive et visible pour les AT
+        modalOverlay.removeAttribute('aria-hidden');
+        modalOverlay.removeAttribute('inert');
+        // Focus initial raisonnable à l'ouverture
+        setTimeout(()=>{
+          const focusTarget = rotateCloseBtn || btnCancel || btnValidate || modalOverlay;
+          if (focusTarget && typeof focusTarget.focus === 'function') { try { focusTarget.focus(); } catch(e){} }
+        }, 0);
         needModalResync = true;
         handleOrientationAndResize();
       });
     }
     function closeModal() {
       modalIsOpen = false;
+      // A11y: si le focus est à l'intérieur, le déplacer hors de la modale
+      try {
+        const ae = document.activeElement;
+        if (ae && modalOverlay && modalOverlay.contains(ae)) {
+          if (btnZoom && typeof btnZoom.focus === 'function') { btnZoom.focus(); }
+          else if (document.body && typeof document.body.focus === 'function') { document.body.focus(); }
+        }
+      } catch(e){}
       modalOverlay.classList.remove("active");
       rotateGate?.classList.remove("show");
       document.documentElement.classList.remove("no-scroll");
+      // A11y: marquer comme caché/inactif
+      modalOverlay?.setAttribute('aria-hidden', 'true');
+      modalOverlay?.setAttribute('inert', '');
     }
     if (btnCancel) btnCancel.addEventListener("click", closeModal);
 
