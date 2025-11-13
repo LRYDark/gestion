@@ -64,7 +64,34 @@ class PluginGestionCri extends CommonDBTM {
       $doc_id  = $DOC->doc_id;
       $DocUrlSharePoint = "";
    
-      $email = $DB->query("SELECT GROUP_CONCAT(email SEPARATOR ',') AS emails FROM ( SELECT DISTINCT u.email AS email FROM glpi_useremails u JOIN glpi_users us ON us.id = u.users_id JOIN glpi_tickets t ON t.id = $ID WHERE us.entities_id = t.entities_id AND u.email IS NOT NULL AND u.email <> '' AND us.is_deleted = 0 UNION SELECT DISTINCT e.email FROM glpi_entities e JOIN glpi_tickets t ON t.entities_id = e.id WHERE t.id = $ID AND e.email IS NOT NULL AND e.email <> '' ) AS mails;")->fetch_object();   
+      //$email = $DB->query("SELECT GROUP_CONCAT(email SEPARATOR ',') AS emails FROM ( SELECT DISTINCT u.email AS email FROM glpi_useremails u JOIN glpi_users us ON us.id = u.users_id JOIN glpi_tickets t ON t.id = $ID WHERE us.entities_id = t.entities_id AND u.email IS NOT NULL AND u.email <> '' AND us.is_deleted = 0 UNION SELECT DISTINCT e.email FROM glpi_entities e JOIN glpi_tickets t ON t.entities_id = e.id WHERE t.id = $ID AND e.email IS NOT NULL AND e.email <> '' ) AS mails;")->fetch_object();   
+      $ticket_id_mails = (int)$ID;
+      $sql = " SELECT GROUP_CONCAT(DISTINCT mails.email SEPARATOR ',') AS emails
+               FROM (
+                  SELECT e.email
+                  FROM glpi_tickets t
+                  JOIN glpi_entities e ON e.id = t.entities_id
+                  WHERE t.id = $ticket_id_mails
+                     AND e.email IS NOT NULL
+                     AND e.email <> ''
+
+                  UNION ALL
+
+                  SELECT ue.email
+                  FROM glpi_tickets t
+                  JOIN glpi_profiles_users pu ON pu.entities_id = t.entities_id
+                  JOIN glpi_users u           ON u.id = pu.users_id
+                  JOIN glpi_useremails ue     ON ue.users_id = u.id
+                  WHERE t.id = $ticket_id_mails
+                     AND u.is_deleted = 0
+                     AND ue.email IS NOT NULL
+                     AND ue.email <> ''
+               ) AS mails;
+               ";
+
+      $res = $DB->query($sql);
+      $email = $res->fetch_object();      
+      
       if(!empty($email->emails)){
          $email = $email->emails;
       }else{
