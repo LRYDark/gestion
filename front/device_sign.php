@@ -158,6 +158,28 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       font-size: 14px;
       color: #2d5a2d;
     }
+    .status-indicator .refresh-btn {
+      margin-left: 8px;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      border: 1px solid #c3e6c3;
+      background: #f6fff6;
+      color: #2d5a2d;
+      cursor: pointer;
+      padding: 0;
+    }
+    .status-indicator .refresh-btn:hover {
+      background: #e8f5e8;
+    }
+    .status-indicator .refresh-btn svg {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
     
     .status-dot {
       width: 8px;
@@ -507,6 +529,41 @@ $plugin_base = $rootdoc . '/plugins/gestion';
 })();
 </script>
 
+<script>
+  // Expose plugin paths for cookie cleanup
+  window.ROOT_DOC = <?= json_encode($rootdoc) ?>;
+  window.PLUGIN_BASE_PATH = <?= json_encode($plugin_base) ?>;
+
+  function forceFullRefresh() {
+    try { sessionStorage.clear(); } catch (e) {}
+    try { localStorage.clear(); } catch (e) {}
+
+    // Try to clear cookies for common paths (root, GLPI root, plugin base)
+    try {
+      var cookies = (document.cookie || '').split(';');
+      var paths = ['/', (window.ROOT_DOC || '/'), ((window.PLUGIN_BASE_PATH || '').replace(/^https?:\/\/[^\/]+/, ''))].filter(function(p){ return !!p; });
+      for (var i = 0; i < cookies.length; i++) {
+        var eq = cookies[i].indexOf('=');
+        var name = (eq > -1 ? cookies[i].substr(0, eq) : cookies[i]).trim();
+        for (var j = 0; j < paths.length; j++) {
+          try {
+            document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=' + paths[j] + ';';
+          } catch (err) {}
+        }
+      }
+    } catch (err) {}
+
+    // Bypass cache by adding a timestamp param
+    try {
+      var url = window.location.href.split('#')[0].replace(/[?&]_refresh=\d+/, '');
+      var sep = url.indexOf('?') === -1 ? '?' : '&';
+      window.location.replace(url + sep + '_refresh=' + Date.now());
+    } catch (err) {
+      window.location.reload();
+    }
+  }
+</script>
+
 <body>
   <header class="header">
     <div class="header-content">
@@ -522,6 +579,14 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       <div class="status-indicator">
         <div class="status-dot"></div>
         <span>Terminal actif</span>
+        <button type="button" class="refresh-btn" onclick="forceFullRefresh()" title="Rafraîchir" aria-label="Rafraîchir">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0114.13-3.36L23 10"></path>
+            <path d="M20.49 15a9 9 0 01-14.13 3.36L1 14"></path>
+          </svg>
+        </button>
       </div>
     </div>
   </header>
