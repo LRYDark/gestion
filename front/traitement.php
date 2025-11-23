@@ -15,7 +15,17 @@ $sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 $doc = new Document();
 
-
+// Ensure optional column to store free-text technician for quick-sign
+try {
+    $table = 'glpi_plugin_gestion_surveys';
+    $chk = $DB->doQuery("SHOW COLUMNS FROM `$table` LIKE 'tech_ext'");
+    if ($chk && $DB->numrows($chk) === 0) {
+        // Best-effort: add column if not exists (safe no-op if lacks perms)
+        @$DB->doQuery("ALTER TABLE `$table` ADD COLUMN `tech_ext` VARCHAR(255) NULL AFTER `users_ext`");
+    }
+} catch (Throwable $e) {
+    // ignore
+}
 
 ///////////////// NEW TEST ////////////////////
     $query = "
@@ -85,6 +95,55 @@ function message($msg, $msgtype){
 $signatureBase64 = $_POST['url'] ?? ''; // Assurez-vous que la variable est définie
 $DOC_NAME = $_POST['DOC'];
 $NAME = $_POST['name'];
+$TECHNICIAN_INPUT = isset($_POST['technician']) ? trim($_POST['technician']) : '';
+$REPORT_ID = isset($_POST['REPORT_ID']) ? (int)$_POST['REPORT_ID'] : 0; // 0 = quick-sign depuis tablette
+$is_quick = ($REPORT_ID === 0);
+
+$tech_id = 0;
+if ($TECHNICIAN_INPUT !== '') {
+    $esc = $DB->escape($TECHNICIAN_INPUT);
+    // 1) correspondances exactes: login, nom, "nom prénom", email
+    $sqlTech = "SELECT u.id
+                FROM glpi_users u
+                LEFT JOIN glpi_useremails ue ON ue.users_id = u.id
+                WHERE u.name = '$esc'
+                   OR u.realname = '$esc'
+                   OR TRIM(CONCAT(u.realname,' ', u.firstname)) = '$esc'
+                   OR TRIM(CONCAT(u.firstname,' ', u.realname)) = '$esc'
+                   OR ue.email = '$esc'
+                LIMIT 1";
+    $resTech = $DB->doQuery($sqlTech);
+    if ($resTech && $DB->numrows($resTech) > 0) {
+        $techrow = $DB->fetchassoc($resTech);
+        $tech_id = (int)$techrow['id'];
+    } else {
+        // 2) fallback: correspondances partielles (LIKE)
+        $like = '%' . $DB->escape($TECHNICIAN_INPUT) . '%';
+        $sqlTech2 = "SELECT u.id
+                     FROM glpi_users u
+                     LEFT JOIN glpi_useremails ue ON ue.users_id = u.id
+                     WHERE u.name LIKE '$like'
+                        OR u.realname LIKE '$like'
+                        OR u.firstname LIKE '$like'
+                        OR CONCAT(u.realname,' ',u.firstname) LIKE '$like'
+                        OR CONCAT(u.firstname,' ',u.realname) LIKE '$like'
+                        OR ue.email LIKE '$like'
+                     LIMIT 1";
+        $resTech2 = $DB->doQuery($sqlTech2);
+        if ($resTech2 && $DB->numrows($resTech2) > 0) {
+            $techrow = $DB->fetchassoc($resTech2);
+            $tech_id = (int)$techrow['id'];
+        }
+    }
+}
+// 3) Si pas de saisie (flux normal), utiliser l'utilisateur de session
+if ($TECHNICIAN_INPUT === '' && $tech_id <= 0) {
+    // Flux normal (pas de saisie): utiliser la session GLPI
+    $tech_id = (int)Session::getLoginUserID();
+}
+// Ne PAS forcer la session en mode signature rapide avec saisie libre
+// Ainsi, si aucun utilisateur ne correspond et que c'est du quick-sign,
+// $tech_id peut rester 0 pour que le PDF affiche la saisie libre.
 $id_document = $_POST['id_document'];
 
 if (empty($_POST['email'])) $_POST['email'] = "vide"; // #GLPI11#
@@ -236,11 +295,21 @@ try {
                 $pdf->Cell(40, 10, date('d/m/Y'));
             }
 
-            if(!empty($config->fields['TechX']) && !empty($config->fields['TechX'])){
-                $tech = getUserName(Session::getLoginUserID());
+            if(!empty($config->fields['TechX']) && !empty($config->fields['TechY'])){
+                // Afficher le nom du technicien
+                // - En signature rapide: si saisie libre et aucun utilisateur trouvé, afficher la saisie
+                // - Sinon: afficher l'utilisateur (trouvé ou session)
+                $tech_name = '';
+                if ($is_quick && $TECHNICIAN_INPUT !== '') {
+                    $tech_name = $TECHNICIAN_INPUT;
+                } else if ((int)$tech_id > 0) {
+                    $tech_name = getUserName($tech_id);
+                } else {
+                    $tech_name = getUserName(Session::getLoginUserID());
+                }
                 $pdf->SetFont('Arial', '', 12);
                 $pdf->SetXY($config->fields['TechX'], $pdf->GetPageHeight() - $config->fields['TechY']); // Position pour "Nom"
-                $pdf->Cell(40, 10, $tech);
+                $pdf->Cell(40, 10, $tech_name);
             }
         }
     }
@@ -336,23 +405,26 @@ if (!str_ends_with($outputPathTemp, '.pdf')) {
 
 if ($pdf->Output('F', $outputPathTemp) === '') {
     $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
-    $tech_id = Session::getLoginUserID();
+    // Ne pas écraser $tech_id s'il provient de la signature rapide
     //$DB->doQuery("UPDATE glpi_plugin_gestion_surveys SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
     $relatedInvoiceToBL = !empty($_POST['relatedInvoiceToBL'])
                           ? strtoupper($_POST['relatedInvoiceToBL'])
-                          : null;
+                          : null;           
+    $updateData = [
+        'signed'             => 1,
+        'date_creation'      => $date,
+        'users_id'           => $tech_id,
+        'users_ext'          => $NAME,
+        'relatedInvoiceToBL' => $relatedInvoiceToBL,
+    ];
+    if ($is_quick && $TECHNICIAN_INPUT !== '') {
+        // store free-text technician if provided (quick-sign only)
+        $updateData['tech_ext'] = $TECHNICIAN_INPUT;
+    }
     $ok = $DB->update(
         'glpi_plugin_gestion_surveys',
-        [
-            'signed'             => 1,
-            'date_creation'      => $date,
-            'users_id'           => $tech_id,
-            'users_ext'          => $NAME,
-            'relatedInvoiceToBL' => $relatedInvoiceToBL,
-        ],
-        [
-            'BL' => $DOC_NAME
-        ]
+        $updateData,
+        [ 'BL' => $DOC_NAME ]
     );
     if ($ok === false) {
         message("Erreur lors de la mise a jours en Base de donnée.", ERROR);
@@ -363,14 +435,15 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
     }
 
+    if ($DOC->tickets_id == 0) {$IdTicket = "Aucun ticket lié";} else { $IdTicket = $DOC->tickets_id; }
     if (!empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1 && !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1) {
         if (!empty($config->fields['CounterInvoiceMail'])){  
 
             if (!empty($_POST['relatedInvoiceToBL'])){
                 $relatedInvoiceToBL = $_POST['relatedInvoiceToBL'];
-                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL <br><br> Mail client : $EMAIL";
+                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
             }else{
-                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Mail client : $EMAIL";
+                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
             }
                 if (!empty($config->fields['ZenDocMail'])){ 
                     $sharepoint->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
@@ -380,7 +453,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         } 
     }else{
         if (!empty($config->fields['ZenDocMail'])){ 
-            $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé", "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL");
+            $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé", "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket");
         }
     }
     // ENVOIE DES MAILS
@@ -426,6 +499,12 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         $fileName = $DOC_NAME; // Nom du fichier après téléversement    
 
         // Étape 3 : Téléverser le fichier
+        // Add Year/Month subfolders to storage path
+        $year = date('Y');
+        $monthIndex = (int)date('n');
+        $monthsFr = [1=>'janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
+        $monthName = $monthsFr[$monthIndex] ?? strtolower(date('F'));
+        $folderPath = rtrim($folderPath, '/'). '/' . $year . '/' . $monthName;
         if ($FolderDes == 'SharePoint'){
             $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPathTemp);
         } 
@@ -434,7 +513,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
 
             // Crée le dossier s’il n’existe pas
             if (!is_dir($destDir)) {
-                mkdir($destDir);
+                @mkdir($destDir, 0755, true);
             }
             // Construire le chemin complet de destination
             $destPath = $destDir . '/' . $fileName;
@@ -482,7 +561,12 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             }
         }
 
-        if ($DB->doQuery("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc, save = '$FolderDes' WHERE id = $id_document")){
+        $name_esc = $DB->escape($NAME);
+        $tech_ext_sql = '';
+        if ($is_quick && $TECHNICIAN_INPUT !== '') {
+            $tech_ext_sql = ", tech_ext = '".$DB->escape($TECHNICIAN_INPUT)."'";
+        }
+        if ($DB->doQuery("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc, save = '$FolderDes', signed = 1, date_creation = NOW(), users_id = $tech_id, users_ext = '$name_esc' $tech_ext_sql WHERE id = $id_document")){
             //unlink($existingPdfPath);
             unlink($signaturePath);
             unlink($outputPathTemp);

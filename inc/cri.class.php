@@ -65,7 +65,34 @@ class PluginGestionCri extends CommonDBTM {
       $doc_id  = $DOC->doc_id;
       $DocUrlSharePoint = "";
    
-      $email = $DB->doQuery("SELECT GROUP_CONCAT(email SEPARATOR ',') AS emails FROM ( SELECT DISTINCT u.email AS email FROM glpi_useremails u JOIN glpi_users us ON us.id = u.users_id JOIN glpi_tickets t ON t.id = $ID WHERE us.entities_id = t.entities_id AND u.email IS NOT NULL AND u.email <> '' AND us.is_deleted = 0 UNION SELECT DISTINCT e.email FROM glpi_entities e JOIN glpi_tickets t ON t.entities_id = e.id WHERE t.id = $ID AND e.email IS NOT NULL AND e.email <> '' ) AS mails;")->fetch_object();   
+      //$email = $DB->doQuery("SELECT GROUP_CONCAT(email SEPARATOR ',') AS emails FROM ( SELECT DISTINCT u.email AS email FROM glpi_useremails u JOIN glpi_users us ON us.id = u.users_id JOIN glpi_tickets t ON t.id = $ID WHERE us.entities_id = t.entities_id AND u.email IS NOT NULL AND u.email <> '' AND us.is_deleted = 0 UNION SELECT DISTINCT e.email FROM glpi_entities e JOIN glpi_tickets t ON t.entities_id = e.id WHERE t.id = $ID AND e.email IS NOT NULL AND e.email <> '' ) AS mails;")->fetch_object();   
+      $ticket_id_mails = (int)$ID;
+      $sql = " SELECT GROUP_CONCAT(DISTINCT mails.email SEPARATOR ',') AS emails
+               FROM (
+                  SELECT e.email
+                  FROM glpi_tickets t
+                  JOIN glpi_entities e ON e.id = t.entities_id
+                  WHERE t.id = $ticket_id_mails
+                     AND e.email IS NOT NULL
+                     AND e.email <> ''
+
+                  UNION ALL
+
+                  SELECT ue.email
+                  FROM glpi_tickets t
+                  JOIN glpi_profiles_users pu ON pu.entities_id = t.entities_id
+                  JOIN glpi_users u           ON u.id = pu.users_id
+                  JOIN glpi_useremails ue     ON ue.users_id = u.id
+                  WHERE t.id = $ticket_id_mails
+                     AND u.is_deleted = 0
+                     AND ue.email IS NOT NULL
+                     AND ue.email <> ''
+               ) AS mails;
+               ";
+
+      $res = $DB->doQuery($sql);
+      $email = $res->fetch_object();  
+      
       if(!empty($email->emails)){
          $email = $email->emails;
       }else{
@@ -106,6 +133,8 @@ class PluginGestionCri extends CommonDBTM {
       $querytask = "SELECT glpi_tickettasks.id FROM glpi_tickettasks INNER JOIN glpi_users ON glpi_tickettasks.users_id = glpi_users.id WHERE tickets_id = $ID $is_private";
       $resulttask = $DB->doQuery($querytask);
       $numbertask = $DB->numrows($resulttask);
+      // Si le document est déjà signé, ne pas afficher l'avertissement lié aux tâches
+      if ($DOC->signed != 0) { $numbertask = 1; }
       if($numbertask == 0){
             echo "<div class='alert alert-important alert-warning d-flex'>";
             echo "<b>" . __("Attention : vous êtes sur le point de signer un bon de livraison sans avoir ajouté de tâche au ticket associé.") . "</b></div>";
@@ -289,10 +318,10 @@ class PluginGestionCri extends CommonDBTM {
                   echo '        <option value="'.$did.'" data-token="'.$tok.'" data-has-token="'.(!empty($tok) ? '1' : '0').'">'.$label.'</option>';
                }
                
+               echo '      </select>';
                // expose ticket id for JS in a robust way
                $ticket_id_js = isset($ID) ? (int)$ID : 0;
                echo '<input type="hidden" id="remote-ticket-id" value="'.$ticket_id_js.'">';
-               echo '      </select>';
 
                // Alerts after actual DB-backed tokens
                $no_rows = (count($rows) === 0);
@@ -630,6 +659,18 @@ class PluginGestionCri extends CommonDBTM {
                if (btn) btn.classList.remove("open");
             }
          });
+         
+         // Mitigation: certaines extensions injectent un content_script qui écoute 'focusin' et peuvent
+         // casser sur ce champ. On stoppe la propagation du focusin uniquement pour #mail.
+         try {
+            document.addEventListener('focusin', function(ev){
+               var emailInput = document.getElementById('mail');
+               if (emailInput && ev.target === emailInput) {
+                  // Empêcher d'autres gestionnaires globaux de recevoir ce focusin
+                  if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+               }
+            }, true);
+         } catch(e) {}
          </script>
          <?php
 
@@ -643,8 +684,8 @@ class PluginGestionCri extends CommonDBTM {
                         echo '<label for="CounterInvoiceClient">Règlement effectué</label>';
                      echo '</div>'; 
                                           
-                     echo '<div class="email-combo-container">'; // new 2
-                        echo '<input type="text" id="mail" name="relatedInvoiceToBL" class="email-input" placeholder="Document relative au bon de livraison (facultatif)">';
+                     echo '<div class="bl-doc-container">'; // new 2 (ne pas réutiliser le conteneur d\'email)
+                        echo '<input type="text" id="relatedInvoiceToBL" name="relatedInvoiceToBL" class="email-input" placeholder="Document relative au bon de livraison (facultatif)">';
                      echo '</div>';                    
                echo '</div>';
             echo '</div>';
@@ -673,8 +714,7 @@ class PluginGestionCri extends CommonDBTM {
                      
                      echo '<div class="email-combo-container">';
                         // Input principal (celui qui sera envoyé)
-                        echo '<input type="email" id="mail" name="email" class="email-input" value="' . htmlspecialchars($defaultEmail) . '" placeholder="Email du client" onclick="showEmailDropdown()" onfocus="showEmailDropdown()">';
-                        
+                        echo '<input type="email" id="mail" name="email" class="email-input" value="' . htmlspecialchars($defaultEmail) . '" placeholder="Email du client" onclick="showEmailDropdown()" onfocus="showEmailDropdown()" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false">';                        
                         // Bouton dropdown si on a des emails
                         if (!empty($emailArray)) {
                            echo '<button type="button" class="email-dropdown-btn" onclick="toggleEmailDropdown()"><i class="fa-solid fa-chevron-down"></i></button>';
@@ -721,7 +761,14 @@ class PluginGestionCri extends CommonDBTM {
             echo '<div class="signed-details">';
                echo '<p><strong>Signé le :</strong> ' . $DOC->date_creation . '</p>';
                echo '<p><strong>Par :</strong> ' . $DOC->users_ext . '</p>';
-               echo '<p><strong>Livré par :</strong> ' . getUserName($DOC->users_id) . '</p>';
+               // Quick-sign may store a free-text technician in tech_ext
+               $tech_display = '';
+               if (isset($DOC->tech_ext) && strlen(trim((string)$DOC->tech_ext)) > 0) {
+                  $tech_display = $DOC->tech_ext;
+               } else {
+                  $tech_display = getUserName($DOC->users_id);
+               }
+               echo '<p><strong>Livré par :</strong> ' . $tech_display . '</p>';
                if (!empty($DOC->relatedInvoiceToBL)){
                   echo '<p><strong>Document lié :</strong> ' . $DOC->relatedInvoiceToBL . '</p>';
                }
@@ -783,7 +830,21 @@ class PluginGestionCri extends CommonDBTM {
                   // Fermer une modale de signature si elle est ouverte
                   const openedModal = document.querySelector('.signature-modal[aria-hidden="false"], .signature-modal:not([aria-hidden])');
                   if (openedModal) {
+                     try {
+                        const ae = document.activeElement;
+                        if (ae && openedModal.contains(ae)) {
+                           // Renvoyer le focus sur le bouton d'action hors modale
+                           if (goBottomBtn && typeof goBottomBtn.focus === 'function') {
+                              goBottomBtn.focus();
+                           } else if (document.body && typeof document.body.focus === 'function') {
+                              document.body.focus();
+                           }
+                        }
+                     } catch(e) {}
+                     // Fermer proprement la modale interne
+                     openedModal.classList.remove('active');
                      openedModal.setAttribute('aria-hidden', 'true');
+                     openedModal.setAttribute('inert', '');
                   }
                   document.documentElement.classList.remove('no-scroll');
                   document.body.classList.remove('no-scroll');
