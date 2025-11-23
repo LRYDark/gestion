@@ -16,6 +16,34 @@ header('Content-Type: application/json; charset=UTF-8');
 global $DB, $CFG_GLPI;
 $config  = PluginGestionConfig::getInstance();
 $rootdoc = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');
+$httpProto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+$serverHost = $_SERVER['SERVER_NAME'] ?? 'localhost';
+
+/**
+ * Uniformise l'URL de pr�visualisation PDF (corrige l'ancien chemin /ajax/view_pdf.php et ajoute le root_doc).
+ */
+function gestion_build_pdf_preview(string $docId, string $rootdoc, string $proto, string $host): string {
+   $rootdoc = rtrim($rootdoc, '/');
+   $base = $proto . $host . $rootdoc . '/plugins/gestion';
+   $token = hash('sha256', $docId . date('Y-m-d') . 'GLPI_PDF_SECRET_2024');
+   return $base . '/view_pdf.php?id=' . rawurlencode($docId) . '&token=' . $token;
+}
+
+/**
+ * Nettoie une URL stock�e (ancien format) pour pointer sur /view_pdf.php avec le bon root_doc.
+ */
+function gestion_sanitize_preview_url(string $url, string $rootdoc, string $proto, string $host): string {
+   if ($url === '') return $url;
+   $rootdoc = rtrim($rootdoc, '/');
+   $url = str_replace('/ajax/view_pdf.php', '/view_pdf.php', $url);
+   // Si l'URL ne contient pas le root_doc, on le force (utile si GLPI est dans /glpi11).
+   $expected = $rootdoc . '/plugins/gestion/view_pdf.php';
+   if (strpos($url, $expected) === false) {
+      $query = parse_url($url, PHP_URL_QUERY);
+      $url = $proto . $host . $expected . ($query ? ('?' . $query) : '');
+   }
+   return $url;
+}
 
 function q_json_end(int $status, array $payload): void {
    if (!headers_sent()) header('Content-Type: application/json; charset=UTF-8');
@@ -84,15 +112,8 @@ if ($save === 'Sage') {
       // Fallback en cas d'erreur: identifiant BL seul
       $pdf_filename = preg_replace('/\.pdf$/i','', $folder);
    }
-
-   // URL d'aperçu via view_pdf.php avec token temporaire
-   $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-   $base  = $proto . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR;
-   $doc_id_for_token = $folder;
-   $secret_key = 'GLPI_PDF_SECRET_2024';
-   $today = date('Y-m-d');
-   $temp_token = hash('sha256', $doc_id_for_token . $today . $secret_key);
-   $doc_url = $base . "/ajax/view_pdf.php?id=" . rawurlencode($folder) . "&token=" . $temp_token;
+   // URL d'aperçu via view_pdf.php avec token temporaire (chemin public)
+   $doc_url = gestion_build_pdf_preview($folder, $rootdoc, $httpProto, $serverHost);
 
 } else if ($save === 'Local') {
    // folder = chemin commençant par _plugins/... et filename = fichier
@@ -117,6 +138,8 @@ if ($check && $DB->numrows($check) === 1) {
    if ($preview && strpos($preview, 'document.send.php') !== false) {
       $preview = rtrim($rootdoc, '/') . '/front/' . ltrim($preview, '/');
    }
+   // Corrige les anciens chemins /ajax/view_pdf.php et ajoute le root_doc si manquant
+   $preview = gestion_sanitize_preview_url($preview, $rootdoc, $httpProto, $serverHost);
    $already = (int)($row['signed'] ?? 0) === 1;
    q_json_end(200, [
       'ok' => true,
@@ -150,3 +173,6 @@ if ($id_res && $DB->numrows($id_res) === 1) {
 }
 
 q_json_end(500, ['ok' => false, 'error' => 'db_select_failed']);
+
+
+
