@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Minimal tablette page: waits for a pending request, then shows a recap, then signature pad.
  * Public page (no login). Validates device_id + token from the plugin's devices table.
@@ -1373,18 +1373,14 @@ $plugin_base = $rootdoc . '/plugins/gestion';
           decodedUrl = decodedUrl.replace(/&#38;/g, '&');
         }
         
-        // ✅ Déclaration en amont
-        let googleViewerUrl = '';
-        // Vérifier si l'URL contient document.send.php
-        if (decodedUrl.includes('document.send.php')) {
-          // Affichage direct via iframe
-          googleViewerUrl = decodedUrl;
-        } else {
-          // Sinon, passer par Google Docs Viewer
-          googleViewerUrl = `https://docs.google.com/viewerng/viewer?url=${encodeURIComponent(decodedUrl)}&embedded=true`;
-        }
-
-        html += `    <iframe src="${escapeHtml(googleViewerUrl)}" class="pdf-viewer" frameborder="0" title="Visualisation PDF"></iframe>`;
+        html += `
+            <object
+              data="${escapeHtml(decodedUrl)}#view=FitH"
+              type="application/pdf"
+              class="pdf-viewer pdf-responsive"
+              style="width:100%;border:1px solid #dee2e6;border-radius:6px;height:clamp(350px,75vh,500px);">
+              Votre navigateur ne peut pas afficher le PDF.
+            </object>`; 
         
         html += `    <div style="margin-top: 8px; text-align: center;">`;
         html += `      <a href="${escapeHtml(decodedUrl)}" target="_blank" class="external-link">`;
