@@ -126,7 +126,8 @@ if ($check && $DB->numrows($check) === 1) {
 }
 
 // Insertion identique à survey.form.php
-$sql = "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`)
+$doc_date_sql = ((int)$signed === 1) ? 'NOW()' : 'NULL';
+$sql = "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`)
         VALUES (" . (int)$tickets_id . ",
                 " . (int)$entities_id . ",
                 " . (is_null($tracker) ? 'NULL' : ("'" . $DB->escape($tracker) . "'")) . ",
@@ -135,7 +136,9 @@ $sql = "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, 
                 " . (int)$signed . ",
                 0,
                 '" . $DB->escape($doc_url) . "',
-                '" . $DB->escape($save) . "')";
+                '" . $DB->escape($save) . "',
+                NOW(),
+                $doc_date_sql)";
 
 if (!$DB->query($sql)) {
    q_json_end(500, ['ok' => false, 'error' => 'db_insert_failed', 'db_error' => $DB->error()]);

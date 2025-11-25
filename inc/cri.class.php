@@ -754,7 +754,8 @@ class PluginGestionCri extends CommonDBTM {
             echo '</div>';
             
             echo '<div class="signed-details">';
-               echo '<p><strong>Signé le :</strong> ' . $DOC->date_creation . '</p>';
+               $signature_date = !empty($DOC->doc_date) ? $DOC->doc_date : $DOC->date_creation;
+               echo '<p><strong>Signé le :</strong> ' . $signature_date . '</p>';
                echo '<p><strong>Par :</strong> ' . $DOC->users_ext . '</p>';
                // Quick-sign may store a free-text technician in tech_ext
                $tech_display = '';

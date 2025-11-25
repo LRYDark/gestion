@@ -406,13 +406,13 @@ if (!str_ends_with($outputPathTemp, '.pdf')) {
 if ($pdf->Output('F', $outputPathTemp) === '') {
     $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
     // Ne pas écraser $tech_id s'il provient de la signature rapide
-    //$DB->query("UPDATE glpi_plugin_gestion_surveys SET signed = 1,date_creation = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
+    //$DB->query("UPDATE glpi_plugin_gestion_surveys SET signed = 1, doc_date = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
     $relatedInvoiceToBL = !empty($_POST['relatedInvoiceToBL'])
                         ? strtoupper($_POST['relatedInvoiceToBL'])
                         : null;
     $updateData = [
         'signed'             => 1,
-        'date_creation'      => $date,
+        'doc_date'           => $date,
         'users_id'           => $tech_id,
         'users_ext'          => $NAME,
         'relatedInvoiceToBL' => $relatedInvoiceToBL,
@@ -567,7 +567,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         if ($is_quick && $TECHNICIAN_INPUT !== '') {
             $tech_ext_sql = ", tech_ext = '".$DB->escape($TECHNICIAN_INPUT)."'";
         }
-        if ($DB->query("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc, save = '$FolderDes', signed = 1, date_creation = NOW(), users_id = $tech_id, users_ext = '$name_esc' $tech_ext_sql WHERE id = $id_document")){
+        if ($DB->query("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc, save = '$FolderDes', signed = 1, doc_date = NOW(), users_id = $tech_id, users_ext = '$name_esc' $tech_ext_sql WHERE id = $id_document")){
             //unlink($existingPdfPath);
             unlink($signaturePath);
             unlink($outputPathTemp);

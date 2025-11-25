@@ -117,7 +117,7 @@ class PluginGestionSurvey extends CommonDBTM {
       $tab[] = [
          'id'                 => '6',
          'table'              => $this->getTable(),
-         'field'              => 'doc_date',
+         'field'              => 'date_creation',
          'name'               => __('Date de création'),
          'datatype'           => 'datetime'
       ];
@@ -125,7 +125,7 @@ class PluginGestionSurvey extends CommonDBTM {
       $tab[] = [
          'id'                 => '7',
          'table'              => $this->getTable(),
-         'field'              => 'date_creation',
+         'field'              => 'doc_date',
          'name'               => __('Date de signature'),
          'datatype'           => 'datetime',
          'massiveaction'      => false

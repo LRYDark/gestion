@@ -106,7 +106,8 @@ if (isset($_POST["add"])) {
    }
          
    if ($valid == true){
-      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`) VALUES ($tickets_id, $entities_id, '$tracker', '$pdf_folder', '$pdf_filename', $pdf_signed, $NewDoc, '$doc_url', '$pdf_save');";
+      $doc_date_sql = ((int)$pdf_signed === 1) ? "NOW()" : "NULL";
+      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`) VALUES ($tickets_id, $entities_id, '$tracker', '$pdf_folder', '$pdf_filename', $pdf_signed, $NewDoc, '$doc_url', '$pdf_save', NOW(), $doc_date_sql);";
       if($DB->doQuery($query)){
          $idsurvey = $DB->query("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename'")->fetch_object();
          $idsurvey = $idsurvey->id;

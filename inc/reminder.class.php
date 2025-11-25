@@ -187,8 +187,8 @@ class PluginGestionReminder extends CommonDBTM {
                if ($row['count'] == 0) {                  
                   // Ajouter le fichier en base
                   $sql = $isSigned
-                     ? "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, signed, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned, '$tracker')"
-                     : "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, tracker) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', '$tracker')";
+                     ? "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, signed, tracker, date_creation) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned, '$tracker', NOW())"
+                     : "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, tracker, date_creation) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', '$tracker', NOW())";
                      
                   if ($DB->query($sql)) {
                      // Récupérer l'ID de la dernière ligne insérée avec LAST_INSERT_ID()
