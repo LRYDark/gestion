@@ -297,20 +297,8 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     }
     
     .pdf-viewer {
-      width: 100%;
-      height: 300px;
-      border: 1px solid #dee2e6;
-      border-radius: 6px;
       background: #ffffff;
       margin-top: 12px;
-    }
-    
-    @media (min-width: 768px) {
-      .pdf-viewer { height: 400px; }
-    }
-    
-    @media (min-width: 1024px) {
-      .pdf-viewer { height: 500px; }
     }
     
     .external-link {
@@ -507,8 +495,6 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       font-size: 14px;
       color: #6c757d;
     }
-
-    .is-standalone .external-link { display: none !important; }
   </style>
 </head>
 
@@ -1378,13 +1364,13 @@ $plugin_base = $rootdoc . '/plugins/gestion';
               data="${escapeHtml(decodedUrl)}#view=FitH"
               type="application/pdf"
               class="pdf-viewer pdf-responsive"
-              style="width:100%;border:1px solid #dee2e6;border-radius:6px;height:clamp(350px,75vh,500px);">
+              style="width:100%;border:1px solid #dee2e6;border-radius:6px;height:calc(100vh - 200px);max-height:900px;">
               Votre navigateur ne peut pas afficher le PDF.
-            </object>`; 
-        
+            </object>`;
+
         html += `    <div style="margin-top: 8px; text-align: center;">`;
         html += `      <a href="${escapeHtml(decodedUrl)}" target="_blank" class="external-link">`;
-        html += `        🔗 Ouvrir en plein écran`;
+        html += `        📄 Ouvrir le document en version complète`;
         html += `      </a>`;
         html += `    </div>`;
       } else {
