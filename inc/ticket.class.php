@@ -195,7 +195,8 @@ class PluginGestionTicket extends CommonDBTM {
                $out .= "</td>";
 
                $out .= "<td class='center'>";
-               $out .= Html::convDate($data["date_creation"]);
+               $signatureDate = !empty($data["doc_date"]) ? $data["doc_date"] : ($data["date_creation"] ?? null);
+               $out .= Html::convDate($signatureDate);
                $out .= "</td>";
 
                $showuserlink = 0;

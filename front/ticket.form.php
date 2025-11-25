@@ -93,14 +93,12 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             }
             if(empty($existedoc->bl)){
                 if ($config->mode() == 0){
-                    if (!$DB->doQuery("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker, save) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker', '$save')")) {
-                        Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
+                    if (!$DB->doQuery("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker', '$save', NOW(), NULL)")) {                        Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
                         $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                     }
                 }
                 if ($config->mode() == 1){
-                    if (!$DB->doQuery("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker, save) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($file_path)."', '$fileUrl', '$tracker', '$save')")) {
-                        Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
+                    if (!$DB->doQuery("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($file_path)."', '$fileUrl', '$tracker', '$save', NOW(), NULL)")) {                        Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
                         $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                     }
                 }
@@ -116,8 +114,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
 
                     if($NewDoc = $doc->add($input)){
                         $fileUrl = 'document.send.php?docid='.$NewDoc;
-                        if (!$DB->doQuery("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_id, doc_url, tracker, save) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$NewDoc', '$fileUrl', '$tracker', '$save')")) {
-                            Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
+                        if (!$DB->doQuery("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_id, doc_url, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$NewDoc', '$fileUrl', '$tracker', '$save', NOW(), NULL)")) {                            Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
                             $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                         }
                     }

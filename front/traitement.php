@@ -412,7 +412,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
                           : null;           
     $updateData = [
         'signed'             => 1,
-        'date_creation'      => $date,
+        'doc_date'      => $date,
         'users_id'           => $tech_id,
         'users_ext'          => $NAME,
         'relatedInvoiceToBL' => $relatedInvoiceToBL,
@@ -566,8 +566,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         if ($is_quick && $TECHNICIAN_INPUT !== '') {
             $tech_ext_sql = ", tech_ext = '".$DB->escape($TECHNICIAN_INPUT)."'";
         }
-        if ($DB->doQuery("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc, save = '$FolderDes', signed = 1, date_creation = NOW(), users_id = $tech_id, users_ext = '$name_esc' $tech_ext_sql WHERE id = $id_document")){
-            //unlink($existingPdfPath);
+        if ($DB->doQuery("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc, save = '$FolderDes', signed = 1, doc_date = NOW(), users_id = $tech_id, users_ext = '$name_esc' $tech_ext_sql WHERE id = $id_document")){            //unlink($existingPdfPath);
             unlink($signaturePath);
             unlink($outputPathTemp);
         }
