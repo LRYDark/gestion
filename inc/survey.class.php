@@ -64,7 +64,6 @@ class PluginGestionSurvey extends CommonDBTM {
     */
    function rawSearchOptions() {
       
-
       $tab = [];
 
       $tab[] = [
@@ -87,7 +86,8 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => 'glpi_tickets',
          'field'              => 'id',
          'name'               => __('Tickets'),
-         'datatype'           => 'dropdown'
+         'datatype'           => 'dropdown',
+         'massiveaction'      => false
       ];
 
       $tab[] = [
@@ -95,7 +95,8 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => 'glpi_entities',
          'field'              => 'completename',
          'name'               => __('Entity'),
-         'datatype'           => 'dropdown'
+         'datatype'           => 'dropdown',
+         'massiveaction'      => true
       ];
 
       $tab[] = [
@@ -103,7 +104,8 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => $this->getTable(),
          'field'              => 'doc_url',
          'name'               => __('Url du document'),
-         'datatype'           => 'text'
+         'datatype'           => 'text',
+         'massiveaction'      => true
       ];
 
       $tab[] = [
@@ -111,7 +113,8 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => $this->getTable(),
          'field'              => 'signed',
          'name'               => __('Signé'),
-         'datatype'           => 'bool'
+         'datatype'           => 'bool',
+         'massiveaction'      => true
       ];
 
       $tab[] = [
@@ -119,7 +122,8 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => $this->getTable(),
          'field'              => 'date_creation',
          'name'               => __('Date de création'),
-         'datatype'           => 'datetime'
+         'datatype'           => 'datetime',
+         'massiveaction'      => true
       ];
 
       $tab[] = [
@@ -128,7 +132,7 @@ class PluginGestionSurvey extends CommonDBTM {
          'field'              => 'doc_date',
          'name'               => __('Date de signature'),
          'datatype'           => 'datetime',
-         'massiveaction'      => false
+         'massiveaction'      => true
       ];
 
       $tab[] = [
@@ -146,7 +150,7 @@ class PluginGestionSurvey extends CommonDBTM {
          'field'              => 'name',
          'name'               => __('Users'),
          'datatype'           => 'dropdown',
-         'massiveaction'      => false
+         'massiveaction'      => true
       ];
 
       $tab[] = [
@@ -155,7 +159,7 @@ class PluginGestionSurvey extends CommonDBTM {
          'field'              => 'tracker',
          'name'               => __('Tracker'),
          'datatype'           => 'text',
-         'massiveaction'      => false
+         'massiveaction'      => true
       ];
 
       $tab[] = [
@@ -164,7 +168,7 @@ class PluginGestionSurvey extends CommonDBTM {
          'field'              => 'relatedInvoiceToBL',
          'name'               => __('Document lié'),
          'datatype'           => 'text',
-         'massiveaction'      => false
+         'massiveaction'      => true
       ];
 
       return $tab;

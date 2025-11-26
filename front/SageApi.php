@@ -77,8 +77,8 @@ function parseDocument(string $docId): array
         }
     }
 
-    // Tracker (ex : "PE")
-    if (preg_match('/Tracker\s*:\s*([A-Z0-9-]+)/ui', $text, $m)) {
+    // Tracker (ex : "PI + EC")
+    if (preg_match('/Tracker\s*:\s*([^\r\n]+)/ui', $text, $m)) {
         $out['tracker'] = trim($m[1]);
     }
 
