@@ -249,7 +249,8 @@ try {
                     $label = iconv('UTF-8', 'windows-1252//TRANSLIT', $label_utf8);
                 } else {
                     // Fallback ISO-8859-1 : remplace l’em-dash
-                    $label = utf8_decode(str_replace(['–','—'], '-', $label_utf8));
+                    //$label = utf8_decode(str_replace(['–','—'], '-', $label_utf8));
+                    $label = iconv('UTF-8', 'ISO-8859-1//TRANSLIT', str_replace(['–','—'], '-', $label_utf8));
                 }
 
                 // Style vert
@@ -287,7 +288,7 @@ try {
             if(!empty($config->fields['SignataireX']) && !empty($config->fields['SignataireY'])){
                 $pdf->SetFont('Arial', '', 10);
                 $pdf->SetXY($config->fields['SignataireX'], $pdf->GetPageHeight() - $config->fields['SignataireY']); // Position pour "Nom"
-                $pdf->Cell(40, 10, $NAME);
+                $pdf->Cell(40, 10, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $NAME));
             }
 
             if(!empty($config->fields['DateX']) && !empty($config->fields['DateY'])){
