@@ -308,7 +308,7 @@ try {
                 } else {
                     $tech_name = getUserName(Session::getLoginUserID());
                 }
-                $pdf->SetFont('Arial', '', 12);
+                $pdf->SetFont('Arial', '', 9);
                 $pdf->SetXY($config->fields['TechX'], $pdf->GetPageHeight() - $config->fields['TechY']); // Position pour "Nom"
                 $pdf->Cell(40, 10, $tech_name);
             }

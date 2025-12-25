@@ -1840,7 +1840,7 @@ class PluginGestionConfig extends CommonDBTM
                   `SignataireY` FLOAT NOT NULL DEFAULT '56.5',
                   `DateX` FLOAT NOT NULL DEFAULT '20',
                   `DateY` FLOAT NOT NULL DEFAULT '51.3',
-                  `TechX` FLOAT NOT NULL DEFAULT '150',
+                  `TechX` FLOAT NOT NULL DEFAULT '145',
                   `TechY` FLOAT NOT NULL DEFAULT '37',
                   PRIMARY KEY (`id`)
          ) ENGINE=InnoDB DEFAULT CHARSET={$default_charset} COLLATE={$default_collation} ROW_FORMAT=DYNAMIC;";
