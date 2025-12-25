@@ -321,8 +321,44 @@ class PluginGestionSurvey extends CommonDBTM {
             echo "<tr class='tab_bg_1'><td></td></tr>";
             echo "<tr class='tab_bg_1'><td></td></tr>";
 
+         $availableEmails = [];
+         $defaultEmail    = '';
+         if (!empty($this->fields['tickets_id'])) {
+            $ticket_id_mails = (int)$this->fields['tickets_id'];
+            $sql = " SELECT GROUP_CONCAT(DISTINCT mails.email SEPARATOR ',') AS emails
+                     FROM (
+                        SELECT e.email
+                        FROM glpi_tickets t
+                        JOIN glpi_entities e ON e.id = t.entities_id
+                        WHERE t.id = $ticket_id_mails
+                           AND e.email IS NOT NULL
+                           AND e.email <> ''
+
+                        UNION ALL
+
+                        SELECT ue.email
+                        FROM glpi_tickets t
+                        JOIN glpi_profiles_users pu ON pu.entities_id = t.entities_id
+                        JOIN glpi_users u           ON u.id = pu.users_id
+                        JOIN glpi_useremails ue     ON ue.users_id = u.id
+                        WHERE t.id = $ticket_id_mails
+                           AND u.is_deleted = 0
+                           AND ue.email IS NOT NULL
+                           AND ue.email <> ''
+                     ) AS mails;";
+            $resEmail = $DB->doQuery($sql);
+            if ($resEmail) {
+               $emailsObj = $resEmail->fetch_object();
+               if (!empty($emailsObj->emails)) {
+                  $availableEmails = array_values(array_unique(array_filter(array_map('trim', explode(',', $emailsObj->emails)))));
+                  $defaultEmail    = $availableEmails[0] ?? '';
+               }
+            }
+         }
+
          $signed = '';
          if ($this->fields['signed'] == 1){
+            $modalId = 'gestionResendMailModal'.$ID;
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __('Informations sur le document <strong>Signé</strong> :') ."</td>";
                echo "<td>";
@@ -331,6 +367,8 @@ class PluginGestionSurvey extends CommonDBTM {
                      'class'   => 'btn btn-secondary',
                      'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
                ]);
+               echo "&nbsp;";
+               echo '<button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#'.$modalId.'">Renvoyer par mail</button>';
             echo "</td></tr>";
          }else{
             echo "<tr class='tab_bg_1'>";
@@ -348,6 +386,149 @@ class PluginGestionSurvey extends CommonDBTM {
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __('Document lié : <strong>'.$this->fields['relatedInvoiceToBL'].'</strong> ')."</td>";
             echo "</tr>";
+         }
+                  if ($this->fields['signed'] == 1 && isset($modalId)) {
+            $csrfToken = Session::getNewCSRFToken();
+            $ajaxUrl   = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/') . '/plugins/gestion/ajax/cri.php';
+            ?>
+            <div class="modal fade" id="<?php echo $modalId; ?>" tabindex="-1" aria-labelledby="<?php echo $modalId; ?>Label" aria-hidden="true">
+               <div class="modal-dialog">
+                  <div class="modal-content">
+                     <div class="modal-header">
+                        <h5 class="modal-title" id="<?php echo $modalId; ?>Label">Renvoyer le document signé</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                     </div>
+                     <div class="modal-body">
+                        <form id="gestion-resend-mail-form-<?php echo $ID; ?>">
+                           <input type="hidden" name="_glpi_csrf_token" value="<?php echo $csrfToken; ?>">
+                           <input type="hidden" name="survey_id" value="<?php echo $ID; ?>">
+                           <div class="mb-3">
+                              <label class="form-label">Déstinataire principal</label>
+                              <input type="text" name="to" class="form-control" value="<?php echo Html::entities_deep($defaultEmail); ?>" placeholder="email1@example.com, email2@example.com">
+                              <?php if (!empty($availableEmails)) { ?>
+                                 <div class="mt-2">
+                                    <small class="text-muted">Suggestions :</small>
+                                    <div class="mt-1" style="display:flex;flex-wrap:wrap;gap:6px;">
+                                       <?php foreach ($availableEmails as $email) { ?>
+                                          <button type="button" class="btn btn-light btn-sm gestion-mail-suggestion" data-target="<?php echo $modalId; ?>" data-value="<?php echo Html::entities_deep($email); ?>"><?php echo Html::entities_deep($email); ?></button>
+                                       <?php } ?>
+                                    </div>
+                                 </div>
+                              <?php } ?>
+                           </div>
+                           <div class="mb-3">
+                              <label class="form-label">Copie (CC)</label>
+                              <input type="text" name="cc" class="form-control" placeholder="Emails en copie, separes par des virgules">
+                           </div>
+                        </form>
+                        <div class="text-danger gestion-send-mail-feedback" style="display:none;"></div>
+                     </div>
+                     <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                        <button type="button" id="gestion-send-mail-btn-<?php echo $ID; ?>" class="btn btn-primary gestion-send-mail-submit" data-target="<?php echo $modalId; ?>">Envoyer le mail</button>
+                     </div>
+                  </div>
+               </div>
+            </div>
+            <?php
+
+            $script = <<<JAVASCRIPT
+               function gestionSendMail(modalId, ajaxUrl, surveyId, csrfToken) {
+                  var modalEl = document.getElementById(modalId);
+                  var feedback = modalEl ? modalEl.querySelector('.gestion-send-mail-feedback') : null;
+                  var toInput = modalEl ? modalEl.querySelector('input[name="to"]') : null;
+                  var ccInput = modalEl ? modalEl.querySelector('input[name="cc"]') : null;
+                  if (!modalEl || !toInput || !ccInput) {
+                     return false;
+                  }
+
+                  var hasRecipient = (toInput.value || '').trim() !== '' || (ccInput.value || '').trim() !== '';
+                  if (!hasRecipient) {
+                     if (feedback) {
+                        feedback.className = 'text-danger gestion-send-mail-feedback';
+                        feedback.style.display = 'block';
+                        feedback.textContent = 'Merci de saisir au moins un destinataire.';
+                     }
+                     return false;
+                  }
+
+                  var btns = modalEl.querySelectorAll('.gestion-send-mail-submit');
+                  btns.forEach(function(b){ b.setAttribute('disabled','disabled'); });
+                  if (feedback) {
+                     feedback.style.display = 'block';
+                     feedback.className = 'text-muted gestion-send-mail-feedback';
+                     feedback.textContent = 'Envoi en cours...';
+                  }
+
+                  var payload = new URLSearchParams();
+                  payload.append('action', 'sendMail');
+                  payload.append('survey_id', surveyId);
+                  payload.append('to', toInput.value);
+                  payload.append('cc', ccInput.value);
+                  payload.append('_glpi_csrf_token', csrfToken);
+
+                  fetch(ajaxUrl, {
+                     method: 'POST',
+                     credentials: 'same-origin',
+                     headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-GLPI-CSRF-Token': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                     },
+                     body: payload.toString()
+                  }).then(function(res){
+                     return res.text().then(function(text){
+                        return { status: res.status, text: text };
+                     });
+                  }).then(function(resObj){
+                     var resp = null;
+                     try { resp = JSON.parse(resObj.text); } catch(e) { resp = null; }
+                     if (feedback) {
+                        if (resp && resp.ok) {
+                           var modalInstance = null;
+                           if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                              modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                           }
+                           if (modalInstance) {
+                              modalInstance.hide();
+                           }
+                           window.location.reload();
+                        } else {
+                           feedback.className = 'text-danger gestion-send-mail-feedback';
+                           feedback.textContent = (resp && resp.message) ? resp.message : "Erreur lors de l'envoi.";
+                        }
+                     }
+                  }).catch(function(err){
+                     if (feedback) {
+                        feedback.className = 'text-danger gestion-send-mail-feedback';
+                        feedback.textContent = "Erreur lors de l'envoi.";
+                     }
+                  }).finally(function(){
+                     btns.forEach(function(b){ b.removeAttribute('disabled'); });
+                  });
+
+                  return false;
+               }
+
+               (function(){
+                  var ajaxUrl   = "{$ajaxUrl}";
+                  var modalId   = "{$modalId}";
+                  var surveyId  = "{$ID}";
+                  var csrfToken = "{$csrfToken}";
+                  var btnId     = "gestion-send-mail-btn-{$ID}";
+                  var btn       = document.getElementById(btnId);
+
+                  if (btn) {
+                     btn.addEventListener('click', function(ev){
+                        ev.preventDefault();
+                        gestionSendMail(modalId, ajaxUrl, surveyId, csrfToken);
+                     });
+                  } else {
+                  }
+               })();
+            JAVASCRIPT;
+
+            echo Html::scriptBlock($script);
          }
       }else{
          $script = <<<JAVASCRIPT
