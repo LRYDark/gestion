@@ -418,6 +418,11 @@ class PluginGestionSurvey extends CommonDBTM {
                echo "<td>" . __('Document lié : <strong>'.$this->fields['relatedInvoiceToBL'].'</strong> ')."</td>";
             echo "</tr>";
          }
+         if(!empty($this->fields['comment'])){
+            echo "<tr class='tab_bg_1'>";
+               echo "<td>" . __('Commentaire : <strong>'.$this->fields['comment'].'</strong> ')."</td>";
+            echo "</tr>";
+         }
          if ($this->fields['signed'] == 1 && isset($modalId)) {
             $csrfToken = Session::getNewCSRFToken();
             $ajaxUrl   = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/') . '/plugins/gestion/ajax/cri.php';
