@@ -1446,7 +1446,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     }
 
     // Autres champs dynamiques (pour le futur)
-    const displayedKeys = ['document_name', 'document_url', 'entity_name', 'client_name', 'ticket_title', 'ticket_description', 'ticket_tasks', 'total_seconds', 'description', 'url', 'total_time','client_email'];
+    const displayedKeys = ['document_name', 'document_url', 'entity_name', 'client_name', 'ticket_title', 'ticket_description', 'ticket_tasks', 'total_seconds', 'description', 'url', 'total_time','client_email','document_linked'];
     Object.keys(parameters).forEach(key => {
       if (!displayedKeys.includes(key) && parameters[key] && typeof parameters[key] === 'string') {
         html += `<div class="section">`;
@@ -1960,6 +1960,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       }
       quickSurveyId = j.id;
       quickPreviewUrl = j.preview_url || null;
+      quickDoc.relatedInvoiceToBL = j.relatedInvoiceToBL || null;
       quickMode = true;
       // Prefer BL returned by server (may include client suffix)
       if (j.bl) { quickDoc.bl = String(j.bl).trim(); }
