@@ -668,6 +668,16 @@ class PluginGestionCri extends CommonDBTM {
          </script>
          <?php
 
+         //$docLinked = isset($DOC->relatedInvoiceToBL) ? 'Document lié : '.$DOC->relatedInvoiceToBL : '';
+         echo '<div class="form-card">';
+            echo '<div class="form-label">Commentaire</div>';
+            echo '<textarea id="comment"
+                           name="comment"
+                           class="email-input"
+                           placeholder="Commentaire éventuel lié au règlement comptoir ou autre..."
+                           rows="3">'./*htmlspecialchars($docLinked).*/'</textarea>';
+         echo '</div>';
+
          // === Facturation comptoir (si activée) ===
          if ($config->fields['CounterInvoice'] == 1 && isCurrentUserAuthorized($config->fields['CounterInvoiceUsers'])) { // NEW
             echo '<div class="form-card">';
@@ -677,10 +687,6 @@ class PluginGestionCri extends CommonDBTM {
                         echo '<input type="checkbox" name="CounterInvoiceClient" value="1" id="CounterInvoiceClient">';
                         echo '<label for="CounterInvoiceClient">Règlement effectué</label>';
                      echo '</div>';      
-                     
-                     echo '<div class="bl-doc-container">'; // new 2 (ne pas réutiliser le conteneur d\'email)
-                        echo '<input type="text" id="relatedInvoiceToBL" name="relatedInvoiceToBL" class="email-input" placeholder="Document relative au bon de livraison (facultatif)">';
-                     echo '</div>';  
                echo '</div>';
             echo '</div>';
          }

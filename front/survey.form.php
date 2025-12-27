@@ -59,12 +59,16 @@ if (isset($_POST["add"])) {
    $search_pdf = $_POST['search_pdf'];
    $pdf_save = $_POST['pdf_save'];
    $pdf_signed = $_POST['pdf_signed'];
+   $tracker = null;
+   $relatedInvoiceToBL = null;
 
    $pdf_filename = $DB->escape($pdf_filename); // sécurise la requête SQL
 
    if ($pdf_save == 'Sage'){
       $fields = parseDocument($search_pdf);
       $pdf_filename = $search_pdf.'_'.str_replace(' ', '_', $fields['client']);
+      $tracker = $fields['tracker'];
+      $relatedInvoiceToBL = $fields['relatedInvoiceToBL'] ?? null;
    }
 
    $query = "SELECT bl, id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename' LIMIT 1";
@@ -105,13 +109,14 @@ if (isset($_POST["add"])) {
       }
    }
          
-   if ($valid == true){
-      $doc_date_sql = ((int)$pdf_signed === 1) ? "NOW()" : "NULL";
-      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`) VALUES ($tickets_id, $entities_id, '$tracker', '$pdf_folder', '$pdf_filename', $pdf_signed, $NewDoc, '$doc_url', '$pdf_save', NOW(), $doc_date_sql);";
-      if($DB->doQuery($query)){
-         $idsurvey = $DB->query("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename'")->fetch_object();
-         $idsurvey = $idsurvey->id;
-         message('Document ajouté : <a href="survey.form.php?id='.$idsurvey.'">Gestion - ID '.$idsurvey.'</a>.', INFO);
+      if ($valid == true){
+         $doc_date_sql = ((int)$pdf_signed === 1) ? "NOW()" : "NULL";
+         $relatedInvoiceSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'".$DB->escape($relatedInvoiceToBL)."'" : "NULL";
+         $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`) VALUES ($tickets_id, $entities_id, '$tracker', $relatedInvoiceSql, '$pdf_folder', '$pdf_filename', $pdf_signed, $NewDoc, '$doc_url', '$pdf_save', NOW(), $doc_date_sql);";
+         if($DB->doQuery($query)){
+            $idsurvey = $DB->query("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename'")->fetch_object();
+            $idsurvey = $idsurvey->id;
+            message('Document ajouté : <a href="survey.form.php?id='.$idsurvey.'">Gestion - ID '.$idsurvey.'</a>.', INFO);
       }else{
          message("Erreur de l'ajout du document", ERROR);
       }

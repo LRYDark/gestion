@@ -1381,6 +1381,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       html += `</div>`;
     }
 
+
     // Ticket (VERSION FUTURE)
     if (parameters.ticket_title) {
       html += `<div class="section">`;

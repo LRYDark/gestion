@@ -910,7 +910,10 @@ class PluginGestionSharepoint extends CommonDBTM {
 
         // Générer un nombre entier aléatoire entre 1 et 100
         $nombreAleatoire = rand(1, 100000);
-        $tracker = '';
+        $result = [
+            'tracker'            => null,
+            'relatedInvoiceToBL' => null,
+        ];
         $config         = new PluginGestionConfig();
         $extracteur     = $config->extract();
 
@@ -935,7 +938,7 @@ class PluginGestionSharepoint extends CommonDBTM {
                     require_once($autoloadPath);
                 } else {
                     file_put_contents($log, "autoload introuvable : $autoloadPath\n", FILE_APPEND);
-                    $tracker = NULL;
+                    $result['tracker'] = NULL;
                 }
                 
                 if (class_exists('Smalot\PdfParser\Parser')) {
@@ -963,7 +966,12 @@ class PluginGestionSharepoint extends CommonDBTM {
                         
                         // Rechercher le texte dynamique entre "Instruction de livraison" et "Tracker"
                         if (preg_match("$extracteur", $cleanText, $matches)) {
-                            $tracker = trim($matches[1]);
+                            $result['tracker'] = trim($matches[1]);
+                        }
+
+                        // Récupérer un numéro de devis éventuel (Document lié)
+                        if (preg_match('/N[°oº]?(?:\\s*de)?\\s*Devis\\s*:\\s*([A-Z0-9-]+)/i', $cleanText, $matches)) {
+                            $result['relatedInvoiceToBL'] = strtoupper(trim($matches[1]));
                         }
                     } catch (Exception $e) {
                         file_put_contents($log, "Erreur lors de l'extraction du tracker depuis le text brut : " . $e->getMessage() . "\n", FILE_APPEND);
@@ -971,17 +979,17 @@ class PluginGestionSharepoint extends CommonDBTM {
 
                 } else {
                     file_put_contents($log, "Classe Parser NON disponible\n", FILE_APPEND);
-                    $tracker = NULL;
+                    $result['tracker'] = NULL;
                 }
             
             } catch (Exception $e) {
                 file_put_contents($log, "Erreur général de récupération du tracker  : " . $e->getMessage() . "\n", FILE_APPEND);
-                $tracker = NULL;
+                $result['tracker'] = NULL;
             }
 
             unlink($destinationPath);
         }
-        return $tracker;
+        return $result;
     }
 
     public function MailSend($EMAIL, $gabarit_id, $outputPath = NULL, $message = NULL, $id_survey = NULL, $tracker = NULL, $url = NULL, $fileName = NULL, $SubjectMail = NULL, $BodyMail = NULL) {

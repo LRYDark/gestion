@@ -60,6 +60,7 @@ function parseDocument(string $docId): array
         'date_iso'  => null,
         'tracker'   => null,
         'client'    => null,
+        'relatedInvoiceToBL' => null,
         // 'raw_text' => $rawText, // décommente si tu veux le texte entier
     ];
 
@@ -80,6 +81,11 @@ function parseDocument(string $docId): array
     // Tracker (ex : "PI + EC")
     if (preg_match('/Tracker\s*:\s*([^\r\n]+)/ui', $text, $m)) {
         $out['tracker'] = trim($m[1]);
+    }
+
+    // Numéro de devis éventuel
+    if (preg_match('/N[°oº]?(?:\s*de)?\s*Devis\s*:\s*([A-Z0-9-]+)/ui', $text, $m)) {
+        $out['relatedInvoiceToBL'] = strtoupper(trim($m[1]));
     }
 
     // --- Client : on prend la 1re ligne après "BON DE LIVRAISON" qui ne contient pas de chiffre

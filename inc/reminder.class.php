@@ -172,10 +172,14 @@ class PluginGestionReminder extends CommonDBTM {
                }
                
                if($config->ExtractYesNo() == 1){
-                  $tracker = $sharepoint->GetTrackerPdfDownload($valueAfterRoot.'/'.$fileName.'.pdf');
+                  $pdfData = $sharepoint->GetTrackerPdfDownload($valueAfterRoot.'/'.$fileName.'.pdf');
+                  $tracker = is_array($pdfData) ? ($pdfData['tracker'] ?? null) : $pdfData;
+                  $relatedInvoiceToBL = is_array($pdfData) ? ($pdfData['relatedInvoiceToBL'] ?? null) : null;
                   if (empty($tracker)){
                      $tracker = NULL;
                   }
+               } else {
+                  $relatedInvoiceToBL = null;
                }
 
                // Vérifier si le fichier existe déjà en base
@@ -186,9 +190,10 @@ class PluginGestionReminder extends CommonDBTM {
 
                if ($row['count'] == 0) {                  
                   // Ajouter le fichier en base
+                  $relatedSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'".$DB->escape($relatedInvoiceToBL)."'" : "NULL";
                   $sql = $isSigned
-                     ? "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, signed, tracker, date_creation) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned, '$tracker', NOW())"
-                     : "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, tracker, date_creation) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', '$tracker', NOW())";
+                     ? "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, signed, relatedInvoiceToBL, tracker, date_creation) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $isSigned, $relatedSql, '$tracker', NOW())"
+                     : "INSERT INTO glpi_plugin_gestion_surveys (entities_id, url_bl, bl, doc_url, doc_date, relatedInvoiceToBL, tracker, date_creation) VALUES ($entitiesid, '$valueAfterRoot', '$fileName', '".$DB->escape($webUrl)."', '$createdDateTime', $relatedSql, '$tracker', NOW())";
                      
                   if ($DB->query($sql)) {
                      // Récupérer l'ID de la dernière ligne insérée avec LAST_INSERT_ID()

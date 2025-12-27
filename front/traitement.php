@@ -408,16 +408,31 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     $date = date('Y-m-d H:i:s'); // Format : 2024-11-02 14:30:45
     // Ne pas écraser $tech_id s'il provient de la signature rapide
     //$DB->query("UPDATE glpi_plugin_gestion_surveys SET signed = 1, doc_date = '$date', users_id = $tech_id, users_ext = '$NAME' WHERE BL = '$DOC_NAME'");
-    $relatedInvoiceToBL = !empty($_POST['relatedInvoiceToBL'])
-                        ? strtoupper($_POST['relatedInvoiceToBL'])
-                        : null;
+    $docLinked = isset($DOC->relatedInvoiceToBL) ? $DOC->relatedInvoiceToBL : null;
+    $rawLinkedFromPost = isset($_POST['relatedInvoiceToBL']) ? $_POST['relatedInvoiceToBL'] : null;
+    $relatedInvoiceToBL = ($rawLinkedFromPost !== null && $rawLinkedFromPost !== '')
+                        ? strtoupper($rawLinkedFromPost)
+                        : $docLinked;
+
+    $rawComment = trim($_POST['comment'] ?? '');
+    $hasComment = !empty($rawComment);
+    $isCounterInvoicePaid = (
+        !empty($config->fields['CounterInvoice'])
+        && (int)$config->fields['CounterInvoice'] === 1
+        && !empty($_POST['CounterInvoiceClient'])
+        && (int)$_POST['CounterInvoiceClient'] === 1
+    );
     $updateData = [
         'signed'             => 1,
         'doc_date'           => $date,
         'users_id'           => $tech_id,
         'users_ext'          => $NAME,
         'relatedInvoiceToBL' => $relatedInvoiceToBL,
+        'comment'            => $hasComment ? $rawComment : null,
     ];
+    if ($isCounterInvoicePaid) {
+        $updateData['paid'] = 1;
+    }
     if ($is_quick && $TECHNICIAN_INPUT !== '') {
         // store free-text technician if provided (quick-sign only)
         $updateData['tech_ext'] = $TECHNICIAN_INPUT;
@@ -437,15 +452,17 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     }
 
     if ($DOC->tickets_id == 0) {$IdTicket = "Aucun ticket lié";} else { $IdTicket = $DOC->tickets_id; }
-    if (!empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1 && !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1) {
+    if ($isCounterInvoicePaid) {
         if (!empty($config->fields['CounterInvoiceMail'])){              
             if (empty($DOC->doc_id)) {$DOC->doc_id = "Aucun ticket lié";}
 
-            if (!empty($_POST['relatedInvoiceToBL'])){
-                $relatedInvoiceToBL = $_POST['relatedInvoiceToBL'];
+            if (!empty($relatedInvoiceToBL)){
                 $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
             }else{
                 $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
+            }
+            if ($hasComment) {
+                $ValueForSigned .= " <br><br> Commentaire : " . $rawComment;
             }
                 if (!empty($config->fields['ZenDocMail'])){ 
                     $sharepoint->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
@@ -455,7 +472,14 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         } 
     }else{
         if (!empty($config->fields['ZenDocMail'])){ 
-            $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé", "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket");
+            $ValueForSigned = "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
+            if (!empty($relatedInvoiceToBL)) {
+                $ValueForSigned .= " <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL";
+            }
+            if ($hasComment) {
+                $ValueForSigned .= " <br><br> Commentaire : " . $rawComment;
+            }
+            $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé", $ValueForSigned);
         }
     }
     // ENVOIE DES MAILS

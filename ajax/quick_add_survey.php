@@ -55,6 +55,13 @@ $doc_id      = 0; // Pas d'enregistrement glpi_documents en mode rapide
 $url_bl      = '';
 $doc_url     = '';
 $pdf_filename = $filename;
+$relatedInvoiceToBL = null;
+
+// Utilitaire d'échappement
+$escapeOrNull = function($val) use ($DB) {
+   return ($val !== null && $val !== '') ? "'" . $DB->escape($val) . "'" : "NULL";
+};
+$relatedInvoiceToBL = null;
 
 if ($save === 'Sage') {
    // Pour Sage, folder = docId (ex: BL199550)
@@ -76,6 +83,9 @@ if ($save === 'Sage') {
          }
          if (!empty($fields['tracker'])) {
             $tracker = $fields['tracker'];
+         }
+         if (!empty($fields['relatedInvoiceToBL'])) {
+            $relatedInvoiceToBL = $fields['relatedInvoiceToBL'];
          }
       }
    } catch (Throwable $e) {
@@ -102,13 +112,33 @@ if ($save === 'Sage') {
 } else if ($save === 'SharePoint') {
    $url_bl = $DB->escape($folder);
    $doc_url = $folder;
+   if ($config->ExtractYesNo() == 1) {
+      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
+      $sp = new PluginGestionSharepoint();
+      $fp = rtrim($folder, '/') . '/' . (preg_match('/\.pdf$/i', $filename) ? $filename : ($filename . '.pdf'));
+      try {
+         $extracted = $sp->GetTrackerPdfDownload($fp);
+         if (is_array($extracted)) {
+            if (!empty($extracted['tracker'])) {
+               $tracker = $extracted['tracker'];
+            }
+            if (!empty($extracted['relatedInvoiceToBL'])) {
+               $relatedInvoiceToBL = $extracted['relatedInvoiceToBL'];
+            }
+         } elseif (!empty($extracted)) {
+            $tracker = $extracted;
+         }
+      } catch (Throwable $e) {
+         // silencieux
+      }
+   }
 } else {
    q_json_end(400, ['ok' => false, 'error' => 'unknown_source']);
 }
 
 // Déduplication par BL
 $bl_esc = $DB->escape($pdf_filename);
-$check = $DB->query("SELECT id, doc_url, signed FROM `glpi_plugin_gestion_surveys` WHERE bl = '$bl_esc' LIMIT 1");
+$check = $DB->query("SELECT id, doc_url, signed, relatedInvoiceToBL FROM `glpi_plugin_gestion_surveys` WHERE bl = '$bl_esc' LIMIT 1");
 if ($check && $DB->numrows($check) === 1) {
    $row = $DB->fetchassoc($check);
    $preview = $row['doc_url'] ?? '';
@@ -121,16 +151,18 @@ if ($check && $DB->numrows($check) === 1) {
       'exists' => true,
       'already_signed' => $already,
       'id' => (int)$row['id'],
-      'preview_url' => $preview
+      'preview_url' => $preview,
+      'relatedInvoiceToBL' => $row['relatedInvoiceToBL'] ?? null
    ]);
 }
 
 // Insertion identique à survey.form.php
 $doc_date_sql = ((int)$signed === 1) ? 'NOW()' : 'NULL';
-$sql = "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`)
+$sql = "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`)
         VALUES (" . (int)$tickets_id . ",
                 " . (int)$entities_id . ",
                 " . (is_null($tracker) ? 'NULL' : ("'" . $DB->escape($tracker) . "'")) . ",
+                " . $escapeOrNull($relatedInvoiceToBL) . ",
                 '" . $DB->escape($url_bl) . "',
                 '" . $bl_esc . "',
                 " . (int)$signed . ",
@@ -147,7 +179,7 @@ if (!$DB->query($sql)) {
 $id_res = $DB->query("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$bl_esc' LIMIT 1");
 if ($id_res && $DB->numrows($id_res) === 1) {
    $row = $DB->fetchassoc($id_res);
-   q_json_end(200, ['ok' => true, 'id' => (int)$row['id'], 'preview_url' => $doc_url, 'save' => $save, 'bl' => $pdf_filename]);
+   q_json_end(200, ['ok' => true, 'id' => (int)$row['id'], 'preview_url' => $doc_url, 'save' => $save, 'bl' => $pdf_filename, 'relatedInvoiceToBL' => $relatedInvoiceToBL]);
 }
 
 q_json_end(500, ['ok' => false, 'error' => 'db_select_failed']);

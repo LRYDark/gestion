@@ -41,6 +41,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
     foreach ($items_to_add as $item) {
         $fileExiste = false;
         $save = null;
+        $relatedInvoiceToBL = null;
 
         if ($config->mode() == 0){
             $save = 'SharePoint';
@@ -50,7 +51,9 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             $fileUrl = $sharepoint->getFileUrl($file_path);
 
             if ($sharepoint->checkFileExists($file_path)) $fileExiste = true;
-            $tracker = $sharepoint->GetTrackerPdfDownload($file_path);
+            $pdfData = $sharepoint->GetTrackerPdfDownload($file_path);
+            $tracker = is_array($pdfData) ? ($pdfData['tracker'] ?? null) : $pdfData;
+            $relatedInvoiceToBL = is_array($pdfData) ? ($pdfData['relatedInvoiceToBL'] ?? null) : null;
         }
         if ($config->mode() == 1){
             $save = 'Sage';
@@ -63,6 +66,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             }
             $itemUrl = $item;
             $tracker = $fields['tracker'];
+            $relatedInvoiceToBL = $fields['relatedInvoiceToBL'] ?? null;
         }
         if ($config->mode() == 2){
             $save = 'Local';
@@ -92,13 +96,15 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             }
             if(empty($existedoc->bl)){
                 if ($config->mode() == 0){
-                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', '$tracker', '$save', NOW(), NULL)")) {
+                    $relatedSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'".$DB->escape($relatedInvoiceToBL)."'" : "NULL";
+                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, relatedInvoiceToBL, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$fileUrl', $relatedSql, '$tracker', '$save', NOW(), NULL)")) {
                         Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
                         $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                     }
                 }
                 if ($config->mode() == 1){
-                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($file_path)."', '$fileUrl', '$tracker', '$save', NOW(), NULL)")) {
+                    $relatedSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'".$DB->escape($relatedInvoiceToBL)."'" : "NULL";
+                    if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_url, relatedInvoiceToBL, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($file_path)."', '$fileUrl', $relatedSql, '$tracker', '$save', NOW(), NULL)")) {
                         Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
                         $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                     }
@@ -115,7 +121,8 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
 
                     if($NewDoc = $doc->add($input)){
                         $fileUrl = 'document.send.php?docid='.$NewDoc;
-                        if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_id, doc_url, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$NewDoc', '$fileUrl', '$tracker', '$save', NOW(), NULL)")) {
+                        $relatedSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'".$DB->escape($relatedInvoiceToBL)."'" : "NULL";
+                        if (!$DB->query("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, doc_id, doc_url, relatedInvoiceToBL, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', '$NewDoc', '$fileUrl', $relatedSql, '$tracker', '$save', NOW(), NULL)")) {
                             Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
                             $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
                         }
@@ -130,11 +137,12 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                     $sql = "UPDATE glpi_plugin_gestion_surveys 
                             SET tickets_id = ?, 
                                 url_bl = ?,
-                                tracker = ?
+                                tracker = ?,
+                                relatedInvoiceToBL = ?
                             WHERE bl = ? OR url_bl = ?";
 
                     $stmt = $DB->prepare($sql);
-                    $stmt->execute([$ticketId, $itemUrl, $tracker, $item, $item]);
+                    $stmt->execute([$ticketId, $itemUrl, $tracker, $relatedInvoiceToBL, $item, $item]);
                 }elseif($existedoc->tickets_id != $ticketId){
                     Session::addMessageAfterRedirect(__($DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
                     $success = false;
