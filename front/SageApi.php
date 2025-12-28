@@ -260,8 +260,8 @@ function Montant($doc)
 {
     $montant = [
         // Valeurs de test avec virgule (laisser en chaîne pour éviter la troncature PHP)
-        'TTC' => '11,89',
-        'HT'  => '9,89',
+        'TTC' => 'Fonctionnalité en cours d’intégration',
+        'HT'  => 'Fonctionnalité en cours d’intégration',
     ];
 
     return $montant;
