@@ -61,6 +61,29 @@ if (!$ok) {
 
 // Base path for plugin AJAX
 $plugin_base = $rootdoc . '/plugins/gestion';
+
+// Montants par dÇ¸faut pour le rÇ¸cap rapide (placeholders issus de Sage)
+$quick_amounts = ['HT' => null, 'TTC' => null];
+try {
+   require_once PLUGIN_GESTION_DIR . '/front/SageApi.php';
+   if (function_exists('Montant')) {
+      $m = Montant();
+      if (is_array($m)) {
+         if (isset($m['HT'])) {
+            $quick_amounts['HT'] = $m['HT'];
+         } else if (isset($m['ht'])) {
+            $quick_amounts['HT'] = $m['ht'];
+         }
+         if (isset($m['TTC'])) {
+            $quick_amounts['TTC'] = $m['TTC'];
+         } else if (isset($m['ttc'])) {
+            $quick_amounts['TTC'] = $m['ttc'];
+         }
+      }
+   }
+} catch (Throwable $e) {
+   // silencieux : valeurs facultatives
+}
 ?><!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -519,6 +542,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   // Expose plugin paths for cookie cleanup
   window.ROOT_DOC = <?= json_encode($rootdoc) ?>;
   window.PLUGIN_BASE_PATH = <?= json_encode($plugin_base) ?>;
+  window.QUICK_MONTANT_DEFAULT = <?= json_encode($quick_amounts) ?>;
 
   function forceFullRefresh() {
     try { sessionStorage.clear(); } catch (e) {}
@@ -1487,6 +1511,20 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   function resetToWaiting(fullReload) {
     document.getElementById('signer').value = '';
     document.getElementById('signerEmail').value = '';
+    ensureQuickBlDetailsElements();
+    const quickComment = document.getElementById('quickBlComment');
+    if (quickComment) quickComment.value = '';
+    const quickPaid = document.getElementById('quickBlPaid');
+    if (quickPaid) quickPaid.checked = false;
+    const quickAmountHT = document.getElementById('quickBlAmountHT');
+    if (quickAmountHT) quickAmountHT.textContent = '';
+    const quickAmountTTC = document.getElementById('quickBlAmountTTC');
+    if (quickAmountTTC) quickAmountTTC.textContent = '';
+    if (typeof setQuickAmountDefaults === 'function') {
+      setQuickAmountDefaults(true);
+    }
+    const quickDetailsModal = document.getElementById('quickBlDetailsModal');
+    if (quickDetailsModal) quickDetailsModal.style.display = 'none';
     ctx.clearRect(0,0,canvas.width, canvas.height);
     
     sendErr.style.display = 'none';
@@ -1604,6 +1642,39 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   let quickDoc = null;      // { save, filename, folder, signed }
   let quickSurveyId = null; // id_document dans glpi_plugin_gestion_surveys
   let quickPreviewUrl = null;
+  let pendingQuickSelection = null; // { item, mode: 'v1'|'v2' }
+  let lastQuickSelection = null;    // garde la dernière sélection cliquée
+  let techSelectHandlerAttached = false;
+
+  function ensureTechChangeHandler() {
+    if (techSelectHandlerAttached) return;
+    const techSelectEl = document.getElementById('modalBlTechnicianSelect');
+    if (!techSelectEl) return;
+    techSelectEl.addEventListener('change', function(){
+      const errEl = document.getElementById('modalQuickBlErr');
+      if (errEl) errEl.style.display = 'none';
+      if (techSelectEl.value && techSelectEl.value.trim()) {
+        const pending = pendingQuickSelection || lastQuickSelection;
+        pendingQuickSelection = null;
+        if (pending) {
+          lastQuickSelection = null;
+          if (pending.mode === 'v2') {
+            window.selectQuickResult2(pending.item);
+          } else if (pending.mode === 'v1') {
+            selectQuickResult(pending.item);
+          }
+        } else if (!quickSurveyId) {
+          // Fallback : relancer la recherche pour permettre de recliquer sans modifier le BL
+          const blInput = document.getElementById('modalQuickBlInput');
+          const q = blInput ? (blInput.value || '').trim() : '';
+          if (q) {
+            searchQuickBL(q);
+          }
+        }
+      }
+    });
+    techSelectHandlerAttached = true;
+  }
 
   // --- Quick Sign (Ticket) ---
   let quickTicketMode = false;
@@ -1615,6 +1686,81 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   const quickResults  = document.getElementById('modalQuickBlResults');
   const quickErr      = document.getElementById('modalQuickBlErr');
   const quickCloseBtn = document.getElementById('closeQuickBlBtn');
+  let quickBlDetailsModal   = null;
+  let quickBlDetailsClose   = null;
+  let quickBlDetailsContinue = null;
+  let quickBlAmountHTInput  = null;
+  let quickBlAmountTTCInput = null;
+
+  function formatAmountDisplay(val){
+    if (val === undefined || val === null || val === '') return '';
+    const raw = String(val).trim();
+    const parsed = Number(raw.replace(',', '.'));
+    if (!isFinite(parsed)) return raw; // garde la valeur brute si non numérique
+    const formatted = parsed.toFixed(2).replace('.', ',');
+    return formatted.replace(/,00$/, ',00'); // garde le format à 2 décimales
+  }
+
+  function ensureQuickBlDetailsElements(){
+    if (!quickBlDetailsModal) quickBlDetailsModal = document.getElementById('quickBlDetailsModal');
+    if (!quickBlDetailsClose) quickBlDetailsClose = document.getElementById('closeQuickBlDetailsBtn');
+    if (!quickBlDetailsContinue) quickBlDetailsContinue = document.getElementById('continueQuickBlBtn');
+    if (!quickBlAmountHTInput) quickBlAmountHTInput = document.getElementById('quickBlAmountHT');
+    if (!quickBlAmountTTCInput) quickBlAmountTTCInput = document.getElementById('quickBlAmountTTC');
+  }
+
+  function setQuickAmounts(htVal, ttcVal, force){
+    ensureQuickBlDetailsElements();
+    if (quickBlAmountHTInput && (force || htVal !== undefined)) {
+      const v = formatAmountDisplay(htVal);
+      quickBlAmountHTInput.textContent = v ? ('Montant HT : ' + v + ' €') : '';
+    }
+    if (quickBlAmountTTCInput && (force || ttcVal !== undefined)) {
+      const v = formatAmountDisplay(ttcVal);
+      quickBlAmountTTCInput.textContent = v ? ('Montant TTC : ' + v + ' €') : '';
+    }
+  }
+
+  function setQuickAmountDefaults(force){
+    ensureQuickBlDetailsElements();
+    const defaults = window.QUICK_MONTANT_DEFAULT || {};
+    const htValRaw = (typeof defaults.HT !== 'undefined') ? defaults.HT : (typeof defaults.ht !== 'undefined' ? defaults.ht : '');
+    const ttcValRaw = (typeof defaults.TTC !== 'undefined') ? defaults.TTC : (typeof defaults.ttc !== 'undefined' ? defaults.ttc : '');
+    const htVal = formatAmountDisplay(htValRaw);
+    const ttcVal = formatAmountDisplay(ttcValRaw);
+    if (quickBlAmountHTInput && (force || !quickBlAmountHTInput.textContent)) quickBlAmountHTInput.textContent = htVal ? ('Montant HT : ' + htVal + ' €') : '';
+    if (quickBlAmountTTCInput && (force || !quickBlAmountTTCInput.textContent)) quickBlAmountTTCInput.textContent = ttcVal ? ('Montant TTC : ' + ttcVal + ' €') : '';
+  }
+
+  function showQuickBlDetailsModal(docLabel){
+    ensureQuickBlDetailsElements();
+    setQuickAmountDefaults(false);
+    if (quickBlDetailsModal) quickBlDetailsModal.style.display = 'block';
+    if (quickBlDetailsClose && !quickBlDetailsClose.__bound) {
+      quickBlDetailsClose.onclick = closeQuickBlDetailsModal;
+      quickBlDetailsClose.__bound = true;
+    }
+    if (quickBlDetailsModal && !quickBlDetailsModal.__backdropBound) {
+      quickBlDetailsModal.onclick = (e)=>{ if (e.target === quickBlDetailsModal) closeQuickBlDetailsModal(); };
+      quickBlDetailsModal.__backdropBound = true;
+    }
+  if (quickBlDetailsContinue && !quickBlDetailsContinue.__bound) {
+    quickBlDetailsContinue.onclick = ()=>{
+      closeQuickBlDetailsModal();
+      showStep('recap');
+    };
+    quickBlDetailsContinue.__bound = true;
+  }
+
+  ensureTechChangeHandler();
+  }
+
+  function closeQuickBlDetailsModal(){
+    ensureQuickBlDetailsElements();
+    if (quickBlDetailsModal) quickBlDetailsModal.style.display = 'none';
+  }
+
+  setQuickAmountDefaults(true);
 
   // Ticket modal elements (will be queried on demand; may not exist at script load)
   let quickTicketModal   = null;
@@ -1667,6 +1813,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
     const resEl    = document.getElementById('modalQuickBlResults');
     const errEl    = document.getElementById('modalQuickBlErr');
     const closeEl  = document.getElementById('closeQuickBlBtn');
+    ensureTechChangeHandler();
     if (!modal) return;
     modal.style.display = 'block';
     if (inputEl) {
@@ -1920,8 +2067,19 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   window.selectQuickResult2 = async function(item){
     const errEl = document.getElementById('modalQuickBlErr');
     const resultsEl = document.getElementById('modalQuickBlResults');
+    const techSel = document.getElementById('modalBlTechnicianSelect');
+    lastQuickSelection = { item, mode: 'v2' };
     if (errEl) errEl.style.display = 'none';
     if (resultsEl) resultsEl.style.display = 'none';
+    if (!techSel || !techSel.value || !techSel.value.trim()) {
+      if (errEl) {
+        errEl.textContent = 'Veuillez sélectionner un technicien avant de choisir un BL.';
+        errEl.style.display = 'block';
+      }
+      pendingQuickSelection = { item, mode: 'v2' };
+      return;
+    }
+    pendingQuickSelection = null;
     const devId = ((typeof DEVICE_ID!=='undefined'&&DEVICE_ID)?DEVICE_ID:(window.DEVICE_ID||''));
     const tok   = ((typeof TOKEN!=='undefined'&&TOKEN)?TOKEN:(window.TOKEN||''));
     if (!devId || !tok) { if (errEl) { errEl.textContent = 'Paramètres tablette manquants (device_id/token)'; errEl.style.display = 'block'; } return; }
@@ -1966,12 +2124,13 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       // Prefer BL returned by server (may include client suffix)
       if (j.bl) { quickDoc.bl = String(j.bl).trim(); }
       var docDisplay2 = quickDoc.bl ? (/(\.pdf)$/i.test(quickDoc.bl) ? quickDoc.bl : (quickDoc.bl + '.pdf')) : (quickDoc.filename || '');
+      setQuickAmounts(j.amount_ht, j.amount_ttc, false);
       recapTicketInfoEl.textContent = 'Document: ' + docDisplay2;
       const params2 = { document_name: docDisplay2 };
       if (quickPreviewUrl) params2.document_url = quickPreviewUrl;
       recapContentEl.innerHTML = generateRecapContent(params2);
       if (typeof closeQuickModal === 'function') closeQuickModal();
-      showStep('recap');
+      showQuickBlDetailsModal(docDisplay2);
     } catch(e){
       if (errEl) { errEl.textContent = 'Création impossible: ' + e.message; errEl.style.display = 'block'; }
       quickMode = false;
@@ -1981,8 +2140,26 @@ $plugin_base = $rootdoc . '/plugins/gestion';
   async function selectQuickResult(item){
         const errEl = document.getElementById('modalQuickBlErr');
         const resultsEl = document.getElementById('modalQuickBlResults');
+        const techSel = document.getElementById('modalBlTechnicianSelect');
+    lastQuickSelection = { item, mode: 'v1' };
     if (errEl) errEl.style.display = 'none';
     if (resultsEl) resultsEl.style.display = 'none';
+    if (!techSel || !techSel.value || !techSel.value.trim()) {
+      if (errEl) {
+        errEl.textContent = 'Veuillez sélectionner un technicien avant de choisir un BL.';
+        errEl.style.display = 'block';
+      }
+      pendingQuickSelection = { item, mode: 'v1' };
+      return;
+    }
+    pendingQuickSelection = null;
+    if (!techSel || !techSel.value || !techSel.value.trim()) {
+      if (errEl) {
+        errEl.textContent = 'Veuillez sélectionner un technicien avant de choisir un BL.';
+        errEl.style.display = 'block';
+      }
+      return;
+    }
     quickDoc = {
       save: (item.save || '').trim(),
       filename: (item.filename || item.text || '').trim(),
@@ -2028,6 +2205,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       const docName = quickDoc.bl ? (/(\.pdf)$/i.test(quickDoc.bl) ? quickDoc.bl : (quickDoc.bl + '.pdf')) : (quickDoc.filename || '');
       ticketInfoEl.textContent = 'Document: ' + docName;
       recapTicketInfoEl.textContent = 'Document: ' + docName;
+      setQuickAmounts(j.amount_ht, j.amount_ttc, false);
 
       try {
         if (quickPreviewUrl) {
@@ -2058,7 +2236,7 @@ $plugin_base = $rootdoc . '/plugins/gestion';
       if (quickPreviewUrl) params.document_url = quickPreviewUrl;
       recapContentEl.innerHTML = generateRecapContent(params);
       if (typeof closeQuickModal === 'function') closeQuickModal();
-      showStep('recap');
+      showQuickBlDetailsModal(docName);
     } catch(e){
       if (quickErr) { if (errEl) { errEl.textContent = 'Création impossible: ' + e.message; errEl.style.display = 'block'; } }
       quickMode = false;
@@ -2128,6 +2306,16 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         const png = canvas.toDataURL('image/png');
         const signer = document.getElementById('signer').value || '';
         const signerEmail = document.getElementById('signerEmail').value || '';
+        const quickCommentInput = document.getElementById('quickBlComment');
+        const quickPaidInput = document.getElementById('quickBlPaid');
+        const quickComment = quickCommentInput ? (quickCommentInput.value || '').trim() : '';
+        const quickPaid = !!(quickPaidInput && quickPaidInput.checked);
+        const techSelect = document.getElementById('modalBlTechnicianSelect');
+        if (!techSelect || !techSelect.value || !techSelect.value.trim()) {
+          sendErr.textContent = 'Veuillez sélectionner un technicien.';
+          sendErr.style.display = 'block';
+          return;
+        }
         if (!quickSurveyId || !quickDoc) {
           throw new Error('Document non initialisé.');
         }
@@ -2153,6 +2341,8 @@ $plugin_base = $rootdoc . '/plugins/gestion';
         addField('url', png);
         addField('name', signer);
         addField('email', signerEmail);
+        addField('comment', quickComment);
+        addField('CounterInvoiceClient', quickPaid ? '1' : '0');
         let techVal = '';
         const blSel = document.getElementById('modalBlTechnicianSelect');
         if (blSel && blSel.value) {
@@ -2400,10 +2590,39 @@ $plugin_base = $rootdoc . '/plugins/gestion';
           <input id="modalQuickBlInput" type="text" inputmode="numeric" pattern="[0-9]*" value="BL" class="form-input" placeholder="Ex: BL199550" style="width:100%;">
           <div id="modalQuickBlErr" class="alert alert-error" style="display:none; margin-top:8px;"></div>
           <div id="modalQuickBlResults" style="border:1px solid #e9ecef;border-radius:8px;padding:8px;max-height:280px;overflow:auto; margin-top:10px;"></div>
-          
         </div>
   </div>
   </div>
+  </div>
+  <!-- Quick BL Details Modal -->
+  <div id="quickBlDetailsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2050;">
+    <div style="max-width:650px; margin:60px auto; background:#fff; border-radius:8px; padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:600; font-size:16px;">Détails BL</div>
+        <button type="button" id="closeQuickBlDetailsBtn" class="btn">Fermer</button>
+      </div>
+      <div class="form-card">
+        <div class="form-label">Commentaire</div>
+        <div class="form-content">
+          <textarea id="quickBlComment" class="form-input" rows="3" placeholder="Ajouter un commentaire (optionnel)" style="width:100%;"></textarea>
+        </div>
+      </div>
+      <div class="form-card">
+        <div class="form-content" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="quickBlPaid" style="width:auto;margin:0;">
+          <label for="quickBlPaid" style="margin:0;">Règlement effectué au comptoir</label>
+        </div>
+      </div><br>
+      <div class="form-card">
+        <div class="form-content" style="display:flex;flex-direction:column;gap:6px;">
+          <div id="quickBlAmountHT" style="font-weight:600;"></div>
+          <div id="quickBlAmountTTC" style="font-weight:600;"></div>
+        </div>
+      </div>
+      <div style="text-align:right; margin-top:12px;">
+        <button type="button" class="btn" id="continueQuickBlBtn">Continuer vers la signature</button>
+      </div>
+    </div>
   </div>
   <!-- Quick Ticket Modal -->
   <div id="quickTicketModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000;">

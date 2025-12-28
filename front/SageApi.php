@@ -255,3 +255,14 @@ function documentExiste(string $docId, ?int &$httpStatus = null): bool
 
     return $httpStatus === 200;
 }
+
+function Montant($doc)
+{
+    $montant = [
+        // Valeurs de test avec virgule (laisser en chaîne pour éviter la troncature PHP)
+        'TTC' => '11,89',
+        'HT'  => '9,89',
+    ];
+
+    return $montant;
+}

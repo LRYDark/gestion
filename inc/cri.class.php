@@ -680,8 +680,33 @@ class PluginGestionCri extends CommonDBTM {
 
          // === Facturation comptoir (si activée) ===
          if ($config->fields['CounterInvoice'] == 1 && isCurrentUserAuthorized($config->fields['CounterInvoiceUsers'])) { // NEW
+            require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
             echo '<div class="form-card">';
                echo '<div class="form-label">Règlement effectué au comptoir</div>';
+
+               $fields = Montant($DOC->url_bl);
+               // Supporte Montant() qui renvoie des chaînes avec virgule (ex: "11,89") ou un array num + cents
+               $ttc = null;
+               $ht  = null;
+               if (isset($fields['TTC'])) {
+                  $val = $fields['TTC'];
+                  $ttc = is_array($val) ? implode(',', $val) : (string)$val;
+               }
+               if (isset($fields['HT'])) {
+                  $val = $fields['HT'];
+                  $ht = is_array($val) ? implode(',', $val) : (string)$val;
+               }
+               echo '<div class="form-content">';
+               echo '<div class="amount-group">';
+                  if ($ttc !== null) {
+                     echo '<div><strong>Montant TTC :</strong> ' . htmlspecialchars($ttc) . ' €</div>';
+                  }
+                  if ($ht !== null) {
+                     echo '<div><strong>Montant HT :</strong> ' . htmlspecialchars($ht) . ' €</div>';
+                  }
+               echo '</div>';
+               echo '</div><br>';
+
                echo '<div class="form-content">';
                      echo '<div class="checkbox-group">';
                         echo '<input type="checkbox" name="CounterInvoiceClient" value="1" id="CounterInvoiceClient">';

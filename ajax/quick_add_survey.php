@@ -14,6 +14,8 @@ header('Content-Type: application/json; charset=UTF-8');
 global $DB, $CFG_GLPI;
 $config  = PluginGestionConfig::getInstance();
 $rootdoc = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');
+$amount_ht = null;
+$amount_ttc = null;
 
 function q_json_end(int $status, array $payload): void {
    if (!headers_sent()) header('Content-Type: application/json; charset=UTF-8');
@@ -93,6 +95,22 @@ if ($save === 'Sage') {
       $pdf_filename = preg_replace('/\.pdf$/i','', $folder);
    }
 
+   // Montants Sage spécifiques au BL
+   try {
+      require_once PLUGIN_GESTION_DIR . '/front/SageApi.php';
+      if (function_exists('Montant')) {
+         $m = Montant($folder);
+         if (is_array($m)) {
+            if (isset($m['HT']))  { $amount_ht  = $m['HT']; }
+            if (isset($m['ht']))  { $amount_ht  = $m['ht']; }
+            if (isset($m['TTC'])) { $amount_ttc = $m['TTC']; }
+            if (isset($m['ttc'])) { $amount_ttc = $m['ttc']; }
+         }
+      }
+   } catch (Throwable $e) {
+      // silencieux
+   }
+
    // URL d'aperçu via view_pdf.php avec token temporaire
    $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
    $base  = $proto . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR;
@@ -146,14 +164,16 @@ if ($check && $DB->numrows($check) === 1) {
       $preview = rtrim($rootdoc, '/') . '/front/' . ltrim($preview, '/');
    }
    $already = (int)($row['signed'] ?? 0) === 1;
-   q_json_end(200, [
-      'ok' => true,
-      'exists' => true,
-      'already_signed' => $already,
-      'id' => (int)$row['id'],
-      'preview_url' => $preview,
-      'relatedInvoiceToBL' => $row['relatedInvoiceToBL'] ?? null
-   ]);
+q_json_end(200, [
+   'ok' => true,
+   'exists' => true,
+   'already_signed' => $already,
+   'id' => (int)$row['id'],
+   'preview_url' => $preview,
+   'relatedInvoiceToBL' => $row['relatedInvoiceToBL'] ?? null,
+   'amount_ht' => $amount_ht,
+   'amount_ttc' => $amount_ttc
+]);
 }
 
 // Insertion identique à survey.form.php
@@ -179,7 +199,16 @@ if (!$DB->query($sql)) {
 $id_res = $DB->query("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$bl_esc' LIMIT 1");
 if ($id_res && $DB->numrows($id_res) === 1) {
    $row = $DB->fetchassoc($id_res);
-   q_json_end(200, ['ok' => true, 'id' => (int)$row['id'], 'preview_url' => $doc_url, 'save' => $save, 'bl' => $pdf_filename, 'relatedInvoiceToBL' => $relatedInvoiceToBL]);
+   q_json_end(200, [
+      'ok' => true,
+      'id' => (int)$row['id'],
+      'preview_url' => $doc_url,
+      'save' => $save,
+      'bl' => $pdf_filename,
+      'relatedInvoiceToBL' => $relatedInvoiceToBL,
+      'amount_ht' => $amount_ht,
+      'amount_ttc' => $amount_ttc
+   ]);
 }
 
 q_json_end(500, ['ok' => false, 'error' => 'db_select_failed']);
