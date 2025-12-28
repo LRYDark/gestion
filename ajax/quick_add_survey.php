@@ -18,6 +18,8 @@ $config  = PluginGestionConfig::getInstance();
 $rootdoc = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');
 $httpProto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
 $serverHost = $_SERVER['SERVER_NAME'] ?? 'localhost';
+$amount_ht = null;
+$amount_ttc = null;
 
 /**
  * Uniformise l'URL de pr�visualisation PDF (corrige l'ancien chemin /ajax/view_pdf.php et ajoute le root_doc).
@@ -122,6 +124,22 @@ if ($save === 'Sage') {
       // Fallback en cas d'erreur: identifiant BL seul
       $pdf_filename = preg_replace('/\.pdf$/i','', $folder);
    }
+
+      // Montants Sage spécifiques au BL
+   try {
+      require_once PLUGIN_GESTION_DIR . '/front/SageApi.php';
+      if (function_exists('Montant')) {
+         $m = Montant($folder);
+         if (is_array($m)) {
+            if (isset($m['HT']))  { $amount_ht  = $m['HT']; }
+            if (isset($m['ht']))  { $amount_ht  = $m['ht']; }
+            if (isset($m['TTC'])) { $amount_ttc = $m['TTC']; }
+            if (isset($m['ttc'])) { $amount_ttc = $m['ttc']; }
+         }
+      }
+   } catch (Throwable $e) {
+      // silencieux
+   }
    // URL d'aperçu via view_pdf.php avec token temporaire (chemin public)
    $doc_url = gestion_build_pdf_preview($folder, $rootdoc, $httpProto, $serverHost);
 
@@ -177,7 +195,9 @@ if ($check && $DB->numrows($check) === 1) {
       'already_signed' => $already,
       'id' => (int)$row['id'],
       'preview_url' => $preview,
-      'relatedInvoiceToBL' => $row['relatedInvoiceToBL'] ?? null
+      'relatedInvoiceToBL' => $row['relatedInvoiceToBL'] ?? null,
+      'amount_ht' => $amount_ht,
+      'amount_ttc' => $amount_ttc
    ]);
 }
 
@@ -205,7 +225,16 @@ if (!$DB->doQuery($sql)) {
 $id_res = $DB->doQuery("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$bl_esc' LIMIT 1");
 if ($id_res && $DB->numrows($id_res) === 1) {
    $row = $DB->fetchassoc($id_res);
-   q_json_end(200, ['ok' => true, 'id' => (int)$row['id'], 'preview_url' => $doc_url, 'save' => $save, 'bl' => $pdf_filename, 'relatedInvoiceToBL' => $relatedInvoiceToBL]);
+   q_json_end(200, [
+      'ok' => true,
+      'id' => (int)$row['id'],
+      'preview_url' => $doc_url,
+      'save' => $save,
+      'bl' => $pdf_filename,
+      'relatedInvoiceToBL' => $relatedInvoiceToBL,
+      'amount_ht' => $amount_ht,
+      'amount_ttc' => $amount_ttc
+   ]);
 }
 
 q_json_end(500, ['ok' => false, 'error' => 'db_select_failed']);

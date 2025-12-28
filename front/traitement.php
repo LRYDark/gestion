@@ -453,22 +453,19 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
 
     if ($DOC->tickets_id == 0) {$IdTicket = "Aucun ticket lié";} else { $IdTicket = $DOC->tickets_id; }
     if ($isCounterInvoicePaid) {
-        if (!empty($config->fields['CounterInvoiceMail'])){  
-
-            if (!empty($relatedInvoiceToBL)){
-                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
+        if (!empty($relatedInvoiceToBL)){
+            $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
+        }else{
+            $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
+        }
+        if ($hasComment) {
+            $ValueForSigned .= " <br><br> Commentaire : " . $rawComment;
+        }
+            if (!empty($config->fields['ZenDocMail'])){ 
+                $sharepoint->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
             }else{
-                $ValueForSigned = "Bon de Livraison signé et règlement effectué au comptoir : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
+                $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
             }
-            if ($hasComment) {
-                $ValueForSigned .= " <br><br> Commentaire : " . $rawComment;
-            }
-                if (!empty($config->fields['ZenDocMail'])){ 
-                    $sharepoint->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
-                }else{
-                    $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
-                }
-        } 
     }else{
         if (!empty($config->fields['ZenDocMail'])){ 
             $ValueForSigned = "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";

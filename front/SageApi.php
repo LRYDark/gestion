@@ -79,7 +79,7 @@ function parseDocument(string $docId): array
     }
 
     // Tracker (ex : "PI + EC")
-    if (preg_match('/Tracker\s*:\s*([^\r\n]+)/ui', $text, $m)) {
+    if (preg_match('/^Tracker[ \t]*:[ \t]*([^\r\n]*)/mi', $text, $m)) {
         $out['tracker'] = trim($m[1]);
     }
 
@@ -254,4 +254,15 @@ function documentExiste(string $docId, ?int &$httpStatus = null): bool
     }
 
     return $httpStatus === 200;
+}
+
+function Montant($doc)
+{
+    $montant = [
+        // Valeurs de test avec virgule (laisser en chaîne pour éviter la troncature PHP)
+        'TTC' => 'Fonctionnalité en cours d’intégration',
+        'HT'  => 'Fonctionnalité en cours d’intégration',
+    ];
+
+    return $montant;
 }
