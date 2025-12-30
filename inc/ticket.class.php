@@ -16,12 +16,11 @@ class PluginGestionTicket extends CommonDBTM {
    }
 
    static function getTypeName($nb = 0) { // voir doc glpi 
-      if(Session::haveRight("plugin_gestion_sign", READ)){
-         return _n('Gestion', 'Gestion', $nb, 'gestion');
-      }
+      return _n('Gestion', 'Gestion', $nb, 'gestion');
    }
    
    function getTabNameForItem(CommonGLPI $item, $withtemplate = 0) { // voir doc glpi 
+      if(Session::haveRight("plugin_gestion_sign", READ)){
          $nb = self::countForItem($item);
          switch ($item->getType()) {
             case 'Ticket' :
@@ -30,6 +29,7 @@ class PluginGestionTicket extends CommonDBTM {
                return self::getTypeName($nb);
          }
          return '';
+      }
    }
 
    static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0) { // voir doc glpi 
