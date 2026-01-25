@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.7.8] - 2025-08-20
+- Exclude the `phpunit` dir when extracting lcoales
+
+## [0.7.7] - 2025-08-18
+- The `var` folder is now ignored by the license checked tool in plugins.
+
+## [0.7.6] - 2025-07-31
+- Use the `ustar` tar format for plugin archives to prevent [issues with long paths](https://github.com/php/php-src/issues/19311).
+
+## [0.7.5] - 2025-05-22
+- gettext sort-output flag is deprecated
+
 ## [0.7.4] - 2024-09-18
 - Fix compatibility with Twig 3.12.
 

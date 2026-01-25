@@ -32,6 +32,7 @@
 
 namespace Smalot\PdfParser;
 
+use Smalot\PdfParser\Exception\InvalidDictionaryObjectException;
 use Smalot\PdfParser\XObject\Form;
 use Smalot\PdfParser\XObject\Image;
 
@@ -451,7 +452,7 @@ class PDFObject
                 $inTextBlock = true;
                 $sections[] = $line;
 
-            // If an 'ET' is encountered, unset the $inTextBlock flag
+                // If an 'ET' is encountered, unset the $inTextBlock flag
             } elseif ('ET' == $line) {
                 $inTextBlock = false;
                 $sections[] = $line;
@@ -559,7 +560,7 @@ class PDFObject
      *
      * @internal
      *
-     * @throws \Exception
+     * @throws InvalidDictionaryObjectException
      */
     public function parseDictionary(string $dictionary): array
     {
@@ -567,7 +568,7 @@ class PDFObject
         $dictionary = preg_replace(['/\r/', '/\n/', '/\s{2,}/'], ' ', trim($dictionary));
 
         if ('<<' != substr($dictionary, 0, 2)) {
-            throw new \Exception('Not a valid dictionary object.');
+            throw new InvalidDictionaryObjectException('Not a valid dictionary object.');
         }
 
         $parsed = [];
@@ -774,16 +775,28 @@ class PDFObject
                         break;
 
                     case 'Do':
-                        if (null !== $page) {
-                            $args = preg_split('/\s/s', $command[self::COMMAND]);
-                            $id = trim(array_pop($args), '/ ');
-                            $xobject = $page->getXObject($id);
+                        if (is_null($page)) {
+                            break;
+                        }
 
-                            // @todo $xobject could be a ElementXRef object, which would then throw an error
-                            if (\is_object($xobject) && $xobject instanceof self && !\in_array($xobject->getUniqueId(), self::$recursionStack, true)) {
-                                // Not a circular reference.
-                                $text[] = $xobject->getText($page);
-                            }
+                        $args = preg_split('/\s/s', $command[self::COMMAND]);
+                        $id = trim(array_pop($args), '/ ');
+                        $xobject = $page->getXObject($id);
+
+                        // Check we got a PDFObject back.
+                        if (!$xobject instanceof self) {
+                            break;
+                        }
+
+                        // If the PDFObject is an Image or a Form, do nothing as
+                        // neither of these XObject types are text.
+                        if ($xobject instanceof Image || $xobject instanceof Form) {
+                            break;
+                        }
+
+                        // Check this is not a circular reference.
+                        if (!\in_array($xobject->getUniqueId(), self::$recursionStack, true)) {
+                            $text[] = $xobject->getText($page);
                         }
                         break;
 

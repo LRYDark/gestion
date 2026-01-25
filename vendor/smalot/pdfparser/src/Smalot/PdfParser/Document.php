@@ -33,6 +33,7 @@
 namespace Smalot\PdfParser;
 
 use Smalot\PdfParser\Encoding\PDFDocEncoding;
+use Smalot\PdfParser\Exception\MissingCatalogException;
 
 /**
  * Technical references :
@@ -255,7 +256,7 @@ class Document
                             if ('rdf:li' == $val['tag']) {
                                 $metadata[] = $val['value'];
 
-                            // Else assign a value to this property
+                                // Else assign a value to this property
                             } else {
                                 $metadata[$val['tag']] = $val['value'];
                             }
@@ -298,7 +299,16 @@ class Document
                 $this->metadata = array_merge($this->metadata, $metadata);
             }
         }
-        xml_parser_free($xml);
+
+        // TODO: remove this if-clause and its content when dropping PHP 7 support
+        if (version_compare(PHP_VERSION, '8.0.0', '<')) {
+            // ref: https://www.php.net/manual/en/function.xml-parser-free.php
+            xml_parser_free($xml);
+
+            // to avoid memory leaks; documentation said:
+            // > it was necessary to also explicitly unset the reference to parser to avoid memory leaks
+            unset($xml);
+        }
     }
 
     public function getDictionary(): array
@@ -379,7 +389,7 @@ class Document
     /**
      * @return Page[]
      *
-     * @throws \Exception
+     * @throws MissingCatalogException
      */
     public function getPages()
     {
@@ -415,7 +425,7 @@ class Document
             return array_values($pages);
         }
 
-        throw new \Exception('Missing catalog.');
+        throw new MissingCatalogException('Missing catalog.');
     }
 
     public function getText(?int $pageLimit = null): string

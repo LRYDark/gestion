@@ -66,7 +66,7 @@ if [ -f "$WORKING_DIR/setup.php" ]; then
 else
     # using core most probably
     NAME="GLPI"
-    EXCLUDE_REGEX="^.\/\(\..*\|\(config\|files\|lib\|marketplace\|node_modules\|plugins\|public\|tests\|tools\|vendor\)\/\).*"
+    EXCLUDE_REGEX="^.\/\(\..*\|\(config\|files\|lib\|marketplace\|node_modules\|plugins\|phpunit\|public\|tests\|tools\|vendor\)\/\).*"
 fi;
 POTFILE="$WORKING_DIR/locales/${NAME,,}.pot"
 
@@ -99,7 +99,6 @@ if [ -d "$WORKING_DIR/templates" ]; then
             --from-code=UTF-8 \
             --force-po \
             --join-existing \
-            --sort-output \
             --keyword=_n:$F_ARGS_N \
             --keyword=__:$F_ARGS__ \
             --keyword=_x:$F_ARGS_X \
@@ -122,7 +121,6 @@ if [ ! -z "$PHP_FILES" ]; then
         --from-code=UTF-8 \
         --force-po \
         --join-existing \
-        --sort-output \
         --keyword=_n:$F_ARGS_N \
         --keyword=__s:$F_ARGS__S \
         --keyword=__:$F_ARGS__ \
@@ -143,7 +141,6 @@ if [ ! -z "$JS_FILES" ]; then
         --from-code=UTF-8 \
         --force-po \
         --join-existing \
-        --sort-output \
         --keyword=_n:$F_ARGS_N \
         --keyword=__:$F_ARGS__ \
         --keyword=_x:$F_ARGS_X \

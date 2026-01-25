@@ -34,4 +34,4 @@ if [ -n "$bashSource" ]; then
     fi
 fi
 
-"${dir}/extract-locales" "$@"
+exec "${dir}/extract-locales" "$@"

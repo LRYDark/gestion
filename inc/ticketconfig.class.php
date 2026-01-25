@@ -209,10 +209,17 @@ class PluginGestionTicketConfig extends CommonDBTM
                       }
                     }
                     function hideModalMessage(){ $('#gestion-messages').hide(); }
+                    function ensureModalInBody() {
+                      var $modal = $('#AddGestionModal');
+                      if ($modal.length && $modal.parent()[0] !== document.body) {
+                        $modal.appendTo(document.body);
+                      }
+                    }
 
                     // Ouvrir le modal + charger options
                     $(document).on('click', '[data-action="open-gestion-modal"]', function(e){
                       e.preventDefault();
+                      ensureModalInBody();
 
                       if (!GESTION_CONNEXION) {
                         $('#AddGestionModal').modal('show');
