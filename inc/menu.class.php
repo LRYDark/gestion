@@ -54,6 +54,8 @@ class PluginGestionMenu extends CommonGLPI
          $menu['links']['search'] = PluginGestionSurvey::getSearchURL(false);
          if (Session::haveRight('plugin_gestion_survey', CREATE)) { // 1.5.5
             $menu['links']['add'] = PluginGestionSurvey::getFormURL(false);
+            // Add quick signature action beside the Add button in the header
+            $menu['links']['Signature BL'] = PLUGIN_GESTION_NOTFULL_WEBDIR . "/front/survey.php?signature_bl=1";
          }
       }
 

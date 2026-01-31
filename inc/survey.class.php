@@ -279,7 +279,6 @@ class PluginGestionSurvey extends CommonDBTM {
                  'root_doc'      => PLUGIN_GESTION_WEBDIR,
                  'root_modal'    => 'survey-form'];
 
-      
       if (!$this->canView()) {
          return false;
       }
