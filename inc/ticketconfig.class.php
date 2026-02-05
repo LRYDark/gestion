@@ -16,7 +16,7 @@ class PluginGestionTicketConfig extends CommonDBTM
 
     public static function getTypeName($nb = 0)
     {
-        return _sn('Gestion des documents liés', 'Gestion des documents liés', $nb, 'gestion');
+        return _sn('Gestion des documents liés non signé(s)', 'Gestion des documents liés non signé(s)', $nb, 'gestion');
     }
 
     /**

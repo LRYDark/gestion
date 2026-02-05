@@ -39,9 +39,18 @@ if (isset($_POST["update"])) {
    
    // ===== AJOUTS POUR SIGNATURE DÉPORTÉE =====
       // Encoder en JSON la liste des utilisateurs autorisés (si fournie)
-      if (isset($encrypted_post['RemoteSignatureUsers']) && is_array($encrypted_post['RemoteSignatureUsers'])) {
-         $ids = array_map('intval', $encrypted_post['RemoteSignatureUsers']);
-         $encrypted_post['RemoteSignatureUsers'] = json_encode(array_values($ids));
+   if (isset($encrypted_post['RemoteSignatureUsers']) && is_array($encrypted_post['RemoteSignatureUsers'])) {
+      $ids = array_map('intval', $encrypted_post['RemoteSignatureUsers']);
+      $encrypted_post['RemoteSignatureUsers'] = json_encode(array_values($ids));
+   }
+   // ===== AJOUTS POUR SIGNATURE BL À L'AJOUT DE TÂCHE =====
+      if (isset($encrypted_post['TaskSignatureUsers']) && is_array($encrypted_post['TaskSignatureUsers'])) {
+         $ids = array_map('intval', $encrypted_post['TaskSignatureUsers']);
+         $encrypted_post['TaskSignatureUsers'] = json_encode(array_values($ids));
+      }
+      if (isset($encrypted_post['TaskSignatureTriggerStates']) && is_array($encrypted_post['TaskSignatureTriggerStates'])) {
+         $ids = array_map('intval', $encrypted_post['TaskSignatureTriggerStates']);
+         $encrypted_post['TaskSignatureTriggerStates'] = json_encode(array_values($ids));
       }
 
    //-----------------------------------------------------------
