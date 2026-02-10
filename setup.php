@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.6.2'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.6.4'); // version du plugin
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 // Minimal GLPI version,
@@ -24,8 +24,8 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
       if (Session::getLoginUserID()) {
          Plugin::registerClass('PluginGestionProfile', ['addtabon' => 'Profile']);
 
-         $PLUGIN_HOOKS['add_css']['rp'] = ["css/signature_gestion.css"];
-         $PLUGIN_HOOKS['add_javascript']['gestion'] = ['js/scripts_gestion.js'];
+         $PLUGIN_HOOKS['add_css']['gestion'] = ["public/css/signature_gestion.css"];
+         $PLUGIN_HOOKS['add_javascript']['gestion'] = ['public/js/scripts_gestion.js'];
       }
 
       if (Session::haveRight('plugin_gestion_survey', READ)) {

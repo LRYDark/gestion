@@ -19,7 +19,7 @@ class PluginGestionConfig extends CommonDBTM
 
    static function getTypeName($nb = 0)
    {
-      return __("Gestion Bl ", "gestion");
+      return __('<span class="d-flex align-items-center"><i class="fa-solid fa-clipboard-check me-2"></i>Gestion BL</span>', "gestion");
    }
 
    static function getInstance()
@@ -105,6 +105,32 @@ class PluginGestionConfig extends CommonDBTM
             <div class="col-md-6">
             <label class="form-label mb-1"><?php echo __('Envoie des PDF par mail', 'gestion'); ?></label>
             <?php Dropdown::showYesNo('MailTo', $config->MailTo(), -1); ?>
+            </div>
+
+            <div class="col-md-6">
+            <label class="form-label mb-1"><?php echo __("Mode d'envoi mail au client (Rapport + BL)", 'gestion'); ?></label>
+            <?php
+               $mailModeValues = [
+                  0 => __('Un seul mail (BL + Rapport fusionnés)', 'gestion'),
+                  1 => __('Deux mails séparés (BL + Rapport)', 'gestion'),
+               ];
+               $rpActive = Plugin::isPluginActive('rp') && class_exists('PluginRpCri');
+               $combinedVal = (int)$config->CombinedMailMode();
+               if ($rpActive) {
+                  Dropdown::showFromArray('CombinedMailMode', $mailModeValues, [
+                     'value' => $combinedVal,
+                  ]);
+               } else {
+                  echo Html::hidden('CombinedMailMode', ['value' => $combinedVal]);
+                  echo '<select class="form-select" disabled>';
+                  foreach ($mailModeValues as $k => $label) {
+                     $sel = ((int)$k === $combinedVal) ? ' selected' : '';
+                     echo '<option value="'.(int)$k.'"'.$sel.'>'.htmlspecialchars($label, ENT_QUOTES).'</option>';
+                  }
+                  echo '</select>';
+                  echo '<div class="form-text text-muted">Necessite le plugin RP.</div>';
+               }
+            ?>
             </div>
 
             <div class="col-md-6">
@@ -1528,6 +1554,54 @@ class PluginGestionConfig extends CommonDBTM
       <?php
       //---------------------------------------------------------------------------------------------------------------------
 
+      // --------------------- SECTION : SIGNATURE BL À L'AJOUT DE TÂCHE ---------------------
+      $taskSigUsers  = $config->TaskSignatureUsers();
+      $taskSigStates = $config->TaskSignatureTriggerStates();
+      $taskStateValues = [
+         Planning::INFO => Planning::getState(Planning::INFO),
+         Planning::TODO => Planning::getState(Planning::TODO),
+         Planning::DONE => Planning::getState(Planning::DONE),
+      ];
+      ?>
+      <div class="card mb-3">
+         <div class="card-header">
+            <h3 class="card-title"><?php echo __('Signature BL à l\'ajout de tâche', 'gestion'); ?></h3>
+         </div>
+         <div class="card-body">
+            <div class="row g-3">
+               <div class="col-md-6">
+                  <label class="form-label mb-1">
+                     <?php echo __('Technicien(s) autorisé(s)', 'gestion'); ?>
+                  </label>
+                  <?php
+                     Dropdown::show('User', [
+                        'name'     => 'TaskSignatureUsers[]',
+                        'multiple' => true,
+                        'value'    => $taskSigUsers,
+                        'width'    => '100%',
+                     ]);
+                  ?>
+               </div>
+               <div class="col-md-6">
+                  <label class="form-label mb-1">
+                     <?php echo __('Déclencheur(s) sur état de tâche', 'gestion'); ?>
+                  </label>
+                  <?php
+                     Dropdown::showFromArray('TaskSignatureTriggerStates', $taskStateValues, [
+                        'multiple' => true,
+                        'values'   => $taskSigStates,
+                        'width'    => '100%',
+                     ]);
+                  ?>
+                  <div class="form-text text-muted">
+                     <?php echo __('Par défaut : Fait.', 'gestion'); ?>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </div>
+      <?php
+
       // Charger la liste des items existants
       $items = $DB->request([
          'FROM'  => 'glpi_plugin_gestion_baseitems',
@@ -1725,6 +1799,9 @@ class PluginGestionConfig extends CommonDBTM
    function MailTo(){
       return ($this->fields['MailTo']);
    }
+   function CombinedMailMode(){
+      return isset($this->fields['CombinedMailMode']) ? (int)$this->fields['CombinedMailMode'] : 0;
+   }
    function gabarit(){
       return ($this->fields['gabarit']);
    }
@@ -1762,6 +1839,21 @@ class PluginGestionConfig extends CommonDBTM
       $arr = json_decode($raw, true);
       return is_array($arr) ? $arr : [];
    }
+   // --- Task signature (BL on task add) ---
+   function TaskSignatureUsers() {
+      $raw = $this->fields['TaskSignatureUsers'] ?? '[]';
+      $arr = json_decode($raw, true);
+      return is_array($arr) ? array_values(array_map('intval', $arr)) : [];
+   }
+   function TaskSignatureTriggerStates() {
+      $raw = $this->fields['TaskSignatureTriggerStates'] ?? '';
+      $arr = json_decode($raw, true);
+      if (!is_array($arr) || empty($arr)) {
+         // Default: Done
+         return [Planning::DONE];
+      }
+      return array_values(array_map('intval', $arr));
+   }
    function SageUrlApi(){
       return ($this->fields['SageUrlApi']);
    }
@@ -1778,7 +1870,7 @@ class PluginGestionConfig extends CommonDBTM
    {
 
       if ($item->getType() == 'Config') {
-         return __("Gestion BL", "gestion");
+         return __('<span class="d-flex align-items-center"><i class="fa-solid fa-clipboard-check me-2"></i>Gestion BL</span>', "gestion");
       }
       return '';
    }
@@ -1825,6 +1917,7 @@ class PluginGestionConfig extends CommonDBTM
                   `NumberViews` INT(10) NOT NULL DEFAULT '800',
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
+                  `CombinedMailMode` TINYINT NOT NULL DEFAULT '0',
                   `ConfigModes` TINYINT NOT NULL DEFAULT '0',
                   `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',
                   `gabarit` INT(10) NOT NULL DEFAULT '0',
@@ -1919,6 +2012,14 @@ class PluginGestionConfig extends CommonDBTM
       if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.5.9'){ // NEW 1.6.0
          include(PLUGIN_GESTION_DIR . "/install/update_160_next.php");
          update_160_next(); 
+      }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.6.2'){ // NEW 1.6.3
+         include(PLUGIN_GESTION_DIR . "/install/update_163_next.php");
+         update_163_next(); 
+      }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.6.3'){ // NEW 1.6.4
+         include(PLUGIN_GESTION_DIR . "/install/update_164_next.php");
+         update_164_next(); 
       }
    }
 

@@ -14,6 +14,7 @@ use Smalot\PdfParser\Parser;
 $sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 $doc = new Document();
+$combined_mode = !empty($_POST['combined_mode']);
 
 // Ensure optional column to store free-text technician for quick-sign
 try {
@@ -53,7 +54,7 @@ try {
                 $FolderDes = 'SharePoint';
             }else{
                 $used_param = 3;
-                message("Erreur d'enregistrement du PDF dans SharePoint, Enregistrement dans le dossier Local", WARNING);
+                gestion_message("Erreur d'enregistrement du PDF dans SharePoint, Enregistrement dans le dossier Local", WARNING);
             }
         } 
 
@@ -71,7 +72,7 @@ try {
             if (!is_dir($destinationPath)) {
                 if (!mkdir($destinationPath, 0755, true)) {
                     // En cas d’échec de création
-                    message("Erreur : impossible de créer le dossier $destinationPath", ERROR);
+                    gestion_message("Erreur : impossible de créer le dossier $destinationPath", ERROR);
                     Html::back();
                     exit;
                 }
@@ -84,7 +85,7 @@ try {
     }
 ///////////////// NEW TEST ////////////////////
 
-function message($msg, $msgtype){
+function gestion_message($msg, $msgtype){
     Session::addMessageAfterRedirect(
         __($msg, 'gestion'),
         true,
@@ -167,13 +168,13 @@ if (strpos($signatureBase64, 'data:image/png;base64,') === 0) {
 // Décoder l’image
 $signatureData = base64_decode($signatureBase64);
 if ($signatureData === false) {
-    message("Erreur lors du décodage de l'image.", ERROR);
+    gestion_message("Erreur lors du décodage de l'image.", ERROR);
 }
 
 // Sauvegarder l'image décodée
 $signaturePath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/signature'.$nombreAleatoire.'.png';
 if (file_put_contents($signaturePath, $signatureData) === false) {
-    message("Échec de la sauvegarde de l'image de signature.", ERROR);
+    gestion_message("Échec de la sauvegarde de l'image de signature.", ERROR);
 }
 
 if ($DOC->save == "SharePoint"){ //Récup BL depuis sharepoint
@@ -188,7 +189,7 @@ if ($DOC->save == "SharePoint"){ //Récup BL depuis sharepoint
         // Étape 4 : Obtenir l'URL de téléchargement
         $downloadUrl = $sharepoint->getDownloadUrl($filePath);
     } catch (Exception $e) {
-        message("Erreur : " . $e->getMessage(), ERROR);
+        gestion_message("Erreur : " . $e->getMessage(), ERROR);
         Html::back();
         exit;
     }
@@ -198,7 +199,7 @@ if ($DOC->save == "SharePoint"){ //Récup BL depuis sharepoint
         $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
         $sharepoint->downloadFileFromUrl($downloadUrl, $destinationPath);
     } catch (Exception $e) {
-        message("Erreur : " . $e->getMessage(), ERROR);
+        gestion_message("Erreur : " . $e->getMessage(), ERROR);
         Html::back();
         exit;
     }
@@ -217,7 +218,7 @@ if ($DOC->save == "Sage"){ //Récup BL depuis local
 }
 
 if (!file_exists($existingPdfPath)) {
-    message("Le fichier PDF source n'existe pas.", ERROR);
+    gestion_message("Le fichier PDF source n'existe pas.", ERROR);
     Html::back();
     exit;
 }
@@ -315,7 +316,7 @@ try {
         }
     }
 } catch (Exception $e) {
-    message("Erreur lors de l'importation du fichier PDF : " . $e->getMessage(), ERROR);
+    gestion_message("Erreur lors de l'importation du fichier PDF : " . $e->getMessage(), ERROR);
     Html::back();
     exit;
 }
@@ -329,20 +330,20 @@ if (!empty($photoBase64) && strpos($photoBase64, 'data:image') === 0) {
     $photoData = base64_decode($photoBase64);
 
     if ($photoData === false) {
-        message("Erreur lors du décodage de l'image.", ERROR);
+        gestion_message("Erreur lors du décodage de l'image.", ERROR);
     }
 
     // Enregistrer temporairement l'image décodée sous forme brute
     $tempPath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/temp_photo'.$nombreAleatoire.'';
     if (file_put_contents($tempPath, $photoData) === false) {
-        message("Erreur lors de la sauvegarde de l'image de la photo.", ERROR);
+        gestion_message("Erreur lors de la sauvegarde de l'image de la photo.", ERROR);
     }
 
     // Déterminer le type de l'image (PNG ou JPEG) et convertir si nécessaire
     $imageInfo = getimagesize($tempPath);
     if ($imageInfo === false) {
         unlink($tempPath); // Supprimer le fichier temporaire
-        message("Le fichier image n'est pas valide.", ERROR);
+        gestion_message("Le fichier image n'est pas valide.", ERROR);
     }
 
     $photoPath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/photo_capture'.$nombreAleatoire.'.png'; // Le chemin final de l'image en PNG
@@ -352,7 +353,7 @@ if (!empty($photoBase64) && strpos($photoBase64, 'data:image') === 0) {
         $image = imagecreatefromjpeg($tempPath);
         if ($image === false) {
             unlink($tempPath);
-            message("Erreur lors de la création de l'image JPEG.", ERROR);
+            gestion_message("Erreur lors de la création de l'image JPEG.", ERROR);
         }
 
         // Corriger l'orientation de l'image à l'aide des métadonnées EXIF
@@ -374,18 +375,18 @@ if (!empty($photoBase64) && strpos($photoBase64, 'data:image') === 0) {
         if (!imagepng($image, $photoPath)) {
             imagedestroy($image);
             unlink($tempPath);
-            message("Erreur lors de la conversion de l'image JPEG en PNG.", ERROR);
+            gestion_message("Erreur lors de la conversion de l'image JPEG en PNG.", ERROR);
         }
         imagedestroy($image);
     } elseif ($imageInfo['mime'] === 'image/png') {
         // Si l'image est déjà un PNG, on la copie simplement
         if (!rename($tempPath, $photoPath)) {
             unlink($tempPath);
-            message("Erreur lors de la sauvegarde de l'image PNG.", ERROR);
+            gestion_message("Erreur lors de la sauvegarde de l'image PNG.", ERROR);
         }
     } else {
         unlink($tempPath);
-        message("Type d'image non pris en charge.", ERROR);
+        gestion_message("Type d'image non pris en charge.", ERROR);
     }
 
     // Ajouter une nouvelle page pour la photo dans le PDF
@@ -443,12 +444,13 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         [ 'BL' => $DOC_NAME ]
     );
     if ($ok === false) {
-        message("Erreur lors de la mise a jours en Base de donnée.", ERROR);
+        gestion_message("Erreur lors de la mise a jours en Base de donnée.", ERROR);
     }
 
     // ENVOIE DES MAILS #GLPI11#
-    if ($MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1 && $EMAIL != 'vide'){        
-        $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoyé à ". $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
+    $allow_client_mail = (!$combined_mode) || ((int)$config->CombinedMailMode() === 1);
+    if ($allow_client_mail && $MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1 && $EMAIL != 'vide'){        
+        $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoye a " . $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
     }
 
     if ($DOC->tickets_id == 0) {$IdTicket = "Aucun ticket lié";} else { $IdTicket = $DOC->tickets_id; }
@@ -461,13 +463,19 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         if ($hasComment) {
             $ValueForSigned .= " <br><br> Commentaire : " . $rawComment;
         }
-            if (!empty($config->fields['ZenDocMail'])){ 
-                $sharepoint->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
-            }else{
-                $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
+            if (!$combined_mode) {
+                if (!empty($config->fields['ZenDocMail'])){ 
+                    $sharepoint->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
+                }else{
+                    $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
+                }
+            } else {
+                if (!empty($config->fields['CounterInvoiceMail'])) {
+                    $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
+                }
             }
     }else{
-        if (!empty($config->fields['ZenDocMail'])){ 
+        if (!$combined_mode && !empty($config->fields['ZenDocMail'])){ 
             $ValueForSigned = "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
             if (!empty($relatedInvoiceToBL)) {
                 $ValueForSigned .= " <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL";
@@ -489,7 +497,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
                 }             
                 $sharepoint->deleteFileByPath($folderPathFile);
             } catch (Exception $e) {
-                message("Erreur : " . $e->getMessage(), ERROR);
+                gestion_message("Erreur : " . $e->getMessage(), ERROR);
             }
         }
         if($DOC->save == "Local"){
@@ -499,7 +507,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
                     unlink($existingPdfPath); // si fichier local alors delete le fichier non signer (configmode = 0 alors suppression du fichier)
                 }
             } catch (Exception $e) {
-                message("Erreur de suppression du document non signé : " . $e->getMessage(), ERROR);
+                gestion_message("Erreur de suppression du document non signé : " . $e->getMessage(), ERROR);
             }
         }
         if ($DOC->save == "Sage"){ //Récup BL depuis local
@@ -546,7 +554,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             copy($outputPathTemp, $destPath);
         }
     } catch (Exception $e) {
-        message("Erreur : " . $e->getMessage(), ERROR);
+        gestion_message("Erreur : " . $e->getMessage(), ERROR);
     }
 ////////////////// Upload du fichier signé dans SharePoint ou localement //////////////////
 
@@ -590,18 +598,23 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         }
         if ($DB->doQuery("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc, save = '$FolderDes', signed = 1, doc_date = NOW(), users_id = $tech_id, users_ext = '$name_esc' $tech_ext_sql WHERE id = $id_document")){            //unlink($existingPdfPath);
             unlink($signaturePath);
-            unlink($outputPathTemp);
+            if ($combined_mode) {
+                $GLOBALS['GESTION_LAST_SIGNED_BL_PDF'] = $outputPathTemp;
+            } else {
+                unlink($outputPathTemp);
+            }
         }
 
-        message('Documents : '. $DOC_NAME.' signé', INFO);
+        gestion_message('Documents : '. $DOC_NAME.' signé', INFO);
     } catch (Exception $e) {
-        message("Signé avec erreur, voir votre administrateur : " . $e->getMessage(), ERROR);
+        gestion_message("Signé avec erreur, voir votre administrateur : " . $e->getMessage(), ERROR);
     }
                 
 
 /*}else{
-    message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
+    gestion_message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);
 }*/
 
 //Html::back();
 ?>
+

@@ -768,3 +768,259 @@ function initializeSignatureGestion(uniqId) {
     document.addEventListener("touchend", (function(){ let last=0; return function(e){ const now=Date.now(); if (now-last<300) e.preventDefault(); last=now; }; })(), {passive:false});
   })();
 }
+
+// --------- Signature BL/Rapport lors de l'ajout d'une tâche ---------
+(function(){
+  const root = (typeof GLPI_PLUG_GESTION !== 'undefined' && typeof GLPI_PLUG_GESTION === 'string' && GLPI_PLUG_GESTION.trim())
+    ? GLPI_PLUG_GESTION
+    : ((window.CFG_GLPI && window.CFG_GLPI.root_doc) ? (window.CFG_GLPI.root_doc + '/plugins/gestion') : '/glpi/plugins/gestion');
+
+  let inflight = false;
+
+  function isTaskForm(form) {
+    if (!form) return false;
+    if (!form.closest('.itiltask')) return false;
+    if (!form.querySelector('[name=\"state\"]')) return false;
+    if (!form.querySelector('[name=\"users_id_tech\"]')) return false;
+    return true;
+  }
+
+  function isAddTaskForm(form) {
+    return isTaskForm(form) && !!form.querySelector('button[name=\"add\"]');
+  }
+
+  function getTicketId(form) {
+    const input = form.querySelector('input[name=\"tickets_id\"]') || form.querySelector('input[name=\"items_id\"]') || form.querySelector('input[name=\"id\"]');
+    if (!input) return 0;
+    const v = parseInt(input.value, 10);
+    return isNaN(v) ? 0 : v;
+  }
+
+  function getTaskState(form) {
+    const sel = form.querySelector('[name=\"state\"]');
+    if (!sel) return null;
+    const v = parseInt(sel.value, 10);
+    return isNaN(v) ? null : v;
+  }
+
+  function fetchContext(ticketId, state) {
+    return new Promise((resolve, reject) => {
+      $.ajax({
+        url: root + '/ajax/task_signature_context.php',
+        method: 'POST',
+        dataType: 'json',
+        data: { ticket_id: ticketId, state: state },
+        timeout: 8000
+      }).done(resolve).fail(reject);
+    });
+  }
+
+  function setPending(ticketId, state) {
+    try {
+      const payload = { ticket_id: ticketId, state: state, ts: Date.now() };
+      sessionStorage.setItem('gestion_task_sig_pending', JSON.stringify(payload));
+    } catch (e) {}
+  }
+
+  function readPending() {
+    try {
+      const raw = sessionStorage.getItem('gestion_task_sig_pending');
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      return data && typeof data === 'object' ? data : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function clearPending() {
+    try { sessionStorage.removeItem('gestion_task_sig_pending'); } catch (e) {}
+  }
+
+  function isTicketPage() {
+    const path = (location && location.pathname) ? location.pathname : '';
+    return /ticket\.form\.php$/i.test(path) || /\/front\/ticket\.form\.php$/i.test(path) || /ticket\.form\.php/i.test(path);
+  }
+
+  function injectHtmlWithScripts($container, html) {
+    $container.html(html);
+    $container.find('script').each(function(){
+      const src = this.getAttribute('src');
+      if (src) {
+        // Déjà chargé globalement, on évite les doublons.
+        return;
+      }
+      const code = this.text || this.textContent || this.innerText || '';
+      if (code.trim() !== '') {
+        try { (0, eval)(code); } catch (e) { console.error(e); }
+      }
+    });
+  }
+
+  function openSignatureModal(ctx) {
+    const modalId = 'gestion-task-signature-dialog';
+    const hasMultipleBL = Array.isArray(ctx.bls) && ctx.bls.length > 1;
+
+    let blOptions = '';
+    if (Array.isArray(ctx.bls)) {
+      ctx.bls.forEach(b => {
+        const sel = (b.id === ctx.default_bl_id) ? ' selected' : '';
+        blOptions += `<option value=\"${b.id}\"${sel}>${b.label}</option>`;
+      });
+    }
+
+    const defaultMode = ctx.default_mode || (ctx.rp_active ? 'both' : 'bl');
+    const radioHtml = ctx.rp_active ? `
+      <div class="mb-3">
+        <label class="form-label mb-1">Mode de signature</label>
+        <div class="d-flex flex-wrap gap-3">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="gestion_sig_mode" id="gestion_sig_mode_rp" value="rp" ${defaultMode === 'rp' ? 'checked' : ''}>
+            <label class="form-check-label" for="gestion_sig_mode_rp">Signature Rapport</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="gestion_sig_mode" id="gestion_sig_mode_both" value="both" ${defaultMode === 'both' ? 'checked' : ''}>
+            <label class="form-check-label" for="gestion_sig_mode_both">Signature Rapport + BL</label>
+          </div>
+        </div>
+      </div>
+    ` : '';
+
+    const blSelectHtml = hasMultipleBL ? `
+      <div class=\"mb-3\">
+        <label class=\"form-label mb-1\">Sélection du BL</label>
+        <select id=\"gestion_sig_bl_select\" class=\"form-select\">${blOptions}</select>
+      </div>
+    ` : '';
+
+    const loadingHtml = `
+      <div class="d-flex align-items-center gap-2 text-muted">
+        <div class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></div>
+        <span>Chargement...</span>
+      </div>
+    `;
+
+    const body = `
+      <div id=\"gestion-task-signature-modal\" data-ticket-id=\"${ctx.ticket_id}\">
+        ${radioHtml}
+        ${blSelectHtml}
+        <div id=\"gestion-task-signature-container\">
+          ${loadingHtml}
+        </div>
+      </div>
+    `;
+
+    glpi_html_dialog({
+      title: 'Gestion BL',
+      body: body,
+      id: modalId,
+      show: function(){
+        const $modal = $('#gestion-task-signature-modal');
+        const $container = $('#gestion-task-signature-container');
+        const $blSelect = $('#gestion_sig_bl_select');
+
+        function currentMode() {
+          if (!ctx.rp_active) return 'bl';
+          const v = $modal.find('input[name=\"gestion_sig_mode\"]:checked').val();
+          return v || defaultMode;
+        }
+
+        function currentBlId() {
+          const v = $blSelect.length ? parseInt($blSelect.val(), 10) : (ctx.default_bl_id || 0);
+          return isNaN(v) ? 0 : v;
+        }
+
+        function loadForm() {
+          const mode = currentMode();
+          const blId = currentBlId();
+
+          // BL requis sauf mode RP
+          if (mode !== 'rp' && !blId) {
+            $container.html('<div class=\"alert alert-warning\">BL manquant.</div>');
+            return;
+          }
+
+          // Afficher/masquer le dropdown BL selon le mode
+          if ($blSelect.length) {
+            $blSelect.closest('.mb-3').toggle(mode !== 'rp');
+          }
+
+          $container.html(loadingHtml);
+          $.ajax({
+            url: root + '/ajax/task_signature_form.php',
+            method: 'POST',
+            data: { ticket_id: ctx.ticket_id, mode: mode, bl_id: blId },
+            dataType: 'html'
+          }).done(function(html){
+            if (!html || !String(html).trim()) {
+              $container.html('<div class=\"alert alert-warning\">Réponse vide du serveur.</div>');
+              return;
+            }
+            injectHtmlWithScripts($container, html);
+          }).fail(function(xhr, status, err){
+            const details = (xhr && xhr.responseText) ? String(xhr.responseText).slice(0, 600) : '';
+            const msg = '<div class=\"alert alert-danger\">Erreur de chargement du formulaire'
+              + (status ? ' (' + status + ')' : '') + '.</div>'
+              + (details ? '<pre style=\"white-space:pre-wrap; font-size:12px; margin-top:6px;\">' + details + '</pre>' : '');
+            $container.html(msg);
+          });
+        }
+
+        $modal.on('change', 'input[name=\"gestion_sig_mode\"]', function(){ loadForm(); });
+        $blSelect.on('change', function(){ loadForm(); });
+
+        // Chargement initial
+        loadForm();
+      }
+    });
+  }
+
+  $(document).on('submit', 'form', function(){
+    const form = this;
+    if (!isAddTaskForm(form)) return;
+
+    const ticketId = getTicketId(form);
+    const state = getTaskState(form);
+    if (!ticketId || state === null) return;
+    setPending(ticketId, state);
+  });
+
+  // Ouverture différée après l'enregistrement (après reload)
+  $(function(){
+    const pending = readPending();
+    if (!pending || !pending.ticket_id) return;
+
+    if (!isTicketPage()) {
+      return; // attendre d'être sur la page ticket
+    }
+
+    const now = Date.now();
+    const age = (pending.ts && typeof pending.ts === 'number') ? (now - pending.ts) : 0;
+    if (age > 120000) { // 2 minutes
+      clearPending();
+      return;
+    }
+
+    // Consommer avant d'ouvrir pour éviter les boucles
+    clearPending();
+
+    if (inflight) return;
+    inflight = true;
+
+    fetchContext(pending.ticket_id, pending.state)
+      .then(function(ctx){
+        inflight = false;
+        if (ctx && ctx.ok && ctx.show) {
+          if (!ctx.rp_active && Array.isArray(ctx.bls) && ctx.bls.length === 1 && typeof gestion_loadCriForm === 'function') {
+            const params = { job: ctx.ticket_id, root_doc: root, root_modal: 'ticket-form' };
+            gestion_loadCriForm('showCriForm', String(ctx.bls[0].id), params);
+            return;
+          }
+          openSignatureModal(ctx);
+        }
+      })
+      .catch(function(){
+        inflight = false;
+      });
+  });
+})();

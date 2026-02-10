@@ -59,7 +59,11 @@ class PluginGestionCri extends CommonDBTM {
       $job->getfromDB($ID);
       $email = '';
 
-      $id = $_POST["modal"];
+      $id = isset($options['modal']) ? (int)$options['modal'] : (int)($_POST["modal"] ?? 0);
+      if ($id <= 0) {
+         echo "<div class='alert alert-danger'>BL introuvable.</div>";
+         return;
+      }
       $DOC = $DB->doQuery("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$id'")->fetch_object();
       $Doc_Name = $DOC->bl;
       $doc_id  = $DOC->doc_id;
@@ -906,6 +910,187 @@ class PluginGestionCri extends CommonDBTM {
          }, 100); // Délai de 100ms pour s'assurer que tout est chargé
       </script>
       <?php
+   }
+
+   /**
+    * Formulaire combiné : Signature Rapport + BL
+    */
+   function showCombinedForm($ID, $bl_id, $options = []) {
+      global $DB, $CFG_GLPI;
+
+      // CSS gestion pour les cartes BL
+      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css">';
+
+      $config     = PluginGestionConfig::getInstance();
+      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
+      $sharepoint = new PluginGestionSharepoint();
+
+      $bl_id = (int)$bl_id;
+      $DOC = $DB->doQuery("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$bl_id'")->fetch_object();
+      if (!$DOC) {
+         echo "<div class='alert alert-danger'>BL introuvable.</div>";
+         return;
+      }
+
+      $Doc_Name = $DOC->bl;
+      $DocUrlSharePoint = "";
+      $fileDownloadUrl = "";
+      $baseUrl = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/') . '/front';
+
+      // Préparation des URLs PDF si prévisualisation activée
+      if ($config->fields['SharePointLinkDisplay'] == 1) {
+         try {
+            if ($DOC->save == 'SharePoint'){
+               $DocUrlSharePoint = $DOC->doc_url;
+               $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);
+            }
+            if ($DOC->save == 'Local'){
+               $fileDownloadUrl = $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
+               $DocUrlSharePoint = $fileDownloadUrl;
+            }
+            if ($DOC->save == 'Sage'){
+               $DocUrlSharePoint = $DOC->doc_url;
+               $fileDownloadUrl = $DOC->doc_url;
+            }
+         } catch (Exception $e) {
+            $fileDownloadUrl = "";
+         }
+      }
+
+      // Helper autorisation utilisateur
+      $isUserAuthorized = function($authorized_users_string) {
+         $current_user_id = $_SESSION['glpiID'];
+         $authorized_users = json_decode($authorized_users_string, true);
+         return is_array($authorized_users) && in_array($current_user_id, $authorized_users);
+      };
+
+      // --------- Section BL (HTML) ---------
+      ob_start();
+      ?>
+      <div class="form-card">
+         <div class="document-info">
+            <div class="document-title">Document : <?php echo htmlspecialchars($Doc_Name, ENT_QUOTES); ?></div>
+            <div class="document-status status-unsigned">Non Signé</div>
+         </div>
+      </div>
+
+      <div class="form-card">
+         <div class="form-label">Visualisation du document</div>
+         <div class="form-content">
+            <?php if ($config->fields['SharePointLinkDisplay'] == 1 && !empty($fileDownloadUrl)) { ?>
+               <object data="<?php echo htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8'); ?>#view=FitH"
+                       type="application/pdf" class="pdf-viewer pdf-responsive">
+                  Votre navigateur ne peut pas afficher le PDF.
+               </object>
+            <?php } ?>
+            <?php if (!empty($DocUrlSharePoint)) { ?>
+               <div style="margin-top: 15px;">
+                  <a href="<?php echo $DocUrlSharePoint; ?>" target="_blank" class="pdf-link">Voir le PDF en plein écran</a>
+               </div>
+            <?php } ?>
+         </div>
+      </div>
+
+      <div class="form-card">
+         <div class="form-label">Ajouter un fichier / image</div>
+         <div class="form-content">
+            <input type="file" id="capture-photo" accept="image/*" capture="environment">
+            <textarea name="photo_base64" id="photo-base64" style="display:none;"></textarea>
+         </div>
+      </div>
+      <script>
+      (function(){
+         const capturePhoto = document.getElementById("capture-photo");
+         if (!capturePhoto || capturePhoto.dataset.gestionPhotoInit === "1") return;
+         capturePhoto.dataset.gestionPhotoInit = "1";
+         capturePhoto.addEventListener("change", function (event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith("image/")) { alert("Le fichier sélectionné n'est pas une image."); return; }
+            if (file.type !== "image/png" && file.type !== "image/jpeg") { alert("Le fichier doit être au format PNG ou JPEG."); return; }
+            const reader = new FileReader();
+            reader.onload = e => { const out = document.getElementById("photo-base64"); if (out) out.value = e.target.result; };
+            reader.readAsDataURL(file);
+         });
+      })();
+      </script>
+
+      <div class="form-card">
+         <div class="form-label">Commentaire</div>
+         <textarea id="comment"
+                   name="comment"
+                   class="email-input"
+                   placeholder="Commentaire éventuel lié au règlement comptoir ou autre..."
+                   rows="3"></textarea>
+      </div>
+
+      <?php
+      // Facturation comptoir (si activée)
+      if ($config->fields['CounterInvoice'] == 1 && $isUserAuthorized($config->fields['CounterInvoiceUsers'])) {
+         require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
+         $fields = Montant($DOC->url_bl);
+         $ttc = null; $ht = null;
+         if (isset($fields['TTC'])) {
+            $val = $fields['TTC'];
+            $ttc = is_array($val) ? implode(',', $val) : (string)$val;
+         }
+         if (isset($fields['HT'])) {
+            $val = $fields['HT'];
+            $ht = is_array($val) ? implode(',', $val) : (string)$val;
+         }
+         ?>
+         <div class="form-card">
+            <div class="form-label">Règlement effectué au comptoir</div>
+            <div class="form-content">
+               <div class="amount-group">
+                  <?php if ($ttc !== null) { ?>
+                     <div><strong>Montant TTC :</strong> <?php echo htmlspecialchars($ttc); ?> €</div>
+                  <?php } ?>
+                  <?php if ($ht !== null) { ?>
+                     <div><strong>Montant HT :</strong> <?php echo htmlspecialchars($ht); ?> €</div>
+                  <?php } ?>
+               </div>
+            </div><br>
+            <div class="form-content">
+               <div class="checkbox-group">
+                  <input type="checkbox" name="CounterInvoiceClient" value="1" id="CounterInvoiceClient">
+                  <label for="CounterInvoiceClient">Règlement effectué</label>
+               </div>
+            </div>
+         </div>
+         <?php
+      }
+      $blSectionHtml = ob_get_clean();
+
+      // --------- Formulaire RP ---------
+      $_POST['modal'] = 'form_rapport';
+      ob_start();
+      $rp = new PluginRpCri();
+      $rp->showForm($ID, ['modal' => 'form_rapport']);
+      $rpHtml = ob_get_clean();
+
+      // Remplacer l'action du formulaire
+      $rpHtml = str_replace(
+         PLUGIN_RP_WEBDIR . '/front/cripdf.form.php',
+         PLUGIN_GESTION_WEBDIR . '/front/traitement_combined.php',
+         $rpHtml
+      );
+
+      // Injecter les champs BL + mode combiné dans le formulaire
+      $hidden = Html::hidden('DOC', ['value' => $Doc_Name])
+              . Html::hidden('id_document', ['value' => $bl_id])
+              . Html::hidden('combined_mode', ['value' => 1]);
+
+      $rpHtml = preg_replace('/<form\b([^>]*)>/', '<form$1>' . $hidden, $rpHtml, 1);
+
+      // Insérer la section BL après l'ouverture du container principal
+      $rpHtml = preg_replace('/<div class="form-container">/', '<div class="form-container">' . $blSectionHtml, $rpHtml, 1);
+
+      // Ajuster le libellé du bouton
+      $rpHtml = str_replace('value="Génération du PDF"', 'value="Signer BL + Rapport"', $rpHtml);
+      $rpHtml = str_replace('value="GÃ©nÃ©ration du PDF"', 'value="Signer BL + Rapport"', $rpHtml);
+
+      echo $rpHtml;
    }
 }
 ?>
