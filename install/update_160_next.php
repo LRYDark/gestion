@@ -12,12 +12,12 @@ function update_160_next() {
    ];
 
    // Liste pour les colonnes manquantes
-   $missing_columns = array_diff($required_columns, array_column($columns, 'Field'));
+   $existing = array_column($columns, 'Field');
 
-    if (!empty($missing_columns)) {
-        $query= "ALTER TABLE glpi_plugin_gestion_surveys
-                ADD COLUMN `paid` TINYINT(1) NOT NULL DEFAULT '0',
-                ADD COLUMN `comment` TEXT NULL;";
-        $DB->doQuery($query) or die($DB->error());
+    if (!in_array('paid', $existing)) {
+        $DB->doQuery("ALTER TABLE `glpi_plugin_gestion_surveys` ADD COLUMN `paid` TINYINT(1) NOT NULL DEFAULT '0'") or die($DB->error());
+    }
+    if (!in_array('comment', $existing)) {
+        $DB->doQuery("ALTER TABLE `glpi_plugin_gestion_surveys` ADD COLUMN `comment` TEXT NULL") or die($DB->error());
     }
 }

@@ -520,6 +520,47 @@ try {
       font-size: 14px;
       color: #6c757d;
     }
+
+    /* ── BL Scanner ── */
+    .bl-input-row { display: flex; gap: 8px; }
+    .bl-input-row .form-input { flex: 1; }
+    .bl-scan-btn {
+      appearance: none;
+      border: 1px solid #ced4da;
+      background: #f8f9fa;
+      border-radius: 6px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .bl-scan-btn:hover { background: #e9ecef; border-color: #adb5bd; }
+    .bl-spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid #e9ecef;
+      border-top-color: #3498db;
+      border-radius: 50%;
+      animation: bl-spin 0.6s linear infinite;
+    }
+    @keyframes bl-spin { to { transform: rotate(360deg); } }
+    .bl-camera-overlay {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      width: 80%; height: 40%;
+      border: 2px dashed rgba(255,255,255,0.5);
+      border-radius: 12px;
+      pointer-events: none;
+    }
+    .bl-corner { position: absolute; width: 24px; height: 24px; }
+    .bl-corner-tl { top: -2px; left: -2px; border-top: 3px solid #3498db; border-left: 3px solid #3498db; border-radius: 8px 0 0 0; }
+    .bl-corner-tr { top: -2px; right: -2px; border-top: 3px solid #3498db; border-right: 3px solid #3498db; border-radius: 0 8px 0 0; }
+    .bl-corner-bl { bottom: -2px; left: -2px; border-bottom: 3px solid #3498db; border-left: 3px solid #3498db; border-radius: 0 0 0 8px; }
+    .bl-corner-br { bottom: -2px; right: -2px; border-bottom: 3px solid #3498db; border-right: 3px solid #3498db; border-radius: 0 0 8px 0; }
   </style>
 </head>
 
@@ -2587,10 +2628,40 @@ try {
         </div>
         <div class="form-label">Recherche BL (ex: BL199550)</div>
         <div class="form-content">
-          <input id="modalQuickBlInput" type="text" inputmode="numeric" pattern="[0-9]*" value="BL" class="form-input" placeholder="Ex: BL199550" style="width:100%;">
+          <div class="bl-input-row">
+            <input id="modalQuickBlInput" type="text" inputmode="numeric" pattern="[0-9]*" value="BL" class="form-input" placeholder="Ex: BL199550">
+            <button type="button" id="blScanBtn" class="bl-scan-btn" title="Scanner un document">📷</button>
+          </div>
+          <input type="file" id="blFileInput" accept="image/*,.pdf,application/pdf" style="display:none;">
           <div id="modalQuickBlErr" class="alert alert-error" style="display:none; margin-top:8px;"></div>
+          <div id="blCameraArea" style="display:none; margin-top:10px;">
+            <div style="position:relative; border-radius:12px; overflow:hidden; background:#000;">
+              <video id="blScanVideo" autoplay playsinline muted style="width:100%; max-height:300px; display:block; object-fit:cover;"></video>
+              <div class="bl-camera-overlay">
+                <div class="bl-corner bl-corner-tl"></div>
+                <div class="bl-corner bl-corner-tr"></div>
+                <div class="bl-corner bl-corner-bl"></div>
+                <div class="bl-corner bl-corner-br"></div>
+              </div>
+              <canvas id="blScanCanvas" style="display:none;"></canvas>
+            </div>
+            <div style="text-align:center; margin-top:8px;">
+              <small style="color:#6c757d;" id="blScanHint">Placez le numéro BL dans le cadre</small>
+              <div style="margin-top:8px; display:flex; gap:8px; justify-content:center;">
+                <button type="button" id="blCaptureBtn" class="btn btn-primary" style="font-size:13px; padding:8px 16px;">📸 Capturer</button>
+                <button type="button" id="blCancelScan" class="btn btn-outline" style="font-size:13px; padding:8px 16px;">Annuler</button>
+              </div>
+            </div>
+          </div>
+          <div id="blOcrProgress" style="display:none; text-align:center; margin:12px 0;">
+            <span class="bl-spinner"></span>
+            <span style="margin-left:8px; color:#6c757d;" id="blOcrStatus">Analyse du document...</span>
+            <div style="height:4px; background:#e9ecef; border-radius:2px; margin-top:8px;">
+              <div id="blOcrBar" style="height:100%; background:#3498db; border-radius:2px; width:0%; transition:width 0.3s;"></div>
+            </div>
+          </div>
           <div id="modalQuickBlResults" style="border:1px solid #e9ecef;border-radius:8px;padding:8px;max-height:280px;overflow:auto; margin-top:10px;"></div>
-          
+
         </div>
   </div>
   </div>
@@ -2673,6 +2744,263 @@ try {
       </div>
     </div>
   </div>
+
+<script>
+// ─── BL Scanner ─────────────────────────────────────
+(function(){
+  const blScanBtnEl    = document.getElementById('blScanBtn');
+  const blFileInput    = document.getElementById('blFileInput');
+  const blCameraArea   = document.getElementById('blCameraArea');
+  const blScanVideo    = document.getElementById('blScanVideo');
+  const blScanCanvas   = document.getElementById('blScanCanvas');
+  const blCaptureBtnEl = document.getElementById('blCaptureBtn');
+  const blCancelScanEl = document.getElementById('blCancelScan');
+  const blScanHintEl   = document.getElementById('blScanHint');
+  const blOcrProgressEl= document.getElementById('blOcrProgress');
+  const blOcrStatusEl  = document.getElementById('blOcrStatus');
+  const blOcrBarEl     = document.getElementById('blOcrBar');
+  const blInput        = document.getElementById('modalQuickBlInput');
+  const blResults      = document.getElementById('modalQuickBlResults');
+  const blErrEl        = document.getElementById('modalQuickBlErr');
+
+  if (!blScanBtnEl) return; // Exit if scan button not found
+
+  let blCameraStream = null;
+  let blAutoScan     = false;
+  let blOcrW         = null;
+
+  function blShowErr(msg) { if (blErrEl) { blErrEl.textContent = msg; blErrEl.style.display = 'block'; } }
+  function blClearErr()   { if (blErrEl) { blErrEl.textContent = ''; blErrEl.style.display = 'none'; } }
+
+  function blIsMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      || ('ontouchstart' in window)
+      || (navigator.maxTouchPoints > 0 && navigator.maxTouchPoints !== 256);
+  }
+
+  // ── Tesseract / PDF.js ──
+  function blLoadTesseract() {
+    return new Promise(function(resolve, reject) {
+      if (window.Tesseract) { resolve(); return; }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      s.onload = resolve;
+      s.onerror = function() { reject(new Error('Impossible de charger le module OCR.')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function blLoadPdfJs() {
+    return new Promise(function(resolve, reject) {
+      if (window.pdfjsLib) { resolve(); return; }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3/build/pdf.min.js';
+      s.onload = function() { if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3/build/pdf.worker.min.js'; resolve(); };
+      s.onerror = function() { reject(new Error('Impossible de charger le module PDF.')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  async function blPdfToCanvas(file) {
+    await blLoadPdfJs();
+    var ab = await file.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+    var page = await pdf.getPage(1);
+    var vp = page.getViewport({ scale: 2 });
+    var c = document.createElement('canvas');
+    c.width = vp.width; c.height = vp.height;
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    return c;
+  }
+
+  // ── OCR progress ──
+  function blShowOcr(show) { if (blOcrProgressEl) blOcrProgressEl.style.display = show ? 'block' : 'none'; if (!show && blOcrBarEl) blOcrBarEl.style.width = '0%'; }
+  function blSetBar(pct)   { if (blOcrBarEl) blOcrBarEl.style.width = Math.round(pct) + '%'; }
+  function blSetStatus(msg){ if (blOcrStatusEl) blOcrStatusEl.textContent = msg || ''; }
+
+  // ── Camera ──
+  function blStopCamera() {
+    blAutoScan = false;
+    blTerminateOcr();
+    if (blCameraStream) { blCameraStream.getTracks().forEach(function(t) { t.stop(); }); blCameraStream = null; }
+    if (blScanVideo) blScanVideo.srcObject = null;
+    if (blCameraArea) blCameraArea.style.display = 'none';
+    if (blResults) blResults.style.display = '';
+  }
+
+  async function blStartCamera() {
+    blStopCamera();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
+    if (!blCameraArea || !blScanVideo) return false;
+    try {
+      blCameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } });
+      blScanVideo.srcObject = blCameraStream;
+      blCameraArea.style.display = 'block';
+      if (blResults) blResults.style.display = 'none';
+      return true;
+    } catch(e) { blStopCamera(); return false; }
+  }
+
+  function blCaptureFrame() {
+    if (!blScanVideo || !blScanCanvas) return null;
+    blScanCanvas.width = blScanVideo.videoWidth || 640;
+    blScanCanvas.height = blScanVideo.videoHeight || 480;
+    blScanCanvas.getContext('2d').drawImage(blScanVideo, 0, 0, blScanCanvas.width, blScanCanvas.height);
+    return blScanCanvas;
+  }
+
+  // ── OCR text extraction ──
+  function blExtractBl(text) {
+    if (!text) return null;
+    var t = text.toUpperCase().replace(/[^A-Z0-9\s\/\-:.]/g, ' ');
+    var m = t.match(/B\s*L\s*[:\-\/.\s]*(\d[\d\s]{2,})/);
+    if (m) { var n = m[1].replace(/\s/g, ''); if (n.length >= 3) return 'BL' + n; }
+    m = t.match(/BON\s+DE\s+LIVRAISON[^0-9]*(\d[\d\s]{2,})/);
+    if (m) { var n2 = m[1].replace(/\s/g, ''); if (n2.length >= 3) return 'BL' + n2; }
+    var nums = t.match(/\b(\d{6,})\b/g);
+    if (nums && nums.length > 0) return 'BL' + nums[0];
+    return null;
+  }
+
+  async function blGetOcrWorker() {
+    if (blOcrW) return blOcrW;
+    await blLoadTesseract();
+    blOcrW = await Tesseract.createWorker('fra+eng', 1);
+    return blOcrW;
+  }
+
+  function blTerminateOcr() {
+    if (blOcrW) { try { blOcrW.terminate(); } catch(e){} blOcrW = null; }
+  }
+
+  function blDelay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+  // ── Auto-scan loop ──
+  async function blAutoScanLoop() {
+    blAutoScan = true;
+    if (blScanHintEl) blScanHintEl.textContent = 'Chargement OCR...';
+    try { await blGetOcrWorker(); } catch(e) { blShowErr('Erreur OCR: ' + e.message); return; }
+    if (!blAutoScan) return;
+    if (blScanHintEl) blScanHintEl.textContent = 'Recherche automatique du numéro BL...';
+    await blDelay(1000);
+    var attempts = 0, max = 20;
+    while (blAutoScan && blCameraStream && attempts < max) {
+      attempts++;
+      if (blScanHintEl) blScanHintEl.textContent = 'Scan en cours... (' + attempts + '/' + max + ')';
+      var c = blCaptureFrame();
+      if (!c) { await blDelay(1000); continue; }
+      try {
+        var w = await blGetOcrWorker();
+        var result = await w.recognize(c);
+        var txt = (result && result.data && result.data.text) || '';
+        var bl = blExtractBl(txt);
+        if (bl) {
+          blAutoScan = false;
+          if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+          blStopCamera();
+          if (blInput) { blInput.value = bl; blInput.dispatchEvent(new Event('input', { bubbles: true })); }
+          return;
+        }
+      } catch(e) {}
+      if (blAutoScan) await blDelay(800);
+    }
+    if (blAutoScan && attempts >= max) {
+      blAutoScan = false;
+      if (blScanHintEl) blScanHintEl.textContent = 'BL non détecté.';
+      blShowErr('Numéro BL non détecté après ' + max + ' tentatives.');
+    }
+  }
+
+  // ── Manual OCR ──
+  async function blRunOcr(imageSource) {
+    blClearErr();
+    blShowOcr(true);
+    blSetBar(10);
+    blSetStatus('Chargement du moteur OCR...');
+    try {
+      await blLoadTesseract();
+      blSetBar(25);
+      blSetStatus('Initialisation...');
+      var w = await Tesseract.createWorker('fra+eng', 1, {
+        logger: function(info) { if (info.status === 'recognizing text' && info.progress) { blSetBar(30 + Math.round(info.progress * 65)); blSetStatus('Lecture du texte...'); } }
+      });
+      blSetBar(30);
+      var result = await w.recognize(imageSource);
+      blSetBar(98);
+      await w.terminate();
+      var txt = (result && result.data && result.data.text) || '';
+      var bl = blExtractBl(txt);
+      blSetBar(100);
+      blShowOcr(false);
+      if (bl) {
+        if (blInput) { blInput.value = bl; blInput.dispatchEvent(new Event('input', { bubbles: true })); }
+        if (navigator.vibrate) navigator.vibrate(100);
+        return bl;
+      }
+      var preview = txt.substring(0, 150).trim();
+      blShowErr('Aucun numéro BL détecté.' + (preview ? ' Texte lu: "' + preview + '"' : ''));
+      return null;
+    } catch(e) { blShowOcr(false); blShowErr('Erreur OCR : ' + e.message); return null; }
+  }
+
+  // ── Event listeners ──
+  if (blIsMobile() && blFileInput) blFileInput.setAttribute('capture', 'environment');
+  if (blIsMobile() && blCaptureBtnEl) blCaptureBtnEl.style.display = 'none';
+
+  blScanBtnEl.addEventListener('click', async function() {
+    blClearErr();
+    blShowOcr(false);
+    if (blIsMobile()) {
+      var ok = await blStartCamera();
+      if (ok) blAutoScanLoop();
+      else if (blFileInput) blFileInput.click();
+    } else {
+      if (blFileInput) blFileInput.click();
+    }
+  });
+
+  if (blFileInput) {
+    blFileInput.addEventListener('change', async function() {
+      if (!blFileInput.files || !blFileInput.files[0]) return;
+      var file = blFileInput.files[0];
+      blStopCamera();
+      var isPdf = file.type === 'application/pdf' || (file.name && file.name.toLowerCase().endsWith('.pdf'));
+      if (isPdf) {
+        try {
+          blShowOcr(true); blSetBar(5); blSetStatus('Lecture du PDF...');
+          var c = await blPdfToCanvas(file);
+          blShowOcr(false);
+          await blRunOcr(c);
+        } catch(e) { blShowOcr(false); blShowErr('Erreur lecture PDF : ' + e.message); }
+        blFileInput.value = '';
+      } else {
+        var img = new Image();
+        img.onload = async function() { await blRunOcr(img); URL.revokeObjectURL(img.src); blFileInput.value = ''; };
+        img.onerror = function() { blShowErr('Impossible de lire le fichier image.'); blFileInput.value = ''; };
+        img.src = URL.createObjectURL(file);
+      }
+    });
+  }
+
+  if (blCaptureBtnEl) {
+    blCaptureBtnEl.addEventListener('click', async function() {
+      var c = blCaptureFrame();
+      if (!c) { blShowErr('Capture impossible.'); return; }
+      blStopCamera();
+      await blRunOcr(c);
+    });
+  }
+
+  if (blCancelScanEl) blCancelScanEl.addEventListener('click', blStopCamera);
+
+  // Stop camera when modal is closed
+  var closeBtn = document.getElementById('closeQuickBlBtn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', function() { blStopCamera(); blShowOcr(false); });
+  }
+})();
+</script>
+
 </body>
 </html>
 

@@ -16,13 +16,20 @@ $config = new PluginGestionConfig();
 $doc = new Document();
 $combined_mode = !empty($_POST['combined_mode']);
 
-// Ensure optional column to store free-text technician for quick-sign
+// Ensure optional columns exist in surveys table
 try {
     $table = 'glpi_plugin_gestion_surveys';
     $chk = $DB->doQuery("SHOW COLUMNS FROM `$table` LIKE 'tech_ext'");
     if ($chk && $DB->numrows($chk) === 0) {
-        // Best-effort: add column if not exists (safe no-op if lacks perms)
         @$DB->doQuery("ALTER TABLE `$table` ADD COLUMN `tech_ext` VARCHAR(255) NULL AFTER `users_ext`");
+    }
+    $chk = $DB->doQuery("SHOW COLUMNS FROM `$table` LIKE 'comment'");
+    if ($chk && $DB->numrows($chk) === 0) {
+        @$DB->doQuery("ALTER TABLE `$table` ADD COLUMN `comment` TEXT NULL");
+    }
+    $chk = $DB->doQuery("SHOW COLUMNS FROM `$table` LIKE 'paid'");
+    if ($chk && $DB->numrows($chk) === 0) {
+        @$DB->doQuery("ALTER TABLE `$table` ADD COLUMN `paid` TINYINT(1) NOT NULL DEFAULT '0'");
     }
 } catch (Throwable $e) {
     // ignore

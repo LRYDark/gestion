@@ -47,6 +47,9 @@ if ($gestion->canView()) {
    echo '<script>
       window.GLPI_PLUG_GESTION = "' . PLUGIN_GESTION_WEBDIR . '";
    </script>';
+   if (defined('GESTION_AUTO_SCAN') && GESTION_AUTO_SCAN) {
+      echo '<script>window.GESTION_AUTO_SCAN = true;</script>';
+   }
    echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . time() . '" defer></script>';
    echo '<style>
       a.btn[href*="signature_bl=1"] {
@@ -81,8 +84,40 @@ if ($gestion->canView()) {
                   <div class="modal-body">
                      <div class="mb-3">
                         <label class="form-label">Recherche BL (ex: BL123456)</label>
-                        <input type="text" id="gestionQuickBlListInput" class="form-control" value="BL" placeholder="Ex: BL123456">
+                        <div class="input-group">
+                           <input type="text" id="gestionQuickBlListInput" class="form-control" value="BL" placeholder="Ex: BL123456">
+                           <button type="button" id="gestionBlScanBtn" class="btn btn-outline-secondary" title="Scanner / Joindre un document">
+                              <i class="ti ti-scan"></i>
+                           </button>
+                        </div>
+                        <input type="file" id="gestionBlFileInput" accept="image/*,.pdf,application/pdf" style="display:none;">
                         <div id="gestionQuickBlListErr" class="alert alert-danger" style="display:none; margin-top:8px;"></div>
+                     </div>
+                     <div id="gestionBlCameraArea" style="display:none;">
+                        <div style="position:relative; border-radius:12px; overflow:hidden; background:#000;">
+                           <video id="gestionBlScanVideo" autoplay playsinline muted style="width:100%; max-height:300px; display:block; object-fit:cover;"></video>
+                           <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:80%; height:40%; border:2px dashed rgba(255,255,255,0.5); border-radius:12px; pointer-events:none;">
+                              <div style="position:absolute;top:-2px;left:-2px;width:24px;height:24px;border-top:3px solid var(--tblr-primary,#206bc4);border-left:3px solid var(--tblr-primary,#206bc4);border-radius:8px 0 0 0;"></div>
+                              <div style="position:absolute;top:-2px;right:-2px;width:24px;height:24px;border-top:3px solid var(--tblr-primary,#206bc4);border-right:3px solid var(--tblr-primary,#206bc4);border-radius:0 8px 0 0;"></div>
+                              <div style="position:absolute;bottom:-2px;left:-2px;width:24px;height:24px;border-bottom:3px solid var(--tblr-primary,#206bc4);border-left:3px solid var(--tblr-primary,#206bc4);border-radius:0 0 0 8px;"></div>
+                              <div style="position:absolute;bottom:-2px;right:-2px;width:24px;height:24px;border-bottom:3px solid var(--tblr-primary,#206bc4);border-right:3px solid var(--tblr-primary,#206bc4);border-radius:0 0 8px 0;"></div>
+                           </div>
+                           <canvas id="gestionBlScanCanvas" style="display:none;"></canvas>
+                        </div>
+                        <div class="text-center mt-2 mb-2">
+                           <small class="text-muted" id="gestionBlScanHint">Placez le numero BL dans le cadre</small>
+                           <div class="mt-2">
+                              <button type="button" id="gestionBlCaptureBtn" class="btn btn-primary btn-sm me-2"><i class="ti ti-camera me-1"></i>Capturer</button>
+                              <button type="button" id="gestionBlCancelScan" class="btn btn-outline-secondary btn-sm">Annuler</button>
+                           </div>
+                        </div>
+                     </div>
+                     <div id="gestionBlOcrProgress" style="display:none;" class="text-center my-3">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                        <span class="ms-2 text-muted" id="gestionBlOcrStatus">Analyse du document...</span>
+                        <div class="progress mt-2" style="height:4px;">
+                           <div id="gestionBlOcrBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%;"></div>
+                        </div>
                      </div>
                      <div id="gestionQuickBlListResults" class="list-group" style="max-height: 280px; overflow:auto;"></div>
                   </div>
@@ -100,6 +135,10 @@ if ($gestion->canView()) {
             const resultsId = 'gestionQuickBlListResults';
             const errId = 'gestionQuickBlListErr';
             let searchTimer = null;
+            let cameraStream = null;
+            let autoScanActive = false;
+            let ocrWorker = null;
+            let pendingAutoClick = false;
 
             function getCsrf() {
                const meta = document.querySelector('meta[property="glpi:csrf_token"]');
@@ -181,12 +220,21 @@ if ($gestion->canView()) {
                });
             }
 
+            function isSageOnlyItem(item) {
+               if (parseInt(item.signed || 0, 10) === 1) return false;
+               var html = (item.html || item.text || '').toUpperCase();
+               return html.indexOf('SAGE') !== -1
+                  && html.indexOf('SIGN') === -1
+                  && html.indexOf('LOCAL') === -1;
+            }
+
             function renderResults(items) {
                const resultsEl = document.getElementById(resultsId);
                if (!resultsEl) return;
                resultsEl.innerHTML = '';
                if (!items || items.length === 0) {
                   resultsEl.innerHTML = '<div class="list-group-item text-muted">Aucun resultat</div>';
+                  pendingAutoClick = false;
                   return;
                }
                items.forEach((item) => {
@@ -197,6 +245,13 @@ if ($gestion->canView()) {
                   row.addEventListener('click', () => selectItem(item));
                   resultsEl.appendChild(row);
                });
+               // Auto-clic apres scan : 1 seul resultat SAGE uniquement
+               if (pendingAutoClick) {
+                  pendingAutoClick = false;
+                  if (items.length === 1 && isSageOnlyItem(items[0])) {
+                     setTimeout(function() { selectItem(items[0]); }, 400);
+                  }
+               }
             }
 
             async function searchBl(q) {
@@ -280,10 +335,12 @@ if ($gestion->canView()) {
             function openModal() {
                const modalEl = document.getElementById(modalId);
                if (!modalEl) return;
+               stopCamera();
                clearError();
+               showOcrProgress(false);
                const inputEl = document.getElementById(inputId);
                const resultsEl = document.getElementById(resultsId);
-               if (resultsEl) resultsEl.innerHTML = '';
+               if (resultsEl) { resultsEl.innerHTML = ''; resultsEl.style.display = ''; }
                if (inputEl) {
                   inputEl.value = normalizeBl(inputEl.value);
                   setTimeout(() => {
@@ -305,6 +362,8 @@ if ($gestion->canView()) {
             }
 
             function closeModal() {
+               stopCamera();
+               showOcrProgress(false);
                const modalEl = document.getElementById(modalId);
                if (!modalEl) return;
                if (window.bootstrap && bootstrap.Modal) {
@@ -344,13 +403,35 @@ if ($gestion->canView()) {
             function openFromUrl() {
                try {
                   const params = new URLSearchParams(window.location.search || '');
-                  if (params.get('signature_bl') === '1') {
+                  const fromUrl = params.get('signature_bl') === '1';
+                  const fromShortcut = !!window.GESTION_AUTO_SCAN;
+
+                  if (fromUrl || fromShortcut) {
+                     const wantScan = params.get('scan') === '1' || fromShortcut;
                      openModal();
-                     params.delete('signature_bl');
-                     const qs = params.toString();
-                     const clean = window.location.pathname + (qs ? ('?' + qs) : '') + window.location.hash;
-                     if (window.history && window.history.replaceState) {
-                        window.history.replaceState({}, document.title, clean);
+
+                     // Nettoyer l URL (seulement si parametres presents)
+                     if (fromUrl) {
+                        params.delete('signature_bl');
+                        params.delete('scan');
+                        const qs = params.toString();
+                        const clean = window.location.pathname + (qs ? ('?' + qs) : '') + window.location.hash;
+                        if (window.history && window.history.replaceState) {
+                           window.history.replaceState({}, document.title, clean);
+                        }
+                     }
+                     if (fromShortcut) delete window.GESTION_AUTO_SCAN;
+
+                     // Lancer le scanner auto (raccourci tablette)
+                     if (wantScan) {
+                        setTimeout(async function() {
+                           var ok = await startCamera();
+                           if (ok) {
+                              var captureBtn = document.getElementById('gestionBlCaptureBtn');
+                              if (captureBtn) captureBtn.style.display = 'none';
+                              autoScanLoop();
+                           }
+                        }, 500);
                      }
                   }
                } catch (e) {}
@@ -371,15 +452,364 @@ if ($gestion->canView()) {
                });
             }
 
+            // ─── Scanner / OCR BL ───────────────────────────────
+            function isMobileDevice() {
+               return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                  || ('ontouchstart' in window)
+                  || (navigator.maxTouchPoints > 0 && navigator.maxTouchPoints !== 256);
+            }
+
+            function loadTesseractJs() {
+               return new Promise(function(resolve, reject) {
+                  if (window.Tesseract) { resolve(); return; }
+                  var s = document.createElement('script');
+                  s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+                  s.onload = function() { resolve(); };
+                  s.onerror = function() { reject(new Error('Impossible de charger le module OCR.')); };
+                  document.head.appendChild(s);
+               });
+            }
+
+            function loadPdfJs() {
+               return new Promise(function(resolve, reject) {
+                  if (window.pdfjsLib) { resolve(); return; }
+                  var s = document.createElement('script');
+                  s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3/build/pdf.min.js';
+                  s.onload = function() {
+                     if (window.pdfjsLib) {
+                        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3/build/pdf.worker.min.js';
+                     }
+                     resolve();
+                  };
+                  s.onerror = function() { reject(new Error('Impossible de charger le module PDF.')); };
+                  document.head.appendChild(s);
+               });
+            }
+
+            async function renderPdfToCanvas(file) {
+               await loadPdfJs();
+               var arrayBuffer = await file.arrayBuffer();
+               var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+               var page = await pdf.getPage(1);
+               var viewport = page.getViewport({ scale: 2 });
+               var canvas = document.createElement('canvas');
+               canvas.width = viewport.width;
+               canvas.height = viewport.height;
+               var ctx = canvas.getContext('2d');
+               await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+               return canvas;
+            }
+
+            function showOcrProgress(show) {
+               var el = document.getElementById('gestionBlOcrProgress');
+               if (el) el.style.display = show ? 'block' : 'none';
+               if (!show) setOcrBar(0);
+            }
+
+            function setOcrBar(pct) {
+               var bar = document.getElementById('gestionBlOcrBar');
+               if (bar) bar.style.width = Math.round(pct) + '%';
+            }
+
+            function setOcrStatus(msg) {
+               var el = document.getElementById('gestionBlOcrStatus');
+               if (el) el.textContent = msg || '';
+            }
+
+            function stopCamera() {
+               autoScanActive = false;
+               terminateOcrWorker();
+               if (cameraStream) {
+                  cameraStream.getTracks().forEach(function(t) { t.stop(); });
+                  cameraStream = null;
+               }
+               var video = document.getElementById('gestionBlScanVideo');
+               if (video) video.srcObject = null;
+               var area = document.getElementById('gestionBlCameraArea');
+               if (area) area.style.display = 'none';
+               var results = document.getElementById(resultsId);
+               if (results) results.style.display = '';
+               var hint = document.getElementById('gestionBlScanHint');
+               if (hint) hint.textContent = 'Placez le numero BL dans le cadre';
+            }
+
+            async function startCamera() {
+               stopCamera();
+               if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                  return false;
+               }
+               var area = document.getElementById('gestionBlCameraArea');
+               var video = document.getElementById('gestionBlScanVideo');
+               if (!area || !video) return false;
+               try {
+                  cameraStream = await navigator.mediaDevices.getUserMedia({
+                     video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                  });
+                  video.srcObject = cameraStream;
+                  area.style.display = 'block';
+                  var results = document.getElementById(resultsId);
+                  if (results) results.style.display = 'none';
+                  return true;
+               } catch (e) {
+                  stopCamera();
+                  return false;
+               }
+            }
+
+            function captureFrameFromVideo() {
+               var video = document.getElementById('gestionBlScanVideo');
+               var canvas = document.getElementById('gestionBlScanCanvas');
+               if (!video || !canvas) return null;
+               canvas.width = video.videoWidth || 640;
+               canvas.height = video.videoHeight || 480;
+               var ctx = canvas.getContext('2d');
+               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+               return canvas;
+            }
+
+            function extractBlFromText(text) {
+               if (!text) return null;
+               var t = text.toUpperCase().replace(/[^A-Z0-9\s\/\-:.]/g, ' ');
+               // BL suivi de chiffres (BL123456, BL 123456, BL:123456, BL-123456)
+               var m = t.match(/B\s*L\s*[:\-\/.\s]*(\d[\d\s]{2,})/);
+               if (m) {
+                  var num = m[1].replace(/\s/g, '');
+                  if (num.length >= 3) return 'BL' + num;
+               }
+               // BON DE LIVRAISON suivi d un numero
+               m = t.match(/BON\s+DE\s+LIVRAISON[^0-9]*(\d[\d\s]{2,})/);
+               if (m) {
+                  var num2 = m[1].replace(/\s/g, '');
+                  if (num2.length >= 3) return 'BL' + num2;
+               }
+               // Fallback: nombre de 6+ chiffres
+               var nums = t.match(/\b(\d{6,})\b/g);
+               if (nums && nums.length > 0) return 'BL' + nums[0];
+               return null;
+            }
+
+            async function getOcrWorker() {
+               if (ocrWorker) return ocrWorker;
+               await loadTesseractJs();
+               ocrWorker = await Tesseract.createWorker('fra+eng', 1);
+               return ocrWorker;
+            }
+
+            function terminateOcrWorker() {
+               if (ocrWorker) {
+                  try { ocrWorker.terminate(); } catch(e) {}
+                  ocrWorker = null;
+               }
+            }
+
+            function delay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+            async function autoScanLoop() {
+               autoScanActive = true;
+               var hint = document.getElementById('gestionBlScanHint');
+               var attempts = 0;
+               var maxAttempts = 20;
+
+               // Pre-charger le worker OCR pendant que l utilisateur positionne le BL
+               if (hint) hint.textContent = 'Chargement OCR...';
+               try {
+                  var worker = await getOcrWorker();
+               } catch (e) {
+                  showError('Erreur OCR: ' + e.message);
+                  return;
+               }
+               if (!autoScanActive) return;
+               if (hint) hint.textContent = 'Recherche automatique du numero BL...';
+
+               // Attendre 1s que la camera se stabilise
+               await delay(1000);
+
+               while (autoScanActive && cameraStream && attempts < maxAttempts) {
+                  attempts++;
+                  if (hint) hint.textContent = 'Scan en cours... (' + attempts + '/' + maxAttempts + ')';
+
+                  var canvas = captureFrameFromVideo();
+                  if (!canvas) { await delay(1000); continue; }
+
+                  try {
+                     var result = await worker.recognize(canvas);
+                     var text = (result && result.data && result.data.text) || '';
+                     var blNum = extractBlFromText(text);
+
+                     if (blNum) {
+                        autoScanActive = false;
+                        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                        stopCamera();
+                        pendingAutoClick = true;
+                        var inp = document.getElementById(inputId);
+                        if (inp) {
+                           inp.value = blNum;
+                           inp.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                        return;
+                     }
+                  } catch (e) {
+                     // Continuer
+                  }
+
+                  if (autoScanActive) await delay(800);
+               }
+
+               if (autoScanActive && attempts >= maxAttempts) {
+                  autoScanActive = false;
+                  if (hint) hint.textContent = 'BL non detecte.';
+                  showError('Numero BL non detecte apres ' + maxAttempts + ' tentatives. Essayez de rapprocher le document.');
+               }
+            }
+
+            async function runOcr(imageSource) {
+               clearError();
+               showOcrProgress(true);
+               setOcrBar(10);
+               setOcrStatus('Chargement du moteur OCR...');
+               try {
+                  await loadTesseractJs();
+                  setOcrBar(25);
+                  setOcrStatus('Initialisation...');
+                  var worker = await Tesseract.createWorker('fra+eng', 1, {
+                     logger: function(info) {
+                        if (info.status === 'recognizing text' && info.progress) {
+                           setOcrBar(30 + Math.round(info.progress * 65));
+                           setOcrStatus('Lecture du texte...');
+                        }
+                     }
+                  });
+                  setOcrBar(30);
+                  var result = await worker.recognize(imageSource);
+                  setOcrBar(98);
+                  await worker.terminate();
+                  var text = (result && result.data && result.data.text) || '';
+                  var blNum = extractBlFromText(text);
+                  setOcrBar(100);
+                  showOcrProgress(false);
+                  if (blNum) {
+                     pendingAutoClick = true;
+                     var inp = document.getElementById(inputId);
+                     if (inp) {
+                        inp.value = blNum;
+                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                     }
+                     if (navigator.vibrate) navigator.vibrate(100);
+                     return blNum;
+                  } else {
+                     var preview = text.substring(0, 150).trim();
+                     showError('Aucun numero BL detecte.' + (preview ? ' Texte lu: "' + preview + '"' : ''));
+                     return null;
+                  }
+               } catch (e) {
+                  showOcrProgress(false);
+                  showError('Erreur OCR : ' + e.message);
+                  return null;
+               }
+            }
+
+            function attachScanBtn() {
+               var scanBtn = document.getElementById('gestionBlScanBtn');
+               var fileInput = document.getElementById('gestionBlFileInput');
+               var captureBtn = document.getElementById('gestionBlCaptureBtn');
+               var cancelBtn = document.getElementById('gestionBlCancelScan');
+               if (!scanBtn || scanBtn.dataset.bound === '1') return;
+               scanBtn.dataset.bound = '1';
+               if (isMobileDevice() && fileInput) {
+                  fileInput.setAttribute('capture', 'environment');
+               }
+
+               // Sur mobile : cacher le bouton Capturer (scan auto)
+               if (isMobileDevice() && captureBtn) {
+                  captureBtn.style.display = 'none';
+               }
+
+               scanBtn.addEventListener('click', async function() {
+                  clearError();
+                  showOcrProgress(false);
+                  if (isMobileDevice()) {
+                     var ok = await startCamera();
+                     if (ok) {
+                        autoScanLoop();
+                     } else {
+                        if (fileInput) fileInput.click();
+                     }
+                  } else {
+                     if (fileInput) fileInput.click();
+                  }
+               });
+
+               if (fileInput) {
+                  fileInput.addEventListener('change', async function() {
+                     if (!fileInput.files || !fileInput.files[0]) return;
+                     var file = fileInput.files[0];
+                     stopCamera();
+                     var isPdf = file.type === 'application/pdf'
+                        || (file.name && file.name.toLowerCase().endsWith('.pdf'));
+                     if (isPdf) {
+                        try {
+                           showOcrProgress(true);
+                           setOcrBar(5);
+                           setOcrStatus('Lecture du PDF...');
+                           var canvas = await renderPdfToCanvas(file);
+                           showOcrProgress(false);
+                           await runOcr(canvas);
+                        } catch (e) {
+                           showOcrProgress(false);
+                           showError('Erreur lecture PDF : ' + e.message);
+                        }
+                        fileInput.value = '';
+                     } else {
+                        var img = new Image();
+                        img.onload = async function() {
+                           await runOcr(img);
+                           URL.revokeObjectURL(img.src);
+                           fileInput.value = '';
+                        };
+                        img.onerror = function() {
+                           showError('Impossible de lire le fichier image.');
+                           fileInput.value = '';
+                        };
+                        img.src = URL.createObjectURL(file);
+                     }
+                  });
+               }
+
+               if (captureBtn) {
+                  captureBtn.addEventListener('click', async function() {
+                     var canvas = captureFrameFromVideo();
+                     if (!canvas) { showError('Capture impossible.'); return; }
+                     stopCamera();
+                     await runOcr(canvas);
+                  });
+               }
+
+               if (cancelBtn) {
+                  cancelBtn.addEventListener('click', function() {
+                     stopCamera();
+                  });
+               }
+
+               var mainModal = document.getElementById(modalId);
+               if (mainModal) {
+                  mainModal.addEventListener('hidden.bs.modal', function() {
+                     stopCamera();
+                     showOcrProgress(false);
+                  });
+               }
+            }
+
             if (document.readyState === 'loading') {
                document.addEventListener('DOMContentLoaded', function(){
                   attachSignatureLink();
                   attachInput();
+                  attachScanBtn();
                   openFromUrl();
                });
             } else {
                attachSignatureLink();
                attachInput();
+               attachScanBtn();
                openFromUrl();
             }
          })();
