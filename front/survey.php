@@ -139,6 +139,9 @@ if ($gestion->canView()) {
             let autoScanActive = false;
             let ocrWorker = null;
             let pendingAutoClick = false;
+            let barcodeDetector = null;
+            let barcodeDetectorReady = false;
+            let jsQrLoadPromise = null;
 
             function getCsrf() {
                const meta = document.querySelector('meta[property="glpi:csrf_token"]');
@@ -164,11 +167,15 @@ if ($gestion->canView()) {
             function normalizeBl(val) {
                let v = (val || '').toString().toUpperCase();
                if (!v.startsWith('BL')) {
-                  v = 'BL' + v.replace(/[^0-9]/g, '');
+                  v = 'BL' + v.replace(/[^0-9]/g, '').slice(0, 6);
                } else {
-                  v = 'BL' + v.slice(2).replace(/[^0-9]/g, '');
+                  v = 'BL' + v.slice(2).replace(/[^0-9]/g, '').slice(0, 6);
                }
                return v;
+            }
+
+            function isStrictBl(val) {
+               return /^BL\d{6}$/.test((val || '').toString().toUpperCase());
             }
 
             function attachBlGuards(inputEl) {
@@ -215,7 +222,7 @@ if ($gestion->canView()) {
                inputEl.addEventListener('paste', (e) => {
                   e.preventDefault();
                   const txt = (e.clipboardData || window.clipboardData)?.getData('text') || '';
-                  inputEl.value = 'BL' + String(txt).replace(/[^0-9]/g, '');
+                  inputEl.value = normalizeBl(txt);
                   ensureCaret();
                });
             }
@@ -470,6 +477,22 @@ if ($gestion->canView()) {
                });
             }
 
+            function loadJsQrJs() {
+               if (window.jsQR) return Promise.resolve();
+               if (jsQrLoadPromise) return jsQrLoadPromise;
+               jsQrLoadPromise = new Promise(function(resolve, reject) {
+                  var s = document.createElement('script');
+                  s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+                  s.onload = function() {
+                     if (window.jsQR) resolve();
+                     else reject(new Error('Impossible de charger le module QR code.'));
+                  };
+                  s.onerror = function() { reject(new Error('Impossible de charger le module QR code.')); };
+                  document.head.appendChild(s);
+               });
+               return jsQrLoadPromise;
+            }
+
             function loadPdfJs() {
                return new Promise(function(resolve, reject) {
                   if (window.pdfjsLib) { resolve(); return; }
@@ -570,22 +593,109 @@ if ($gestion->canView()) {
             function extractBlFromText(text) {
                if (!text) return null;
                var t = text.toUpperCase().replace(/[^A-Z0-9\s\/\-:.]/g, ' ');
-               // BL suivi de chiffres (BL123456, BL 123456, BL:123456, BL-123456)
-               var m = t.match(/B\s*L\s*[:\-\/.\s]*(\d[\d\s]{2,})/);
+               // Anti faux-positifs: BL explicite + exactement 6 chiffres.
+               var m = t.match(/(?:^|[^A-Z0-9])B\s*L\s*[:\-\/.\s]*((?:\d[\s\-\/.]*){6})(?![\s\-\/.]*\d)/);
                if (m) {
-                  var num = m[1].replace(/\s/g, '');
-                  if (num.length >= 3) return 'BL' + num;
+                  var num = m[1].replace(/[^0-9]/g, '');
+                  if (num.length === 6) return 'BL' + num;
                }
-               // BON DE LIVRAISON suivi d un numero
-               m = t.match(/BON\s+DE\s+LIVRAISON[^0-9]*(\d[\d\s]{2,})/);
-               if (m) {
-                  var num2 = m[1].replace(/\s/g, '');
-                  if (num2.length >= 3) return 'BL' + num2;
-               }
-               // Fallback: nombre de 6+ chiffres
-               var nums = t.match(/\b(\d{6,})\b/g);
-               if (nums && nums.length > 0) return 'BL' + nums[0];
                return null;
+            }
+
+            function fillInputWithBl(blNum) {
+               if (!blNum) return;
+               var normalized = normalizeBl(blNum);
+               if (!isStrictBl(normalized)) return;
+               pendingAutoClick = true;
+               var inp = document.getElementById(inputId);
+               if (inp) {
+                  inp.value = normalized;
+                  inp.dispatchEvent(new Event('input', { bubbles: true }));
+               }
+            }
+
+            function toCanvasSource(source) {
+               if (!source) return null;
+               if (typeof HTMLCanvasElement !== 'undefined' && source instanceof HTMLCanvasElement) {
+                  return source;
+               }
+               var width = 0;
+               var height = 0;
+               if (typeof HTMLVideoElement !== 'undefined' && source instanceof HTMLVideoElement) {
+                  width = source.videoWidth || source.clientWidth || 0;
+                  height = source.videoHeight || source.clientHeight || 0;
+               } else {
+                  width = source.naturalWidth || source.width || 0;
+                  height = source.naturalHeight || source.height || 0;
+               }
+               if (!width || !height) return null;
+               var canvas = document.createElement('canvas');
+               canvas.width = width;
+               canvas.height = height;
+               var ctx = canvas.getContext('2d');
+               if (!ctx) return null;
+               ctx.drawImage(source, 0, 0, width, height);
+               return canvas;
+            }
+
+            async function detectBlWithBarcodeDetector(source) {
+               if (typeof BarcodeDetector === 'undefined') return null;
+               var canvas = toCanvasSource(source);
+               if (!canvas) return null;
+               try {
+                  if (!barcodeDetectorReady) {
+                     var formats = ['qr_code'];
+                     var canFilterFormats = false;
+                     if (typeof BarcodeDetector.getSupportedFormats === 'function') {
+                        canFilterFormats = true;
+                        try {
+                           var supported = await BarcodeDetector.getSupportedFormats();
+                           if (Array.isArray(supported) && supported.length) {
+                              formats = formats.filter(function(f) { return supported.indexOf(f) !== -1; });
+                           }
+                        } catch (e) {}
+                     }
+                     barcodeDetector = (canFilterFormats && formats.length)
+                        ? new BarcodeDetector({ formats: formats })
+                        : new BarcodeDetector();
+                     barcodeDetectorReady = true;
+                  }
+                  var detected = await barcodeDetector.detect(canvas);
+                  if (!detected || !detected.length) return null;
+                  for (var i = 0; i < detected.length; i++) {
+                     var raw = (detected[i] && detected[i].rawValue) ? String(detected[i].rawValue) : '';
+                     var bl = extractBlFromText(raw);
+                     if (bl) return bl;
+                  }
+               } catch (e) {}
+               return null;
+            }
+
+            async function detectBlWithJsQr(source) {
+               var canvas = toCanvasSource(source);
+               if (!canvas) return null;
+               try {
+                  await loadJsQrJs();
+               } catch (e) {
+                  return null;
+               }
+               if (!window.jsQR) return null;
+               try {
+                  var ctx = canvas.getContext('2d', { willReadFrequently: true });
+                  if (!ctx) return null;
+                  var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  var qrResult = window.jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+                  if (!qrResult || !qrResult.data) return null;
+                  return extractBlFromText(String(qrResult.data));
+               } catch (e) {
+                  return null;
+               }
+            }
+
+            async function detectBlFromCodes(source) {
+               var bl = await detectBlWithBarcodeDetector(source);
+               if (bl) return bl;
+               return await detectBlWithJsQr(source);
             }
 
             async function getOcrWorker() {
@@ -609,6 +719,10 @@ if ($gestion->canView()) {
                var hint = document.getElementById('gestionBlScanHint');
                var attempts = 0;
                var maxAttempts = 20;
+               var codeCandidate = '';
+               var codeCandidateHits = 0;
+               var ocrCandidate = '';
+               var ocrCandidateHits = 0;
 
                // Pre-charger le worker OCR pendant que l utilisateur positionne le BL
                if (hint) hint.textContent = 'Chargement OCR...';
@@ -632,21 +746,55 @@ if ($gestion->canView()) {
                   if (!canvas) { await delay(1000); continue; }
 
                   try {
+                     var codeBl = await detectBlFromCodes(canvas);
+                     if (codeBl) {
+                        if (codeBl === codeCandidate) {
+                           codeCandidateHits++;
+                        } else {
+                           codeCandidate = codeBl;
+                           codeCandidateHits = 1;
+                        }
+                        if (codeCandidateHits < 2) {
+                           if (hint) hint.textContent = 'Code detecte, confirmation...';
+                           if (autoScanActive) await delay(250);
+                           continue;
+                        }
+                        autoScanActive = false;
+                        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                        stopCamera();
+                        fillInputWithBl(codeBl);
+                        return;
+                     } else {
+                        codeCandidate = '';
+                        codeCandidateHits = 0;
+                     }
+                  } catch (e) {}
+
+                  try {
                      var result = await worker.recognize(canvas);
                      var text = (result && result.data && result.data.text) || '';
                      var blNum = extractBlFromText(text);
 
                      if (blNum) {
+                        if (blNum === ocrCandidate) {
+                           ocrCandidateHits++;
+                        } else {
+                           ocrCandidate = blNum;
+                           ocrCandidateHits = 1;
+                        }
+                        if (ocrCandidateHits < 2) {
+                           if (hint) hint.textContent = 'OCR detecte, confirmation...';
+                           if (autoScanActive) await delay(250);
+                           continue;
+                        }
                         autoScanActive = false;
                         if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                         stopCamera();
-                        pendingAutoClick = true;
-                        var inp = document.getElementById(inputId);
-                        if (inp) {
-                           inp.value = blNum;
-                           inp.dispatchEvent(new Event('input', { bubbles: true }));
-                        }
+                        fillInputWithBl(blNum);
                         return;
+                     } else {
+                        ocrCandidate = '';
+                        ocrCandidateHits = 0;
                      }
                   } catch (e) {
                      // Continuer
@@ -665,6 +813,18 @@ if ($gestion->canView()) {
             async function runOcr(imageSource) {
                clearError();
                showOcrProgress(true);
+               setOcrBar(8);
+               setOcrStatus('Lecture QR code...');
+               try {
+                  var codeBl = await detectBlFromCodes(imageSource);
+                  if (codeBl) {
+                     setOcrBar(100);
+                     showOcrProgress(false);
+                     fillInputWithBl(codeBl);
+                     if (navigator.vibrate) navigator.vibrate(100);
+                     return codeBl;
+                  }
+               } catch (e) {}
                setOcrBar(10);
                setOcrStatus('Chargement du moteur OCR...');
                try {
@@ -681,19 +841,24 @@ if ($gestion->canView()) {
                   });
                   setOcrBar(30);
                   var result = await worker.recognize(imageSource);
-                  setOcrBar(98);
-                  await worker.terminate();
                   var text = (result && result.data && result.data.text) || '';
                   var blNum = extractBlFromText(text);
+                  if (blNum) {
+                     setOcrBar(92);
+                     setOcrStatus('Verification OCR...');
+                     var confirm = await worker.recognize(imageSource);
+                     var confirmText = (confirm && confirm.data && confirm.data.text) || '';
+                     var confirmBl = extractBlFromText(confirmText);
+                     if (confirmBl !== blNum) {
+                        blNum = null;
+                     }
+                  }
+                  setOcrBar(98);
+                  await worker.terminate();
                   setOcrBar(100);
                   showOcrProgress(false);
                   if (blNum) {
-                     pendingAutoClick = true;
-                     var inp = document.getElementById(inputId);
-                     if (inp) {
-                        inp.value = blNum;
-                        inp.dispatchEvent(new Event('input', { bubbles: true }));
-                     }
+                     fillInputWithBl(blNum);
                      if (navigator.vibrate) navigator.vibrate(100);
                      return blNum;
                   } else {
