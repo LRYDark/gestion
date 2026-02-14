@@ -34,7 +34,7 @@ class PluginGestionConfig extends CommonDBTM
    }
 
    static function showConfigForm(){ //formulaire de configuration du plugin
-      global $DB;
+      global $DB, $CFG_GLPI;
       $config = new self();
       $config->getFromDB(1);
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
@@ -87,6 +87,19 @@ class PluginGestionConfig extends CommonDBTM
 
       $config->showFormHeader(['colspan' => 4]);
       echo '</table>'; 
+
+      $api_hl_enabled = Config::isHlApiEnabled();
+      $api_legacy_enabled = !empty($CFG_GLPI['enable_api']);
+      $api_glpi_enabled = $api_hl_enabled || $api_legacy_enabled;
+      $api_rootdoc = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');
+      $api_base_url = rtrim((string)($CFG_GLPI['url_base'] ?? ''), '/');
+      if ($api_base_url === '') {
+         $api_base_url = $api_rootdoc;
+      }
+      $api_prepare_endpoint = $api_rootdoc . '/plugins/gestion/api/bl_prepare.php';
+      $api_sign_endpoint = $api_rootdoc . '/plugins/gestion/api/bl_sign.php';
+      $api_token_endpoint = $api_rootdoc . '/api.php/v2.2/token';
+      $api_legacy_init_session_endpoint = $api_rootdoc . '/api.php/v1/initSession';
 
    // --- CARD : Gestion ---
       ?>
@@ -181,9 +194,385 @@ class PluginGestionConfig extends CommonDBTM
             </div>
             </div>
 
+            <?php if ($api_glpi_enabled): ?>
+            <div class="col-md-12">
+               <label class="form-label mb-1 d-block"><?php echo __('API application tierce', 'gestion'); ?></label>
+               <div class="d-flex flex-wrap align-items-center gap-2">
+                  <?php if ($api_hl_enabled): ?>
+                  <span class="badge bg-success"><?php echo __('API v2 active', 'gestion'); ?></span>
+                  <?php endif; ?>
+                  <?php if ($api_legacy_enabled): ?>
+                  <span class="badge bg-warning text-dark"><?php echo __('API legacy active', 'gestion'); ?></span>
+                  <?php endif; ?>
+                  <button type="button"
+                           class="btn btn-outline-primary btn-sm"
+                           data-bs-toggle="modal"
+                           data-bs-target="#gestionApiDocModal">
+                     <?php echo __('Voir la documentation API', 'gestion'); ?>
+                  </button>
+               </div>
+               <div class="form-text text-muted">
+                  <?php echo __('Compatible OAuth v2 (Bearer) et legacy (App-Token + user_token/session_token). En v2.2, utiliser un token utilisateur.', 'gestion'); ?>
+               </div>
+            </div>
+            <?php endif; ?>
+
          </div>
       </div>
       </div>
+
+      <?php if ($api_glpi_enabled): ?>
+      <div class="modal fade" id="gestionApiDocModal" tabindex="-1" aria-labelledby="gestionApiDocModalLabel" aria-hidden="true">
+         <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+               <div class="modal-header">
+                  <h5 class="modal-title" id="gestionApiDocModalLabel"><?php echo __('Documentation API du plugin Gestion', 'gestion'); ?></h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<?php echo __('Fermer', 'gestion'); ?>"></button>
+               </div>
+               <div class="modal-body">
+                  <p class="mb-2"><strong><?php echo __('Pré-requis', 'gestion'); ?></strong></p>
+                  <ul class="mb-3">
+                     <li><?php echo __('Activer au moins une API GLPI : v2 (High-Level) ou legacy.', 'gestion'); ?></li>
+                     <li><?php echo __('Ces endpoints plugin acceptent les deux méthodes d\'authentification.', 'gestion'); ?></li>
+                  </ul>
+
+                  <p class="mb-2"><strong><?php echo __('Méthode 1 : OAuth v2 (recommandée)', 'gestion'); ?></strong></p>
+                  <pre class="bg-light p-2 rounded"><code>Authorization: Bearer &lt;access_token_oauth&gt;</code></pre>
+                  <ul class="mb-3">
+                     <li><?php echo __('Pour ces endpoints plugin, le token OAuth doit etre lie a un utilisateur.', 'gestion'); ?></li>
+                     <li><?php echo __('En v2.2, utiliser grant_type=password (login GLPI + mot de passe) ou authorization_code.', 'gestion'); ?></li>
+                     <li><?php echo __('grant_type=client_credentials seul renverra user_context_required.', 'gestion'); ?></li>
+                  </ul>
+
+                  <p class="mb-2"><strong><?php echo __('Endpoint OAuth token (GLPI v2.2)', 'gestion'); ?></strong></p>
+                  <pre class="bg-light p-2 rounded"><code>POST <?php echo htmlspecialchars($api_token_endpoint, ENT_QUOTES, 'UTF-8'); ?></code></pre>
+                  <pre class="bg-light p-2 rounded"><code>grant_type=password
+client_id=&lt;client_id_oauth&gt;
+client_secret=&lt;client_secret_oauth&gt;
+username=&lt;login_glpi&gt;
+password=&lt;mot_de_passe_glpi&gt;
+scope=api user</code></pre>
+
+                  <p class="mb-2 mt-3"><strong><?php echo __('Méthode 2 : Legacy v1 (jeton utilisateur)', 'gestion'); ?></strong></p>
+                  <pre class="bg-light p-2 rounded"><code>App-Token: &lt;app_token_glpi&gt;
+Authorization: user_token &lt;user_token_preferences&gt;</code></pre>
+                  <p class="mb-2"><strong><?php echo __('Alternative legacy (session)', 'gestion'); ?></strong></p>
+                  <pre class="bg-light p-2 rounded"><code>App-Token: &lt;app_token_glpi&gt;
+Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
+                  <pre class="bg-light p-2 rounded"><code>POST <?php echo htmlspecialchars($api_legacy_init_session_endpoint, ENT_QUOTES, 'UTF-8'); ?></code></pre>
+
+                  <p class="mb-2"><strong><?php echo __('Endpoints', 'gestion'); ?></strong></p>
+                  <div class="mb-2">
+                     <div><code>GET <?php echo htmlspecialchars($api_prepare_endpoint, ENT_QUOTES, 'UTF-8'); ?>?bl=BL123456</code></div>
+                     <small class="text-muted"><?php echo __('Vérifie le BL, le prépare et retourne l\'aperçu + le statut.', 'gestion'); ?></small>
+                  </div>
+                  <div class="mb-3">
+                     <div><code>POST <?php echo htmlspecialchars($api_sign_endpoint, ENT_QUOTES, 'UTF-8'); ?></code></div>
+                     <small class="text-muted"><?php echo __('Enregistre la signature (comme le flux plugin), avec nom, email et image base64.', 'gestion'); ?></small>
+                  </div>
+
+                  <p class="mb-2"><strong><?php echo __('Exemple JSON pour la signature', 'gestion'); ?></strong></p>
+                  <pre class="bg-light p-2 rounded mb-0"><code>{
+  "survey_id": 123,
+  "name": "Client Nom",
+  "email": "client@example.com",
+  "signature": "data:image/png;base64,....",
+  "mail_to_client": 1
+}</code></pre>
+               </div>
+               <div class="modal-footer">
+                  <button type="button"
+                          class="btn btn-outline-primary"
+                          data-bs-target="#gestionApiTesterModal"
+                          data-bs-toggle="modal">
+                     <?php echo __('Tester API/Auth', 'gestion'); ?>
+                  </button>
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('Fermer', 'gestion'); ?></button>
+               </div>
+            </div>
+         </div>
+      </div>
+
+      <div class="modal fade" id="gestionApiTesterModal" tabindex="-1" aria-labelledby="gestionApiTesterModalLabel" aria-hidden="true">
+         <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+               <div class="modal-header">
+                  <h5 class="modal-title" id="gestionApiTesterModalLabel"><?php echo __('Test API / Authentification', 'gestion'); ?></h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<?php echo __('Fermer', 'gestion'); ?>"></button>
+               </div>
+               <div class="modal-body">
+                  <div class="row g-3">
+                     <div class="col-md-4">
+                        <label for="gestionApiTestMode" class="form-label"><?php echo __('Mode de test', 'gestion'); ?></label>
+                        <select id="gestionApiTestMode" class="form-select">
+                           <option value="v2_password"><?php echo __('OAuth v2.2 (grant password)', 'gestion'); ?></option>
+                           <option value="v1_user_token"><?php echo __('Legacy v1 (App-Token + user_token)', 'gestion'); ?></option>
+                        </select>
+                     </div>
+                     <div class="col-md-8">
+                        <label for="gestionApiTestBaseUrl" class="form-label"><?php echo __('Base URL GLPI', 'gestion'); ?></label>
+                        <input id="gestionApiTestBaseUrl"
+                               class="form-control"
+                               value="<?php echo htmlspecialchars($api_base_url, ENT_QUOTES, 'UTF-8'); ?>"
+                               placeholder="https://example.tld/glpi">
+                     </div>
+                     <div class="col-md-4">
+                        <label for="gestionApiTestBL" class="form-label"><?php echo __('BL de test', 'gestion'); ?></label>
+                        <input id="gestionApiTestBL" class="form-control" value="BL202852" placeholder="BL202852">
+                     </div>
+                  </div>
+
+                  <div id="gestionApiTestV2Fields" class="row g-3 mt-1">
+                     <div class="col-md-6">
+                        <label for="gestionApiClientId" class="form-label"><?php echo __('Client ID OAuth', 'gestion'); ?></label>
+                        <input id="gestionApiClientId" class="form-control" placeholder="client_id">
+                     </div>
+                     <div class="col-md-6">
+                        <label for="gestionApiClientSecret" class="form-label"><?php echo __('Client secret OAuth', 'gestion'); ?></label>
+                        <input id="gestionApiClientSecret" type="password" class="form-control" placeholder="client_secret">
+                     </div>
+                     <div class="col-md-6">
+                        <label for="gestionApiUsername" class="form-label"><?php echo __('Login GLPI', 'gestion'); ?></label>
+                        <input id="gestionApiUsername" class="form-control" placeholder="login">
+                     </div>
+                     <div class="col-md-6">
+                        <label for="gestionApiPassword" class="form-label"><?php echo __('Mot de passe GLPI', 'gestion'); ?></label>
+                        <input id="gestionApiPassword" type="password" class="form-control" placeholder="mot de passe">
+                     </div>
+                  </div>
+
+                  <div id="gestionApiTestV1Fields" class="row g-3 mt-1" style="display:none;">
+                     <div class="col-md-6">
+                        <label for="gestionApiAppToken" class="form-label"><?php echo __('App-Token', 'gestion'); ?></label>
+                        <input id="gestionApiAppToken" class="form-control" placeholder="app_token">
+                     </div>
+                     <div class="col-md-6">
+                        <label for="gestionApiUserToken" class="form-label"><?php echo __('User token (préférences GLPI)', 'gestion'); ?></label>
+                        <input id="gestionApiUserToken" class="form-control" placeholder="user_token">
+                     </div>
+                  </div>
+
+                  <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+                     <button type="button" class="btn btn-primary" id="gestionApiRunTestBtn"><?php echo __('Tester l\'API maintenant', 'gestion'); ?></button>
+                     <button type="button" class="btn btn-outline-secondary" id="gestionApiBuildPsBtn"><?php echo __('Générer script PowerShell', 'gestion'); ?></button>
+                     <button type="button" class="btn btn-outline-secondary" id="gestionApiCopyPsBtn"><?php echo __('Copier le script', 'gestion'); ?></button>
+                     <button type="button" class="btn btn-outline-secondary" id="gestionApiPopupPsBtn"><?php echo __('Ouvrir dans une fenêtre', 'gestion'); ?></button>
+                  </div>
+
+                  <div class="mt-3">
+                     <label for="gestionApiPsScript" class="form-label"><?php echo __('Script PowerShell généré', 'gestion'); ?></label>
+                     <textarea id="gestionApiPsScript" class="form-control font-monospace" rows="14"></textarea>
+                  </div>
+
+                  <div class="mt-3">
+                     <label for="gestionApiTestResult" class="form-label"><?php echo __('Résultat du test HTTP', 'gestion'); ?></label>
+                     <pre id="gestionApiTestResult" class="bg-light p-2 rounded small mb-0"></pre>
+                  </div>
+               </div>
+               <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-target="#gestionApiDocModal" data-bs-toggle="modal"><?php echo __('Retour doc API', 'gestion'); ?></button>
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('Fermer', 'gestion'); ?></button>
+               </div>
+            </div>
+         </div>
+      </div>
+
+      <script>
+      (function () {
+         if (window.gestionApiTesterInit) {
+            return;
+         }
+         window.gestionApiTesterInit = true;
+
+         const get = (id) => document.getElementById(id);
+         const modeEl = get('gestionApiTestMode');
+         const resultEl = get('gestionApiTestResult');
+         const scriptEl = get('gestionApiPsScript');
+
+         const fields = {
+            baseUrl: get('gestionApiTestBaseUrl'),
+            bl: get('gestionApiTestBL'),
+            clientId: get('gestionApiClientId'),
+            clientSecret: get('gestionApiClientSecret'),
+            username: get('gestionApiUsername'),
+            password: get('gestionApiPassword'),
+            appToken: get('gestionApiAppToken'),
+            userToken: get('gestionApiUserToken'),
+            v2Box: get('gestionApiTestV2Fields'),
+            v1Box: get('gestionApiTestV1Fields')
+         };
+
+         const escPs = (value) => String(value ?? '').replace(/'/g, "''");
+         const clip = async (text) => {
+            if (navigator.clipboard && window.isSecureContext) {
+               await navigator.clipboard.writeText(text);
+               return;
+            }
+            scriptEl.focus();
+            scriptEl.select();
+            document.execCommand('copy');
+         };
+         const normalizeBase = (txt) => String(txt ?? '').trim().replace(/\/+$/, '');
+         const absolutizeBase = (txt) => {
+            const base = normalizeBase(txt);
+            if (base.startsWith('/')) {
+               return window.location.origin + base;
+            }
+            return base;
+         };
+
+         const setResult = (txt) => {
+            resultEl.textContent = String(txt ?? '');
+         };
+
+         const setMode = () => {
+            const v2 = modeEl.value === 'v2_password';
+            fields.v2Box.style.display = v2 ? '' : 'none';
+            fields.v1Box.style.display = v2 ? 'none' : '';
+         };
+
+         const buildScript = () => {
+            const mode = modeEl.value;
+            const base = absolutizeBase(fields.baseUrl.value);
+            const bl = fields.bl.value.trim();
+            if (mode === 'v2_password') {
+               return [
+                  "$BaseUrl = '" + escPs(base) + "'",
+                  "$BL = '" + escPs(bl) + "'",
+                  "$ClientId = '" + escPs(fields.clientId.value) + "'",
+                  "$ClientSecret = '" + escPs(fields.clientSecret.value) + "'",
+                  "$Username = '" + escPs(fields.username.value) + "'",
+                  "$Password = '" + escPs(fields.password.value) + "'",
+                  "",
+                  "$token = Invoke-RestMethod -Method POST -Uri \"$BaseUrl/api.php/v2.2/token\" -ContentType \"application/x-www-form-urlencoded\" -Body @{",
+                  "    grant_type    = 'password'",
+                  "    client_id     = $ClientId",
+                  "    client_secret = $ClientSecret",
+                  "    username      = $Username",
+                  "    password      = $Password",
+                  "    scope         = 'api user'",
+                  "}",
+                  "",
+                  "$headers = @{ Authorization = \"Bearer $($token.access_token)\"; Accept = 'application/json' }",
+                  "Invoke-WebRequest -Method GET -Uri \"$BaseUrl/plugins/gestion/api/bl_prepare.php?bl=$BL\" -Headers $headers -TimeoutSec 180"
+               ].join("\n");
+            }
+
+            return [
+               "$BaseUrl = '" + escPs(base) + "'",
+               "$BL = '" + escPs(bl) + "'",
+               "$AppToken = '" + escPs(fields.appToken.value) + "'",
+               "$UserToken = '" + escPs(fields.userToken.value) + "'",
+               "",
+               "$headers = @{",
+               "    'App-Token'    = $AppToken",
+               "    'Authorization' = \"user_token $UserToken\"",
+               "    'Accept'        = 'application/json'",
+               "}",
+               "Invoke-WebRequest -Method GET -Uri \"$BaseUrl/plugins/gestion/api/bl_prepare.php?bl=$BL\" -Headers $headers -TimeoutSec 180"
+            ].join("\n");
+         };
+
+         const readBody = async (res) => {
+            const txt = await res.text();
+            try {
+               return JSON.stringify(JSON.parse(txt), null, 2);
+            } catch (e) {
+               return txt;
+            }
+         };
+
+         const runTest = async () => {
+            const base = normalizeBase(fields.baseUrl.value);
+            const bl = fields.bl.value.trim();
+            if (!base || !bl) {
+               setResult("Base URL et BL sont obligatoires.");
+               return;
+            }
+
+            setResult("Test en cours...");
+
+            try {
+               if (modeEl.value === 'v2_password') {
+                  const tokenForm = new URLSearchParams();
+                  tokenForm.set('grant_type', 'password');
+                  tokenForm.set('client_id', fields.clientId.value.trim());
+                  tokenForm.set('client_secret', fields.clientSecret.value);
+                  tokenForm.set('username', fields.username.value.trim());
+                  tokenForm.set('password', fields.password.value);
+                  tokenForm.set('scope', 'api user');
+
+                  const tokenRes = await fetch(base + '/api.php/v2.2/token', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                     body: tokenForm
+                  });
+                  const tokenBodyRaw = await tokenRes.text();
+                  let tokenBody = {};
+                  try {
+                     tokenBody = JSON.parse(tokenBodyRaw);
+                  } catch (e) {
+                     tokenBody = {};
+                  }
+                  if (!tokenRes.ok || !tokenBody.access_token) {
+                     setResult("OAuth v2.2 token KO (HTTP " + tokenRes.status + ")\n" + tokenBodyRaw);
+                     return;
+                  }
+
+                  const prepareRes = await fetch(base + '/plugins/gestion/api/bl_prepare.php?bl=' + encodeURIComponent(bl), {
+                     headers: { 'Authorization': 'Bearer ' + tokenBody.access_token, 'Accept': 'application/json' }
+                  });
+                  setResult("Token OK (HTTP " + tokenRes.status + ")\n\nBL prepare HTTP " + prepareRes.status + "\n" + (await readBody(prepareRes)));
+                  return;
+               }
+
+               const prepareRes = await fetch(base + '/plugins/gestion/api/bl_prepare.php?bl=' + encodeURIComponent(bl), {
+                  headers: {
+                     'App-Token': fields.appToken.value.trim(),
+                     'Authorization': 'user_token ' + fields.userToken.value.trim(),
+                     'Accept': 'application/json'
+                  }
+               });
+               setResult("BL prepare HTTP " + prepareRes.status + "\n" + (await readBody(prepareRes)));
+            } catch (e) {
+               setResult("Erreur JS: " + e.message);
+            }
+         };
+
+         get('gestionApiRunTestBtn').addEventListener('click', runTest);
+         get('gestionApiBuildPsBtn').addEventListener('click', function () {
+            scriptEl.value = buildScript();
+         });
+         get('gestionApiCopyPsBtn').addEventListener('click', async function () {
+            scriptEl.value = buildScript();
+            await clip(scriptEl.value);
+            setResult("Script copié dans le presse-papiers.");
+         });
+         get('gestionApiPopupPsBtn').addEventListener('click', function () {
+            scriptEl.value = buildScript();
+            const popup = window.open('', '_blank', 'width=980,height=760');
+            if (!popup) {
+               setResult("Popup bloquée par le navigateur.");
+               return;
+            }
+            const escaped = scriptEl.value
+               .replace(/&/g, '&amp;')
+               .replace(/</g, '&lt;')
+               .replace(/>/g, '&gt;');
+            popup.document.write('<!doctype html><html><head><meta charset=\"utf-8\"><title>Script PowerShell API Gestion</title></head><body style=\"font-family:monospace;padding:12px;\"><h3>Script PowerShell</h3><pre style=\"white-space:pre-wrap;word-break:break-word;\">' + escaped + '</pre></body></html>');
+            popup.document.close();
+         });
+
+         modeEl.addEventListener('change', function () {
+            setMode();
+            scriptEl.value = buildScript();
+         });
+
+         setMode();
+         scriptEl.value = buildScript();
+      })();
+      </script>
+      <?php endif; ?>
 
       <?php
       // --- CARD : Positionnement des éléments (Paramètre : 0 pour masqué) ---

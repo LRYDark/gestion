@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.6.5'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.7.0'); // version du plugin
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 // Minimal GLPI version,
@@ -20,6 +20,22 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
 
    $plugin = new Plugin();
    if ($plugin->isInstalled('gestion') && $plugin->isActivated('gestion')){  // verification si le plugin gestion est installé et activé
+      $api_pattern_prepare = '#^/api/bl_prepare\.php(?:/.*)?$#';
+      $api_pattern_sign = '#^/api/bl_sign\.php(?:/.*)?$#';
+
+      \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
+         'gestion',
+         $api_pattern_prepare,
+         \Glpi\Http\Firewall::STRATEGY_NO_CHECK
+      );
+      \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
+         'gestion',
+         $api_pattern_sign,
+         \Glpi\Http\Firewall::STRATEGY_NO_CHECK
+      );
+
+      \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $api_pattern_prepare);
+      \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $api_pattern_sign);
 
       if (Session::getLoginUserID()) {
          Plugin::registerClass('PluginGestionProfile', ['addtabon' => 'Profile']);
