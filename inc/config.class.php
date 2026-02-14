@@ -1305,7 +1305,7 @@ class PluginGestionConfig extends CommonDBTM
       $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
       $domain   = $_SERVER['SERVER_NAME'];
       $rootdoc  = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');
-      $jsBase   = $protocol . $domain . $rootdoc . '/plugins/gestion/front/device_sign.php';
+      $jsBase   = $protocol . $domain . $rootdoc . '/plugins/gestion/device_sign.php';
       ?>
 
       <div class="card mb-3">
