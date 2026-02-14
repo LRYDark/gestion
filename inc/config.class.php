@@ -271,14 +271,30 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                      <small class="text-muted"><?php echo __('Enregistre la signature (comme le flux plugin), avec nom, email et image base64.', 'gestion'); ?></small>
                   </div>
 
+                  <p class="mb-2"><strong><?php echo __('Champs de la requete de signature', 'gestion'); ?></strong></p>
+                  <ul class="mb-3">
+                     <li><code>survey_id</code> ou <code>bl</code> : <?php echo __('obligatoire (au moins un des deux).', 'gestion'); ?></li>
+                     <li><code>signer_name</code> (ou <code>name</code>) : <?php echo __('obligatoire.', 'gestion'); ?></li>
+                     <li><code>signature</code> (base64 data URL) : <?php echo __('obligatoire.', 'gestion'); ?></li>
+                     <li><code>signer_email</code> (ou <code>email</code>) : <?php echo __('optionnel.', 'gestion'); ?></li>
+                     <li><code>mail_to_client</code> : <?php echo __('optionnel (0/1).', 'gestion'); ?></li>
+                     <li><code>comment</code> : <?php echo __('optionnel (commentaire libre).', 'gestion'); ?></li>
+                     <li><code>counter_invoice_client</code> : <?php echo __('optionnel (0/1, signe au comptoir).', 'gestion'); ?></li>
+                  </ul>
+
                   <p class="mb-2"><strong><?php echo __('Exemple JSON pour la signature', 'gestion'); ?></strong></p>
                   <pre class="bg-light p-2 rounded mb-0"><code>{
   "survey_id": 123,
-  "name": "Client Nom",
-  "email": "client@example.com",
+  "signer_name": "Client Nom",
+  "signer_email": "client@example.com",
   "signature": "data:image/png;base64,....",
-  "mail_to_client": 1
+  "mail_to_client": 1,
+  "comment": "Livraison effectuee au comptoir",
+  "counter_invoice_client": 1
 }</code></pre>
+                  <div class="form-text text-muted mt-2">
+                     <?php echo __('La reponse de signature renvoie aussi comment et counter_invoice_client pour completer le suivi BDD.', 'gestion'); ?>
+                  </div>
                </div>
                <div class="modal-footer">
                   <button type="button"

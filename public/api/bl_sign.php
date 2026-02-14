@@ -214,8 +214,18 @@ $signer_name = trim((string)($input['signer_name'] ?? $input['name'] ?? ''));
 $signer_email = trim((string)($input['signer_email'] ?? $input['email'] ?? ''));
 $signature = (string)($input['signature'] ?? $input['url'] ?? '');
 $mail_to_client = api_sign_bool($input['mail_to_client'] ?? $input['mailtoclient'] ?? ($signer_email !== '' ? '1' : '0'));
-$comment = trim((string)($input['comment'] ?? ''));
-$counter_invoice_client = api_sign_bool($input['counter_invoice_client'] ?? $input['CounterInvoiceClient'] ?? '0');
+$comment = trim((string)($input['comment'] ?? $input['comments'] ?? $input['commentaire'] ?? $input['note'] ?? ''));
+$counter_invoice_client = api_sign_bool(
+   $input['counter_invoice_client']
+   ?? $input['CounterInvoiceClient']
+   ?? $input['counter_invoice']
+   ?? $input['signed_at_counter']
+   ?? $input['signed_counter']
+   ?? $input['signed_comptoir']
+   ?? $input['comptoir']
+   ?? $input['counter']
+   ?? '0'
+);
 
 if ($survey_id <= 0 && $bl === '') {
    api_sign_end(422, ['ok' => false, 'error' => 'missing_survey_or_bl']);
@@ -311,4 +321,6 @@ api_sign_end(200, [
    'doc_url'          => (string)($row['doc_url'] ?? ''),
    'technician_login' => $technician_login,
    'technician_label' => (string)($auth['tech_label'] ?? ''),
+   'comment'          => ($comment !== '' ? $comment : null),
+   'counter_invoice_client' => $counter_invoice_client ? 1 : 0,
 ]);
