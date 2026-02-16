@@ -18,12 +18,20 @@ if (!isset($_GET['id'])) {
 $id = $_GET['id'];
 
 // Fonction pour générer/valider les tokens temporaires
-function generateTempToken($doc_id, $secret_key = 'GLPI_PDF_SECRET_2024') {
+function _pdf_preview_secret() {
+    if (defined('GLPI_PDF_PREVIEW_SECRET')) return GLPI_PDF_PREVIEW_SECRET;
+    $env = getenv('GLPI_PDF_PREVIEW_SECRET');
+    if ($env) return $env;
+    return hash('sha256', realpath(__DIR__ . '/..') . 'gestion_pdf_preview');
+}
+function generateTempToken($doc_id, $secret_key = null) {
+    if ($secret_key === null || $secret_key === 'GLPI_PDF_SECRET_2024') $secret_key = _pdf_preview_secret();
     $today = date('Y-m-d');
     return hash('sha256', $doc_id . $today . $secret_key);
 }
 
-function validateTempToken($doc_id, $provided_token, $secret_key = 'GLPI_PDF_SECRET_2024') {
+function validateTempToken($doc_id, $provided_token, $secret_key = null) {
+    if ($secret_key === null || $secret_key === 'GLPI_PDF_SECRET_2024') $secret_key = _pdf_preview_secret();
     if (empty($provided_token) || empty($doc_id)) {
         return false;
     }

@@ -98,6 +98,8 @@ class PluginGestionConfig extends CommonDBTM
       }
       $api_prepare_endpoint = $api_rootdoc . '/plugins/gestion/api/bl_prepare.php';
       $api_sign_endpoint = $api_rootdoc . '/plugins/gestion/api/bl_sign.php';
+      $api_combined_endpoint = $api_rootdoc . '/plugins/gestion/api/combined_sign.php';
+      $api_ticket_bls_endpoint = $api_rootdoc . '/plugins/gestion/api/ticket_bls.php';
       $api_token_endpoint = $api_rootdoc . '/api.php/v2.2/token';
       $api_legacy_init_session_endpoint = $api_rootdoc . '/api.php/v1/initSession';
 
@@ -270,6 +272,14 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                      <div><code>POST <?php echo htmlspecialchars($api_sign_endpoint, ENT_QUOTES, 'UTF-8'); ?></code></div>
                      <small class="text-muted"><?php echo __('Enregistre la signature (comme le flux plugin), avec nom, email et image base64.', 'gestion'); ?></small>
                   </div>
+                  <div class="mb-3">
+                     <div><code>POST <?php echo htmlspecialchars($api_combined_endpoint, ENT_QUOTES, 'UTF-8'); ?></code></div>
+                     <small class="text-muted"><?php echo __('Orchestre BL et/ou rapport RP dans un seul appel (mode auto, bl, report, both).', 'gestion'); ?></small>
+                  </div>
+                  <div class="mb-3">
+                     <div><code>GET <?php echo htmlspecialchars($api_ticket_bls_endpoint, ENT_QUOTES, 'UTF-8'); ?>?ticket_id=55347</code></div>
+                     <small class="text-muted"><?php echo __('Retourne la liste des BL associes a un ticket (utilise pour afficher les BL en haut de la fiche ticket dans les apps tierces).', 'gestion'); ?></small>
+                  </div>
 
                   <p class="mb-2"><strong><?php echo __('Champs de la requete de signature', 'gestion'); ?></strong></p>
                   <ul class="mb-3">
@@ -295,6 +305,47 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   <div class="form-text text-muted mt-2">
                      <?php echo __('La reponse de signature renvoie aussi comment et counter_invoice_client pour completer le suivi BDD.', 'gestion'); ?>
                   </div>
+
+                  <p class="mb-2 mt-3"><strong><?php echo __('Endpoint combiné BL/Rapport (si plugin RP actif)', 'gestion'); ?></strong></p>
+                  <ul class="mb-3">
+                     <li><code>mode</code> : <?php echo __('auto | bl | report | both', 'gestion'); ?></li>
+                     <li><code>survey_id</code> ou <code>bl</code> : <?php echo __('recommandé pour le flux BL.', 'gestion'); ?></li>
+                     <li><code>ticket_id</code> : <?php echo __('recommandé pour le flux rapport.', 'gestion'); ?></li>
+                     <li><?php echo __('En mode both: ticket et BL doivent être associés.', 'gestion'); ?></li>
+                     <li><?php echo __('Pour un flux orienté rapport (ticket en entrée), point d entrée principal: /plugins/rp/api/ticket_sign.php.', 'gestion'); ?></li>
+                     <li><?php echo __('Le flux inverse est disponible ici via combined_sign (BL en entree), mais reste un cas secondaire.', 'gestion'); ?></li>
+                  </ul>
+                  <pre class="bg-light p-2 rounded mb-0"><code>{
+  "mode": "both",
+  "bl": "BL202852",
+  "ticket_id": 55347,
+  "document_type": "intervention_report",
+  "signer_name": "Client Nom",
+  "signer_email": "",
+  "signature": "data:image/png;base64,...",
+  "mail_to_client": 0,
+  "comment": "Signature BL + rapport",
+  "counter_invoice_client": 0
+}</code></pre>
+
+                  <p class="mb-2 mt-3"><strong><?php echo __('Endpoint BL lies a un ticket', 'gestion'); ?></strong></p>
+                  <ul class="mb-3">
+                     <li><code>ticket_id</code> : <?php echo __('obligatoire.', 'gestion'); ?></li>
+                     <li><?php echo __('Reponse: bl_numbers (liste simple) + bls (detail survey_id, signed, doc_date, preview_url).', 'gestion'); ?></li>
+                  </ul>
+                  <pre class="bg-light p-2 rounded mb-0"><code>{
+  "ticket_id": 55347,
+  "bl_numbers": ["BL202852_EMPX"],
+  "bls": [
+    {
+      "survey_id": 34,
+      "bl": "BL202852_EMPX",
+      "signed": true,
+      "doc_date": "2026-02-15 10:45:00",
+      "preview_url": "/glpi11/front/document.send.php?docid=28419"
+    }
+  ]
+}</code></pre>
                </div>
                <div class="modal-footer">
                   <button type="button"

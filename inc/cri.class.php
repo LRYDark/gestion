@@ -45,7 +45,12 @@ class PluginGestionCri extends CommonDBTM {
          echo $responsiveScript;
 
       // Fonction pour générer le token temporaire (identique à view_pdf.php)
-      function generateTempTokenForPreview($doc_id, $secret_key = 'GLPI_PDF_SECRET_2024') {
+      function generateTempTokenForPreview($doc_id, $secret_key = null) {
+          if ($secret_key === null || $secret_key === 'GLPI_PDF_SECRET_2024') {
+              $secret_key = defined('GLPI_PDF_PREVIEW_SECRET')
+                  ? GLPI_PDF_PREVIEW_SECRET
+                  : (getenv('GLPI_PDF_PREVIEW_SECRET') ?: hash('sha256', realpath(__DIR__ . '/..') . 'gestion_pdf_preview'));
+          }
           $today = date('Y-m-d');
           return hash('sha256', $doc_id . $today . $secret_key);
       }

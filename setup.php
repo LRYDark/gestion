@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.7.0'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.7.0_beta1'); // version du plugin
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 // Minimal GLPI version,
@@ -22,6 +22,8 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
    if ($plugin->isInstalled('gestion') && $plugin->isActivated('gestion')){  // verification si le plugin gestion est installé et activé
       $api_pattern_prepare = '#^/api/bl_prepare\.php(?:/.*)?$#';
       $api_pattern_sign = '#^/api/bl_sign\.php(?:/.*)?$#';
+      $api_pattern_combined = '#^/api/combined_sign\.php(?:/.*)?$#';
+      $api_pattern_ticket_bls = '#^/api/ticket_bls\.php(?:/.*)?$#';
 
       \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
          'gestion',
@@ -33,9 +35,21 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
          $api_pattern_sign,
          \Glpi\Http\Firewall::STRATEGY_NO_CHECK
       );
+      \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
+         'gestion',
+         $api_pattern_combined,
+         \Glpi\Http\Firewall::STRATEGY_NO_CHECK
+      );
+      \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
+         'gestion',
+         $api_pattern_ticket_bls,
+         \Glpi\Http\Firewall::STRATEGY_NO_CHECK
+      );
 
       \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $api_pattern_prepare);
       \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $api_pattern_sign);
+      \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $api_pattern_combined);
+      \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $api_pattern_ticket_bls);
 
       if (Session::getLoginUserID()) {
          Plugin::registerClass('PluginGestionProfile', ['addtabon' => 'Profile']);

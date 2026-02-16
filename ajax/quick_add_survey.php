@@ -27,7 +27,10 @@ $amount_ttc = null;
 function gestion_build_pdf_preview(string $docId, string $rootdoc, string $proto, string $host): string {
    $rootdoc = rtrim($rootdoc, '/');
    $base = $proto . $host . $rootdoc . '/plugins/gestion';
-   $token = hash('sha256', $docId . date('Y-m-d') . 'GLPI_PDF_SECRET_2024');
+   $secret = defined('GLPI_PDF_PREVIEW_SECRET')
+       ? GLPI_PDF_PREVIEW_SECRET
+       : (getenv('GLPI_PDF_PREVIEW_SECRET') ?: hash('sha256', realpath(__DIR__ . '/..') . 'gestion_pdf_preview'));
+   $token = hash('sha256', $docId . date('Y-m-d') . $secret);
    return $base . '/view_pdf.php?id=' . rawurlencode($docId) . '&token=' . $token;
 }
 

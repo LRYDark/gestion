@@ -1,8 +1,14 @@
 <?php
 // ============ CORS Headers ============
-header('Access-Control-Allow-Origin: *');
+$_cors_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$_cors_allowed = getenv('GLPI_API_CORS_ORIGIN') ?: '*';
+if ($_cors_allowed === '*' || $_cors_origin === $_cors_allowed) {
+    header('Access-Control-Allow-Origin: ' . ($_cors_allowed === '*' ? '*' : $_cors_origin));
+} else {
+    header('Access-Control-Allow-Origin: ' . $_cors_allowed);
+}
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, App-Token, Session-Token');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, App-Token, Session-Token, User-Token, X-App-Token, Glpi-Entity, Glpi-Entity-Recursive, Glpi-Profile');
 header('Content-Type: application/json; charset=UTF-8');
 
 // Preflight OPTIONS
@@ -43,8 +49,11 @@ function api_prepare_end(int $status, array $payload): void
 
 function api_prepare_preview_url(string $doc_id, string $rootdoc): string
 {
-   $token = hash('sha256', $doc_id . date('Y-m-d') . 'GLPI_PDF_SECRET_2024');
-   return rtrim($rootdoc, '/') . '/plugins/gestion/public/view_pdf.php?id=' . rawurlencode($doc_id) . '&token=' . $token;
+   $secret = defined('GLPI_PDF_PREVIEW_SECRET')
+       ? GLPI_PDF_PREVIEW_SECRET
+       : (getenv('GLPI_PDF_PREVIEW_SECRET') ?: hash('sha256', realpath(__DIR__ . '/../..') . 'gestion_pdf_preview'));
+   $token = hash('sha256', $doc_id . date('Y-m-d') . $secret);
+   return rtrim($rootdoc, '/') . '/plugins/gestion/view_pdf.php?id=' . rawurlencode($doc_id) . '&token=' . $token;
 }
 
 function api_prepare_preview_from_row(array $row, string $rootdoc): string
@@ -60,11 +69,21 @@ function api_prepare_preview_from_row(array $row, string $rootdoc): string
    }
 
    if (str_contains($preview, 'document.send.php')) {
-      return rtrim($rootdoc, '/') . '/front/' . ltrim($preview, '/');
+      if (preg_match('#^https?://#i', $preview)) {
+         return $preview;
+      }
+      $rootdoc = rtrim($rootdoc, '/');
+      if (str_starts_with($preview, $rootdoc . '/')) {
+         return $preview;
+      }
+      if (str_starts_with($preview, '/')) {
+         return $rootdoc . $preview;
+      }
+      return $rootdoc . '/front/' . ltrim($preview, '/');
    }
 
-   $preview = str_replace('/ajax/view_pdf.php', '/public/view_pdf.php', $preview);
-   $preview = str_replace('/plugins/gestion/view_pdf.php', '/plugins/gestion/public/view_pdf.php', $preview);
+   $preview = str_replace('/ajax/view_pdf.php', '/view_pdf.php', $preview);
+   $preview = str_replace('/plugins/gestion/public/view_pdf.php', '/plugins/gestion/view_pdf.php', $preview);
 
    return $preview;
 }

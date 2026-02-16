@@ -1,8 +1,14 @@
 <?php
 // ============ CORS Headers ============
-header('Access-Control-Allow-Origin: *');
+$_cors_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$_cors_allowed = getenv('GLPI_API_CORS_ORIGIN') ?: '*';
+if ($_cors_allowed === '*' || $_cors_origin === $_cors_allowed) {
+    header('Access-Control-Allow-Origin: ' . ($_cors_allowed === '*' ? '*' : $_cors_origin));
+} else {
+    header('Access-Control-Allow-Origin: ' . $_cors_allowed);
+}
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, App-Token, Session-Token');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, App-Token, Session-Token, User-Token, X-App-Token, Glpi-Entity, Glpi-Entity-Recursive, Glpi-Profile');
 header('Content-Type: application/json; charset=UTF-8');
 
 // Preflight OPTIONS
