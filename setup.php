@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.7.0_beta1'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.7.0_beta2'); // version du plugin
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 // Minimal GLPI version,

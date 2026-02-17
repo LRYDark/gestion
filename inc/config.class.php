@@ -2013,6 +2013,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       // --------------------- SECTION : SIGNATURE BL À L'AJOUT DE TÂCHE ---------------------
       $taskSigUsers  = $config->TaskSignatureUsers();
       $taskSigStates = $config->TaskSignatureTriggerStates();
+      $planningBLSignatureOn = (int)$config->PlanningBLSignatureOn();
       $taskStateValues = [
          Planning::INFO => Planning::getState(Planning::INFO),
          Planning::TODO => Planning::getState(Planning::TODO),
@@ -2051,6 +2052,24 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   ?>
                   <div class="form-text text-muted">
                      <?php echo __('Par défaut : Fait.', 'gestion'); ?>
+                  </div>
+               </div>
+               <div class="col-md-12">
+                  <label for="PlanningBLSignatureOn_switch" class="form-label mb-1">
+                     <?php echo __('Signature BL cliquable depuis le planning GLPI', 'gestion'); ?>
+                  </label>
+                  <div class="form-check form-switch">
+                     <input type="hidden" name="PlanningBLSignatureOn" value="0">
+                     <input class="form-check-input"
+                           type="checkbox"
+                           id="PlanningBLSignatureOn_switch"
+                           name="PlanningBLSignatureOn"
+                           value="1"
+                           <?php echo ($planningBLSignatureOn === 1 ? 'checked' : ''); ?>>
+                     <label class="form-check-label" for="PlanningBLSignatureOn_switch"><?php echo __('Activer', 'gestion'); ?></label>
+                  </div>
+                  <div class="form-text text-muted">
+                     <?php echo __('Rend les numeros BL detectes dans les evenements du planning cliquables pour ouvrir le formulaire de signature Gestion.', 'gestion'); ?>
                   </div>
                </div>
             </div>
@@ -2310,6 +2329,9 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       }
       return array_values(array_map('intval', $arr));
    }
+   function PlanningBLSignatureOn() {
+      return isset($this->fields['PlanningBLSignatureOn']) ? (int)$this->fields['PlanningBLSignatureOn'] : 0;
+   }
    function SageUrlApi(){
       return ($this->fields['SageUrlApi']);
    }
@@ -2374,6 +2396,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `CombinedMailMode` TINYINT NOT NULL DEFAULT '0',
+                  `PlanningBLSignatureOn` TINYINT NOT NULL DEFAULT '0',
                   `ConfigModes` TINYINT NOT NULL DEFAULT '0',
                   `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',
                   `gabarit` INT(10) NOT NULL DEFAULT '0',
@@ -2476,6 +2499,10 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.6.3'){ // NEW 1.6.4
          include(PLUGIN_GESTION_DIR . "/install/update_164_next.php");
          update_164_next(); 
+      }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.6.4'){ // NEW 1.7.0
+         include(PLUGIN_GESTION_DIR . "/install/update_170_next.php");
+         update_170_next();
       }
    }
 

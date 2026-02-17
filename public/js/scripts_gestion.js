@@ -9,6 +9,7 @@ function gestion_loadCriForm(action, modal, params) {
       url: params.root_doc + '/ajax/cri.php',
       type: "POST",
       dataType: "html",
+      timeout: 12000,
       data: {
          'action': action,
          'params': params,
@@ -24,23 +25,40 @@ function gestion_loadCriForm(action, modal, params) {
             }
 
          } catch (err) {
-            $('#' + modal).html(response);
+            // `modal` can be a numeric survey id used server-side.
+            // Using jQuery selector like `#123` may fail on some browsers/engines.
+            try {
+               if (modal !== undefined && modal !== null && String(modal).trim() !== '') {
+                  var mount = document.getElementById(String(modal));
+                  if (mount) {
+                     mount.innerHTML = response;
+                  }
+               }
+            } catch (e) {}
 
             switch (action) {
                case 'saveCri':
                   // Ferme le modal et recharge la page
                   window.location.reload();
                   break;
-               default:
-                  // Ouvre le modal et force le style no-scroll avec JavaScript
-                  // Capture l'élément déclencheur pour restaurer le focus à la fermeture
-                  var openerEl = document.activeElement || null;
-                  window.__gestionModalFocusMap = window.__gestionModalFocusMap || {};
-                  window.__gestionModalFocusMap[action] = openerEl;
-                  glpi_html_dialog({
-                     title: __('Gestion BL', 'gestion'),
-                     body: response,
-                     id: action,
+                default:
+                   // Ouvre le modal et force le style no-scroll avec JavaScript
+                   // Capture l'élément déclencheur pour restaurer le focus à la fermeture
+                   var openerEl = document.activeElement || null;
+                   window.__gestionModalFocusMap = window.__gestionModalFocusMap || {};
+                   window.__gestionModalFocusMap[action] = openerEl;
+                   if (typeof glpi_html_dialog !== 'function') {
+                      if (params && params.fallback_url) {
+                         window.location.href = params.fallback_url;
+                         return;
+                      }
+                      alert('Impossible d\'ouvrir la fenetre de signature.');
+                      return;
+                   }
+                   glpi_html_dialog({
+                      title: __('Gestion BL', 'gestion'),
+                      body: response,
+                      id: action,
                      afterOpen: function() {
                         // Forcer le style no-scroll sur le body
                         document.body.classList.add('no-scroll');
@@ -68,6 +86,9 @@ function gestion_loadCriForm(action, modal, params) {
                               try {
                                  var ae = document.activeElement;
                                  if (ae && modalEl.contains(ae)) {
+                                    if (typeof ae.blur === 'function') {
+                                       ae.blur();
+                                    }
                                     var opener = (window.__gestionModalFocusMap || {})[action];
                                     if (opener && document.body.contains(opener) && typeof opener.focus === 'function') {
                                        opener.focus();
@@ -100,6 +121,16 @@ function gestion_loadCriForm(action, modal, params) {
                   break;
             }
          }
+      },
+      error: function(xhr, status, err) {
+         try {
+            console.error('[gestion] gestion_loadCriForm failed', status, err, xhr && xhr.status, xhr && xhr.responseText);
+         } catch (e) {}
+         if (params && params.fallback_url) {
+            window.location.href = params.fallback_url;
+            return;
+         }
+         alert('Impossible d\'ouvrir la signature pour le moment.');
       }
    });
 }
@@ -504,7 +535,10 @@ function initializeSignatureGestion(uniqId) {
       const backup = document.createElement("canvas");
       backup.width  = originalCanvas.width;
       backup.height = originalCanvas.height;
-      backup.getContext("2d").drawImage(originalCanvas, 0, 0);
+      const hasSourceBitmap = originalCanvas.width > 0 && originalCanvas.height > 0;
+      if (hasSourceBitmap) {
+        backup.getContext("2d").drawImage(originalCanvas, 0, 0);
+      }
 
       // resize + DPR
       fixDPR(originalCanvas, originalCtx, cssW, cssH);
@@ -512,8 +546,10 @@ function initializeSignatureGestion(uniqId) {
       // restaure
       const m = originalCtx.getTransform();
       originalCtx.setTransform(1,0,0,1,0,0);
-      originalCtx.drawImage(backup, 0,0, backup.width, backup.height,
-                                    0,0, originalCanvas.width, originalCanvas.height);
+      if (backup.width > 0 && backup.height > 0) {
+        originalCtx.drawImage(backup, 0,0, backup.width, backup.height,
+                                      0,0, originalCanvas.width, originalCanvas.height);
+      }
       originalCtx.setTransform(m);
       setup(originalCtx, TARGET_BASE_LINE);
     }
@@ -1023,4 +1059,706 @@ function initializeSignatureGestion(uniqId) {
         inflight = false;
       });
   });
+})();
+
+// --------- Lien BL cliquable dans le planning GLPI ---------
+(function(){
+  const PLANNING_INIT_GUARD = '__gestion_planning_bl_init__';
+  if (window[PLANNING_INIT_GUARD]) {
+    return;
+  }
+  window[PLANNING_INIT_GUARD] = true;
+
+  const root = (typeof GLPI_PLUG_GESTION !== 'undefined' && typeof GLPI_PLUG_GESTION === 'string' && GLPI_PLUG_GESTION.trim())
+    ? GLPI_PLUG_GESTION
+    : ((window.CFG_GLPI && window.CFG_GLPI.root_doc) ? (window.CFG_GLPI.root_doc + '/plugins/gestion') : '/glpi/plugins/gestion');
+
+  const path = ((window.location && window.location.pathname) ? window.location.pathname : '').toLowerCase();
+  const isPlanningPage = /\/front\/planning\.php$/.test(path) || path.indexOf('/front/planning.php') !== -1;
+  const isExternalEventFormPage = /\/front\/planningexternalevent\.form\.php$/.test(path)
+    || path.indexOf('/front/planningexternalevent.form.php') !== -1;
+  if (!isPlanningPage && !isExternalEventFormPage) {
+    return;
+  }
+
+  const BL_REGEX = /\bBL[\s-]?\d{6}\b/gi;
+  const LINK_CLASS = 'gestion-planning-bl-link';
+  const ACTION_LINK_CLASS = 'gestion-planning-bl-open';
+  let featureEnabled = false;
+  let scanQueued = false;
+  let formRefreshTimer = null;
+
+  function getCsrf() {
+    const meta = document.querySelector('meta[property="glpi:csrf_token"]');
+    if (meta && meta.content) return meta.content;
+    const input = document.querySelector('input[name="_glpi_csrf_token"]');
+    return input ? input.value : '';
+  }
+
+  function normalizeBL(raw) {
+    if (!raw) return '';
+    const compact = String(raw).toUpperCase().replace(/[\s-]/g, '');
+    if (/^\d{6}$/.test(compact)) return 'BL' + compact;
+    if (/^BL\d{6}$/.test(compact)) return compact;
+    return '';
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  async function fetchFeatureFlag() {
+    // Link activation remains client-side to avoid extra network roundtrip.
+    return true;
+  }
+
+  function firstBLFromText(text) {
+    const list = extractBLs(text || '');
+    return list.length ? list[0] : '';
+  }
+
+  function normalizeCandidateFilename(name) {
+    return String(name || '')
+      .trim()
+      .replace(/\.pdf$/i, '');
+  }
+
+  function pickBestDocumentCandidate(bl, items) {
+    if (!Array.isArray(items) || !items.length) {
+      return null;
+    }
+
+    const unsigned = items.filter(function(item) {
+      return parseInt(item && item.signed, 10) !== 1;
+    });
+    const pool = unsigned.length ? unsigned : items;
+
+    // 1) Exact BL match from text/id/filename
+    const exact = pool.find(function(item) {
+      const textBL = firstBLFromText(item && item.text);
+      const idBL = firstBLFromText(item && item.id);
+      const fileBL = firstBLFromText(normalizeCandidateFilename(item && item.filename));
+      return textBL === bl || idBL === bl || fileBL === bl;
+    });
+    if (exact) {
+      return exact;
+    }
+
+    // 2) Fallback to first result
+    return pool[0] || null;
+  }
+
+  async function searchDocumentsForBL(bl) {
+    const response = await fetch(root + '/ajax/ajax_search_pdf.php?q=' + encodeURIComponent(bl), {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    if (!response.ok) {
+      throw new Error('search_http_' + response.status);
+    }
+    let data = [];
+    try {
+      data = await response.json();
+    } catch (e) {
+      data = [];
+    }
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function createSurveyFromCandidate(candidate, bl) {
+    const save = String((candidate && candidate.save) || '').trim();
+    const filenameRaw = String((candidate && candidate.filename) || '').trim();
+    const folder = String((candidate && candidate.folder) || '').trim();
+    const signed = parseInt((candidate && candidate.signed) || 0, 10) === 1 ? 1 : 0;
+    const searchPdf = String((candidate && (candidate.text || candidate.id)) || bl).trim();
+    const filename = filenameRaw || (bl + '.pdf');
+
+    if (!save || !folder) {
+      throw new Error('candidate_incomplete');
+    }
+
+    const csrf = getCsrf();
+    const payload = new URLSearchParams();
+    payload.append('save', save);
+    payload.append('filename', filename);
+    payload.append('folder', folder);
+    payload.append('signed', String(signed));
+    payload.append('search_pdf', searchPdf);
+    payload.append('tickets_id', '0');
+    payload.append('entities_id', '0');
+    if (csrf) payload.append('_glpi_csrf_token', csrf);
+
+    const response = await fetch(root + '/ajax/quick_add_survey_form.php', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: Object.assign(
+        {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        csrf ? { 'X-Glpi-Csrf-Token': csrf } : {}
+      ),
+      body: payload.toString()
+    });
+
+    let data = {};
+    try {
+      data = await response.json();
+    } catch (e) {
+      data = {};
+    }
+
+    if (!response.ok || !data || data.ok !== true) {
+      const err = (data && (data.error || data.message)) ? String(data.error || data.message) : ('create_http_' + response.status);
+      throw new Error(err);
+    }
+
+    return {
+      survey_id: parseInt(data.id, 10) || 0,
+      ticket_id: parseInt(data.tickets_id, 10) || 0,
+      bl: data.bl || bl
+    };
+  }
+
+  async function ensureSurveyForBL(bl, onStatus) {
+    if (typeof onStatus === 'function') {
+      onStatus('Recherche du BL en cours...');
+    }
+
+    // Search candidate docs then auto-create survey
+    const items = await searchDocumentsForBL(bl);
+    let candidate = pickBestDocumentCandidate(bl, items);
+
+    // Fallback: force Sage creation from BL even if search list is empty
+    if (!candidate) {
+      candidate = {
+        save: 'Sage',
+        filename: bl + '.pdf',
+        folder: bl,
+        text: bl,
+        id: bl,
+        signed: 0
+      };
+    }
+
+    if (typeof onStatus === 'function') {
+      onStatus('Creation de la fiche signature...');
+    }
+    return createSurveyFromCandidate(candidate, bl);
+  }
+
+  function buildLinkedHtml(text) {
+    if (!text || !BL_REGEX.test(text)) {
+      BL_REGEX.lastIndex = 0;
+      return null;
+    }
+
+    BL_REGEX.lastIndex = 0;
+    let cursor = 0;
+    let html = '';
+    let matched = false;
+    let match;
+    while ((match = BL_REGEX.exec(text)) !== null) {
+      matched = true;
+      const raw = match[0];
+      const normalized = normalizeBL(raw);
+      const start = match.index;
+      const end = start + raw.length;
+      html += escapeHtml(text.slice(cursor, start));
+      if (normalized) {
+        html += '<a href="#" class="' + LINK_CLASS + '" data-bl="' + escapeHtml(normalized) + '">' + escapeHtml(raw) + '</a>';
+      } else {
+        html += escapeHtml(raw);
+      }
+      cursor = end;
+    }
+    html += escapeHtml(text.slice(cursor));
+    return matched ? html : null;
+  }
+
+  function stripHtml(raw) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = String(raw || '');
+    return (tmp.textContent || tmp.innerText || '').trim();
+  }
+
+  function extractBLs(rawText) {
+    const text = String(rawText || '');
+    if (!text) {
+      return [];
+    }
+    BL_REGEX.lastIndex = 0;
+    const seen = new Set();
+    const result = [];
+    let match;
+    while ((match = BL_REGEX.exec(text)) !== null) {
+      const bl = normalizeBL(match[0]);
+      if (bl && !seen.has(bl)) {
+        seen.add(bl);
+        result.push(bl);
+      }
+    }
+    BL_REGEX.lastIndex = 0;
+    return result;
+  }
+
+  function getRichFieldText(textarea) {
+    if (!textarea) {
+      return '';
+    }
+
+    const editorId = (textarea.getAttribute('id') || '').trim();
+    if (editorId && typeof window.getRichTextEditorContent === 'function') {
+      try {
+        const html = window.getRichTextEditorContent(editorId);
+        if (typeof html === 'string' && html.trim() !== '') {
+          return stripHtml(html);
+        }
+      } catch (e) {
+        // fallback on textarea value
+      }
+    }
+
+    const value = String(textarea.value || '').trim();
+    const host = textarea.closest('.form-field, .mb-3, .form-group, .col-10, .col-sm-8') || textarea.parentElement || document;
+
+    const editable = host.querySelector('[contenteditable="true"]');
+    if (editable) {
+      const visibleText = (editable.innerText || editable.textContent || '').trim();
+      if (visibleText) {
+        return visibleText;
+      }
+    }
+
+    const iframe = host.querySelector('iframe.tox-edit-area__iframe, .tox-edit-area iframe');
+    if (iframe && iframe.contentDocument && iframe.contentDocument.body) {
+      const iframeText = (iframe.contentDocument.body.innerText || iframe.contentDocument.body.textContent || '').trim();
+      if (iframeText) {
+        return iframeText;
+      }
+    }
+
+    if (/<[a-z][\s\S]*>/i.test(value)) {
+      return stripHtml(value);
+    }
+    return value;
+  }
+
+  function ensureActionContainer(textarea) {
+    const host = textarea.closest('.form-field, .mb-3, .form-group, .col-10, .col-sm-8') || textarea.parentElement;
+    if (!host) {
+      return null;
+    }
+
+    let box = host.querySelector('.gestion-planning-bl-actions');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'gestion-planning-bl-actions mt-2 d-flex flex-wrap gap-2';
+      box.style.display = 'none';
+      host.appendChild(box);
+    }
+    return box;
+  }
+
+  function decoratePlanningDescriptionField(textarea) {
+    if (!textarea || textarea.name !== 'text') {
+      return;
+    }
+
+    const content = getRichFieldText(textarea);
+    const bls = extractBLs(content);
+    const box = ensureActionContainer(textarea);
+    if (!box) {
+      return;
+    }
+
+    const signature = bls.join('|');
+    const previousSignature = box.dataset.gestionPlanningBLSignature || '';
+
+    if (!bls.length) {
+      if (previousSignature === '' && box.style.display === 'none') {
+        return;
+      }
+      box.innerHTML = '';
+      box.style.display = 'none';
+      box.dataset.gestionPlanningBLSignature = '';
+      return;
+    }
+
+    if (previousSignature === signature) {
+      if (box.style.display === 'none') {
+        box.style.display = '';
+      }
+      return;
+    }
+
+    box.innerHTML = bls.map(function(bl) {
+      return '<a href="#" class="btn btn-primary ' + ACTION_LINK_CLASS + '" style="cursor:pointer;pointer-events:auto;" data-bl="' + escapeHtml(bl) + '">' +
+        '<i class="ti ti-signature me-1"></i>Signer ' + escapeHtml(bl) +
+      '</a>';
+    }).join('');
+    box.dataset.gestionPlanningBLSignature = signature;
+    bindDirectActionLinks(box);
+    box.style.display = '';
+  }
+
+  function scanPlanningFormsForBL(rootEl) {
+    if (!featureEnabled) {
+      return;
+    }
+    const scope = rootEl || document;
+    const textareas = scope.querySelectorAll('textarea[name="text"]');
+    textareas.forEach(function(textarea) {
+      if (!textarea.dataset.gestionPlanningBLBind) {
+        textarea.dataset.gestionPlanningBLBind = '1';
+        ['input', 'change', 'keyup', 'blur'].forEach(function(evt) {
+          textarea.addEventListener(evt, function() {
+            decoratePlanningDescriptionField(textarea);
+          });
+        });
+      }
+      decoratePlanningDescriptionField(textarea);
+    });
+    bindDirectActionLinks(scope);
+  }
+
+  function decoratePlanningCell(el) {
+    if (!el || el.tagName === 'A' || el.children.length > 0) {
+      return;
+    }
+
+    const currentText = (el.textContent || '').trim();
+    if (!currentText) {
+      return;
+    }
+    if (el.dataset.gestionPlanningLinkedText === currentText) {
+      return;
+    }
+
+    const linkedHtml = buildLinkedHtml(currentText);
+    if (!linkedHtml) {
+      el.dataset.gestionPlanningLinkedText = currentText;
+      return;
+    }
+
+    el.innerHTML = linkedHtml;
+    el.dataset.gestionPlanningLinkedText = currentText;
+  }
+
+  function scanPlanningForBL() {
+    if (!featureEnabled) {
+      return;
+    }
+    const candidates = document.querySelectorAll('.fc-event-title, .fc-list-event-title');
+    candidates.forEach(decoratePlanningCell);
+  }
+
+  function queueScan() {
+    if (scanQueued) return;
+    scanQueued = true;
+    window.requestAnimationFrame(function() {
+      scanQueued = false;
+      scanPlanningForBL();
+      scanPlanningFormsForBL(document);
+      scanIframesForBL();
+    });
+  }
+
+  const PROGRESS_MODAL_ID = 'gestion-planning-bl-progress';
+  let inflightRequest = null;
+  let inflightBL = '';
+
+  function renderProgressBody(bl, message) {
+    const safeBL = escapeHtml(bl || '');
+    const safeMessage = escapeHtml(message || 'Chargement...');
+    return ''
+      + '<div class="d-flex align-items-center gap-2 py-2">'
+      + '  <div class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></div>'
+      + '  <div>'
+      + '    <div class="fw-bold">Signature ' + safeBL + '</div>'
+      + '    <div class="text-muted">' + safeMessage + '</div>'
+      + '  </div>'
+      + '</div>';
+  }
+
+  function showProgressModal(bl, message) {
+    const body = renderProgressBody(bl, message);
+    const existing = document.getElementById(PROGRESS_MODAL_ID);
+    if (existing) {
+      const target = existing.querySelector('.modal-body') || existing;
+      target.innerHTML = body;
+      return;
+    }
+    if (typeof glpi_html_dialog === 'function') {
+      glpi_html_dialog({
+        title: 'Gestion BL',
+        body: body,
+        id: PROGRESS_MODAL_ID
+      });
+      return;
+    }
+
+    let overlay = document.getElementById(PROGRESS_MODAL_ID + '-fallback');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = PROGRESS_MODAL_ID + '-fallback';
+      overlay.style.position = 'fixed';
+      overlay.style.inset = '0';
+      overlay.style.background = 'rgba(0,0,0,0.35)';
+      overlay.style.zIndex = '99999';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.innerHTML = '<div class="card shadow" style="min-width:320px;max-width:90vw;"><div class="card-body"></div></div>';
+      document.body.appendChild(overlay);
+    }
+    const cardBody = overlay.querySelector('.card-body') || overlay;
+    cardBody.innerHTML = body;
+  }
+
+  function closeProgressModal() {
+    const modal = document.getElementById(PROGRESS_MODAL_ID);
+    if (modal) {
+      try {
+        const $modal = $(modal);
+        if ($modal && typeof $modal.modal === 'function') {
+          $modal.modal('hide');
+        }
+      } catch (e) {
+        // ignore and fallback on hard remove below
+      }
+    }
+    window.setTimeout(function() {
+      const stale = document.getElementById(PROGRESS_MODAL_ID);
+      if (stale && stale.parentNode) {
+        stale.parentNode.removeChild(stale);
+      }
+      const fallback = document.getElementById(PROGRESS_MODAL_ID + '-fallback');
+      if (fallback && fallback.parentNode) {
+        fallback.parentNode.removeChild(fallback);
+      }
+    }, 250);
+  }
+
+  function openSignatureModal(row) {
+    const surveyId = parseInt(row.survey_id, 10);
+    const ticketId = parseInt(row.ticket_id, 10) || 0;
+    if (!surveyId) {
+      alert('BL introuvable dans Gestion.');
+      return;
+    }
+
+    const fallbackUrl = root + '/front/survey.form.php?id=' + encodeURIComponent(String(surveyId));
+
+    if (typeof gestion_loadCriForm === 'function') {
+      const params = {
+        job: ticketId,
+        root_doc: root,
+        root_modal: 'planning-form',
+        fallback_url: fallbackUrl
+      };
+      const fallbackTimer = window.setTimeout(function() {
+        const modalShown = !!document.querySelector('#showCriForm.show, #showCriForm.modal.show');
+        if (!modalShown) {
+          window.location.href = fallbackUrl;
+        }
+      }, 3500);
+
+      const clearTimerOnShow = window.setInterval(function() {
+        const modalShown = !!document.querySelector('#showCriForm.show, #showCriForm.modal.show');
+        if (modalShown) {
+          window.clearTimeout(fallbackTimer);
+          window.clearInterval(clearTimerOnShow);
+        }
+      }, 120);
+
+      window.setTimeout(function() {
+        window.clearInterval(clearTimerOnShow);
+      }, 4000);
+
+      gestion_loadCriForm('showCriForm', String(surveyId), params);
+      return;
+    }
+
+    window.location.href = fallbackUrl;
+  }
+
+  async function onBLClick(bl) {
+    if (inflightRequest) {
+      showProgressModal(inflightBL || bl, 'Ouverture en cours...');
+      return inflightRequest;
+    }
+
+    showProgressModal(bl, 'Demarrage...');
+    inflightBL = bl;
+
+    const task = (async function() {
+    try {
+      const row = await ensureSurveyForBL(bl, function(status) {
+        showProgressModal(bl, status);
+      });
+      if (!row || !parseInt(row.survey_id, 10)) {
+        closeProgressModal();
+        alert('Impossible d\'ouvrir la signature pour ' + bl + '.');
+        return;
+      }
+      showProgressModal(bl, 'Ouverture du formulaire...');
+      closeProgressModal();
+      openSignatureModal(row);
+    } catch (error) {
+      closeProgressModal();
+      const code = String((error && error.message) || '');
+      if (code === 'feature_disabled') {
+        alert('La signature BL depuis le planning est desactivee dans la configuration du plugin.');
+        return;
+      }
+      if (code === 'not_found') {
+        alert('Aucun document trouve pour ' + bl + '.');
+        return;
+      }
+      if (code.indexOf('already') !== -1 || code.indexOf('deja') !== -1) {
+        alert('Ce BL est deja signe.');
+        return;
+      }
+      console.error(error);
+      alert('Impossible d\'ouvrir la signature pour ' + bl + '.');
+    } finally {
+      inflightRequest = null;
+      inflightBL = '';
+    }
+    })();
+
+    inflightRequest = task;
+    return task;
+  }
+
+  function handleBLActionClick(event, element) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const source = element || (event && event.currentTarget) || (event && event.target) || null;
+    if (!source) {
+      return;
+    }
+    const bl = normalizeBL(source.getAttribute('data-bl') || source.textContent || '');
+    if (!bl) {
+      return;
+    }
+
+    onBLClick(bl).catch(function(err) {
+      console.error(err);
+      alert('Erreur lors de l\'ouverture de la signature BL.');
+    });
+  }
+
+  function bindDirectActionLinks(scope) {
+    const rootEl = scope || document;
+    const items = rootEl.querySelectorAll('a.' + ACTION_LINK_CLASS + ', button.' + ACTION_LINK_CLASS);
+    items.forEach(function(item) {
+      if (item.dataset.gestionPlanningBLDirectBind === '1') {
+        return;
+      }
+      item.dataset.gestionPlanningBLDirectBind = '1';
+      item.addEventListener('click', function(evt) {
+        handleBLActionClick(evt, item);
+      });
+      item.addEventListener('keydown', function(evt) {
+        if (evt.key === 'Enter' || evt.key === ' ') {
+          handleBLActionClick(evt, item);
+        }
+      });
+    });
+  }
+
+  document.addEventListener('click', function(event) {
+    let link = event.target && event.target.closest ? event.target.closest('a.' + LINK_CLASS + ', button.' + LINK_CLASS) : null;
+    if (!link && event.target && event.target.closest) {
+      link = event.target.closest('a.' + ACTION_LINK_CLASS + ', button.' + ACTION_LINK_CLASS);
+    }
+    if (!link) return;
+    handleBLActionClick(event, link);
+  }, true);
+
+  function startObserver() {
+    const observer = new MutationObserver(function() {
+      queueScan();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  function scanIframesForBL() {
+    const frames = document.querySelectorAll('iframe');
+    frames.forEach(function(frame) {
+      if (!frame.dataset.gestionPlanningBLFrameBind) {
+        frame.dataset.gestionPlanningBLFrameBind = '1';
+        frame.addEventListener('load', function() {
+          try {
+            const doc = frame.contentDocument;
+            if (!doc) {
+              return;
+            }
+            scanPlanningFormsForBL(doc);
+            bindDirectActionLinks(doc);
+          } catch (e) {
+            // cross-origin or not ready
+          }
+        });
+      }
+      try {
+        const doc = frame.contentDocument;
+        if (!doc) {
+          return;
+        }
+        scanPlanningFormsForBL(doc);
+        bindDirectActionLinks(doc);
+      } catch (e) {
+        // cross-origin or not ready
+      }
+    });
+  }
+
+  function startFormRefresh() {
+    if (formRefreshTimer) {
+      return;
+    }
+    formRefreshTimer = window.setInterval(function() {
+      if (!featureEnabled) {
+        return;
+      }
+      if (document.hidden) {
+        return;
+      }
+      scanPlanningFormsForBL(document);
+      scanIframesForBL();
+    }, 5000);
+  }
+
+  async function bootstrapPlanningBLLinks() {
+    try {
+      featureEnabled = await fetchFeatureFlag();
+      if (!featureEnabled) return;
+      queueScan();
+      bindDirectActionLinks(document);
+      scanIframesForBL();
+      startObserver();
+      startFormRefresh();
+    } catch (e) {
+      console.error('[gestion] planning BL links init failed', e);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrapPlanningBLLinks);
+  } else {
+    bootstrapPlanningBLLinks();
+  }
 })();
