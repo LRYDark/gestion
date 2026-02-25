@@ -49,20 +49,27 @@ function message($msg, $msgtype){
     );
 }
 
+function pluginGestionSurveyCheckCSRF(array $data): void {
+    if (!empty($data['plugin_gestion_survey_csrf_token'])) {
+        Session::checkCSRF(['_glpi_csrf_token' => (string)$data['plugin_gestion_survey_csrf_token']], true);
+        return;
+    }
+    Session::checkCSRF($data, true);
+}
+
 if (isset($_POST["add"])) {
+   pluginGestionSurveyCheckCSRF($_POST);
    $valid = false;
    $NewDoc = 0;
-   $tickets_id = $_POST['tickets_id'];
-   $entities_id = $_POST['entities_id'];
-   $pdf_filename = $_POST['pdf_filename'];
-   $pdf_folder = $_POST['pdf_folder'];
-   $search_pdf = $_POST['search_pdf'];
-   $pdf_save = $_POST['pdf_save'];
-   $pdf_signed = $_POST['pdf_signed'];
+   $tickets_id = (int)($_POST['tickets_id'] ?? 0);
+   $entities_id = (int)($_POST['entities_id'] ?? 0);
+   $pdf_filename = trim((string)($_POST['pdf_filename'] ?? ''));
+   $pdf_folder = trim((string)($_POST['pdf_folder'] ?? ''));
+   $search_pdf = trim((string)($_POST['search_pdf'] ?? ''));
+   $pdf_save = trim((string)($_POST['pdf_save'] ?? ''));
+   $pdf_signed = (int)($_POST['pdf_signed'] ?? 0);
    $tracker = null;
    $relatedInvoiceToBL = null;
-
-   $pdf_filename = $DB->escape($pdf_filename); // sécurise la requête SQL
 
    if ($pdf_save == 'Sage'){
       $fields = parseDocument($search_pdf);
@@ -71,7 +78,8 @@ if (isset($_POST["add"])) {
       $relatedInvoiceToBL = $fields['relatedInvoiceToBL'] ?? null;
    }
 
-   $query = "SELECT bl, id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename' LIMIT 1";
+   $pdf_filename_db = $DB->escape($pdf_filename);
+   $query = "SELECT bl, id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename_db' LIMIT 1";
    $result = $DB->doQuery($query);
 
    if ($result && $result->num_rows > 0) {
@@ -101,21 +109,21 @@ if (isset($_POST["add"])) {
       if ($pdf_save == 'Sage'){
          $tracker = $fields['tracker'];
          $valid = true;
-         if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
-            $doc_url = "https://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/view_pdf.php?id=$search_pdf";
-         } else {
-            $doc_url = "http://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/view_pdf.php?id=$search_pdf";
-         }
+         $doc_url = rtrim($CFG_GLPI['url_base'] ?? '', '/') . PLUGIN_GESTION_WEBDIR . "/view_pdf.php?id=" . rawurlencode($search_pdf);
       }
    }
          
    if ($valid == true){
       $doc_date_sql = ((int)$pdf_signed === 1) ? "NOW()" : "NULL";
       $relatedInvoiceSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'".$DB->escape($relatedInvoiceToBL)."'" : "NULL";
-      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`) VALUES ($tickets_id, $entities_id, '$tracker', $relatedInvoiceSql, '$pdf_folder', '$pdf_filename', $pdf_signed, $NewDoc, '$doc_url', '$pdf_save', NOW(), $doc_date_sql);";
+      $trackerSql = ($tracker !== null && $tracker !== '') ? "'" . $DB->escape((string)$tracker) . "'" : "NULL";
+      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`) VALUES (" . (int)$tickets_id . ", " . (int)$entities_id . ", $trackerSql, $relatedInvoiceSql, '" . $DB->escape($pdf_folder) . "', '$pdf_filename_db', " . (int)$pdf_signed . ", " . (int)$NewDoc . ", '" . $DB->escape((string)$doc_url) . "', '" . $DB->escape($pdf_save) . "', NOW(), $doc_date_sql);";
       if($DB->doQuery($query)){
-         $idsurvey = $DB->doQuery("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename'")->fetch_object();
-         $idsurvey = $idsurvey->id;
+         $idsurvey = (int)$DB->insertId();
+         if ($idsurvey <= 0) {
+            $idsurveyObj = $DB->doQuery("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename_db'")->fetch_object();
+            $idsurvey = (int)($idsurveyObj->id ?? 0);
+         }
          message('Document ajouté : <a href="survey.form.php?id='.$idsurvey.'">Gestion - ID '.$idsurvey.'</a>.', INFO);
       }else{
          message("Erreur de l'ajout du document", ERROR);
@@ -125,12 +133,14 @@ if (isset($_POST["add"])) {
    Html::back();
 
 }else if (isset($_POST["purge"])) {
-   $survey->check($_POST['id'], PURGE);
+   pluginGestionSurveyCheckCSRF($_POST);
+   $survey->check((int)$_POST['id'], PURGE);
    $survey->delete($_POST);
    $survey->redirectToList();
 
 } else if (isset($_POST["update"])) {
-   $survey->check($_POST['id'], UPDATE);
+   pluginGestionSurveyCheckCSRF($_POST);
+   $survey->check((int)$_POST['id'], UPDATE);
    $survey->update($_POST);
 
    Html::back();
@@ -138,6 +148,6 @@ if (isset($_POST["add"])) {
 } else {
    $survey->checkGlobal(READ);
    Html::header(PluginGestionSurvey::getTypeName(2), '', "management", "plugingestionmenu", "gestion");
-   $survey->display(['id' => $_GET['id']]);
+   $survey->display(['id' => (int)($_GET['id'] ?? 0)]);
    Html::footer();
 }

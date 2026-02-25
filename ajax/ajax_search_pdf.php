@@ -10,8 +10,8 @@ global $DB, $CFG_GLPI;
 $sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 
-$search = isset($_GET['q']) ? $_GET['q'] : '';
-$search = strtolower(trim($search));
+$search = strtolower(trim((string)($_GET['q'] ?? '')));
+$search = substr($search, 0, 255);
 $results = [];
 
 if ($config->SharePointSearch() == 1 && $config->SharePointOn() == 1 ){
@@ -20,8 +20,6 @@ if ($config->SharePointSearch() == 1 && $config->SharePointOn() == 1 ){
         // SharePoint
         $sharepoint_results = $sharepoint->searchSharePointGlobal($search);
         if (is_array($sharepoint_results)) {
-            error_log("Debug SharePoint - Nombre de résultats: " . count($sharepoint_results));
-            
             // Ajouter le badge SharePoint à chaque résultat
             foreach ($sharepoint_results as &$result) {
                 // Ajouter la source SharePoint
@@ -34,7 +32,6 @@ if ($config->SharePointSearch() == 1 && $config->SharePointOn() == 1 ){
                     $result['html'] = $result['text'] . ' <span style="color:white;background-color:#0078d4;padding:2px 6px;border-radius:4px;font-size:11px;">☁️ SHAREPOINT</span>';
                 }
                 
-                error_log("Debug SharePoint - Résultat: " . json_encode($result));
             }
             
             $results = array_merge($results, $sharepoint_results);
@@ -46,7 +43,7 @@ if ($config->SageSearch() == 1 && $config->SageOn() == 1){
     // Recherche Sage - L'API ne fait que vérifier l'existence avec l'élément complet
     // Ne proposer des suggestions QUE si le terme ressemble à un document complet
     
-    $searchTerm = trim($_GET['q']);
+    $searchTerm = trim((string)($_GET['q'] ?? ''));
     
     // Vérifier que le terme ressemble à un format de document complet
     // Ex: BL123456 (au moins 2 lettres + 4 chiffres minimum)
@@ -89,6 +86,17 @@ if ($config->LocalSearch() == 1){
         $folders = [];
         // On récupère tous les folder_name avec params = 3 ou 2
         $res = $DB->doQuery("SELECT folder_name FROM `glpi_plugin_gestion_configsfolder` WHERE params IN (2,3)");
+        if ($res) {
+            while ($row = $res->fetch_object()) {
+                if (!empty($row->folder_name)) {
+                    $folders[] = $row->folder_name;
+                }
+            }
+        }
+
+        if (empty($folders)) {
+            $folders[] = "DocumentsSigned";
+        }
 
         foreach ($rii as $file) {
             if (!$file->isFile()) continue;
@@ -102,19 +110,6 @@ if ($config->LocalSearch() == 1){
                 $filename = $file->getFilename();
                 $path_only = dirname($relative_path) . '/';
                 $webUrl = $path_only;
-
-                if ($res) {
-                    while ($row = $res->fetch_object()) {
-                        if (!empty($row->folder_name)) {
-                            $folders[] = $row->folder_name;
-                        }
-                    }
-                }
-
-                // Si aucun résultat, on ajoute le nom par défaut
-                if (empty($folders)) {
-                    $folders[] = "DocumentsSigned";
-                }
 
                 // Vérification dans $webUrl
                 $signed = false;
@@ -157,12 +152,6 @@ usort($results, function($a, $b) {
     
     return $aOrder - $bOrder;
 });
-
-// Debug : Log des résultats finaux
-error_log("Debug résultats finaux - Nombre total: " . count($results));
-foreach ($results as $result) {
-    error_log("Debug résultat final: " . json_encode($result));
-}
 
 // Sortie JSON finale
 echo json_encode($results);

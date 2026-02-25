@@ -12,14 +12,17 @@ Session::checkRight('config', UPDATE);
 $config = new PluginGestionConfig();
 
 function encryptArray($array) {
-   $include_keys = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken'];
+   static $include_keys_map = null;
+   if ($include_keys_map === null) {
+      $include_keys_map = array_flip(['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken']);
+   }
    $encrypted_array = [];
 
    foreach ($array as $key => $value) {
        // Crypter uniquement les clés définies dans $include_keys
-       if (in_array($key, $include_keys) && !empty($value)) {
+       if (isset($include_keys_map[$key]) && is_scalar($value) && (string)$value !== '') {
            //$encrypted_array[$key] = encryptData($value);
-           $encrypted_array[$key] = PluginGestionCrypto::encrypt($value);
+           $encrypted_array[$key] = PluginGestionCrypto::encrypt((string)$value);
        } else {
            $encrypted_array[$key] = $value;
        }
@@ -27,7 +30,55 @@ function encryptArray($array) {
    return $encrypted_array;
 }
 
+function pluginGestionCheckCSRF(array $data): void {
+   if (!empty($data['plugin_gestion_csrf_token'])) {
+      Session::checkCSRF([
+         '_glpi_csrf_token' => (string)$data['plugin_gestion_csrf_token']
+      ], true);
+      return;
+   }
+
+   Session::checkCSRF($data, true);
+}
+
+// ── Actions device kiosque (ban / unban / delete) — traitement avant le formulaire principal ──
+$deviceActionPayload = (string)($_POST['device_action_submit'] ?? '');
+if ($deviceActionPayload !== '' || (isset($_POST['action_device']) && isset($_POST['device_row_id']))) {
+   Session::checkRight('config', UPDATE);
+   pluginGestionCheckCSRF($_POST);
+
+   $devId     = 0;
+   $devAction = '';
+   if ($deviceActionPayload !== '') {
+      [$devAction, $devIdRaw] = array_pad(explode(':', $deviceActionPayload, 2), 2, '');
+      $devId = (int)$devIdRaw;
+   } else {
+      $devId     = (int)$_POST['device_row_id'];
+      $devAction = (string)$_POST['action_device'];
+   }
+   $devTable  = 'glpi_plugin_gestion_devices';
+
+   if ($devId > 0 && $DB->tableExists($devTable)) {
+      switch ($devAction) {
+         case 'ban':
+            $DB->update($devTable, ['status' => 'banned'], ['id' => $devId]);
+            Session::addMessageAfterRedirect(__('Appareil banni.', 'gestion'), false, WARNING);
+            break;
+         case 'unban':
+            $DB->update($devTable, ['status' => 'active'], ['id' => $devId]);
+            Session::addMessageAfterRedirect(__('Appareil débanni.', 'gestion'), false, INFO);
+            break;
+         case 'delete':
+            $DB->delete($devTable, ['id' => $devId]);
+            Session::addMessageAfterRedirect(__('Appareil supprimé.', 'gestion'), false, INFO);
+            break;
+      }
+   }
+   Html::back();
+}
+
 if (isset($_POST["update"])) {
+   pluginGestionCheckCSRF($_POST);
    $encrypted_post = encryptArray($_POST);
 
    // ===== AJOUTS POUR SIGNATURE FACTURE COMPTOIR =====
@@ -84,108 +135,8 @@ if (isset($_POST["update"])) {
          }
       }
 
-   //-----------------------------------------------------------
-      // --- Signature déportée (tablette) : SAVE ---
-
-      $rows = $_POST['sig'] ?? [];
-      $tbl  = 'glpi_plugin_gestion_signaturedevices';
-
-      // Générateur de token hex (64 chars) + vérif unicité
-      $genToken = function() use ($DB, $tbl) {
-         for ($i = 0; $i < 5; $i++) {
-            if (function_exists('random_bytes')) {
-               $tok = bin2hex(random_bytes(32));
-            } elseif (function_exists('openssl_random_pseudo_bytes')) {
-               $tok = bin2hex(openssl_random_pseudo_bytes(32));
-            } else {
-               // fallback (rare)
-               $tok = bin2hex(pack('N4', mt_rand(), mt_rand(), mt_rand(), mt_rand()));
-            }
-            // collision check (quasi-improbable, mais on sécurise)
-            $exists = $DB->request([
-               'FROM'   => $tbl,
-               'FIELDS' => new \QueryExpression('COUNT(*) AS c'),
-               'WHERE'  => ['device_token' => $tok]
-            ])->current();
-            if (empty($exists['c'])) {
-               return $tok;
-            }
-         }
-         return $tok; // dernier généré
-      };
-
-      foreach ($rows as $key => $data) {
-         $device_id    = trim($data['device_id']    ?? '');
-         $serial       = trim($data['serial']       ?? '');
-         $device_token = trim($data['device_token'] ?? '');
-         $is_active    = isset($data['is_active']) ? 1 : 0;
-         $del          = (int)($data['_delete'] ?? 0);
-
-         if (is_numeric($key)) {
-            // --- UPDATE ligne existante
-            $id = (int)$key;
-
-            if ($del === 1) {
-               $DB->delete($tbl, ['id' => $id]);
-            } else {
-               // Auto-génère si token vide
-               if ($device_token === '') {
-                  $device_token = $genToken();
-               }
-               $DB->update($tbl, [
-                  'device_id'    => $device_id,
-                  'serial'       => $serial,
-                  'device_token' => $device_token,
-                  'is_active'    => $is_active
-               ], ['id' => $id]);
-            }
-
-         } else {
-            // --- INSERT nouvelle ligne (key = new_xxx)
-            // Si l'utilisateur n'a pas fourni de token, on le génère
-            if ($device_token === '') {
-               $device_token = $genToken();
-            }
-            $hasContent = ($device_id !== '' || $serial !== '' || $device_token !== '');
-            if ($del !== 1 && $hasContent) {
-               $DB->insert($tbl, [
-                  'device_id'    => $device_id,
-                  'serial'       => $serial,
-                  'device_token' => $device_token,
-                  'is_active'    => $is_active
-               ]);
-            }
-         }
-      }
-   //-----------------------------------------------------------
-
-      $rows = $_POST['bi'] ?? [];
-      $tbl  = 'glpi_plugin_gestion_baseitems';
-
-      foreach ($rows as $key => $data) {
-         $desc = trim($data['description'] ?? '');
-         $info = trim($data['info'] ?? '');
-         $del  = (int)($data['_delete'] ?? 0);
-
-         if (is_numeric($key)) {
-            $id = (int)$key;
-            if ($del === 1) {
-               $DB->delete($tbl, ['id' => $id]);
-            } else {
-               $DB->update($tbl, [
-                  'description' => $desc,
-                  'info'        => $info
-               ], ['id' => $id]);
-            }
-         } else {
-            if ($del !== 1 && ($desc !== '' || $info !== '')) {
-               $DB->insert($tbl, [
-                  'description' => $desc,
-                  'info'        => $info
-               ]);
-            }
-         }
-      }
+   // ── Devices kiosque : gérés via action_device (ban/unban/delete) ci-dessus.
+   // ── Base Description / Info : supprimé en v1.7.0_alpha1 — aucun traitement.
    // ----------------------------------------------------------
 
    if(!$config->update($encrypted_post)){

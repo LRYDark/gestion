@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.7.0_beta2'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.7.0_alpha1'); // version du plugin
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 // Minimal GLPI version,
@@ -20,36 +20,55 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
 
    $plugin = new Plugin();
    if ($plugin->isInstalled('gestion') && $plugin->isActivated('gestion')){  // verification si le plugin gestion est installé et activé
-      $api_pattern_prepare = '#^/api/bl_prepare\.php(?:/.*)?$#';
-      $api_pattern_sign = '#^/api/bl_sign\.php(?:/.*)?$#';
-      $api_pattern_combined = '#^/api/combined_sign\.php(?:/.*)?$#';
-      $api_pattern_ticket_bls = '#^/api/ticket_bls\.php(?:/.*)?$#';
+      // ── Endpoints BL (app technicien APPAPPLE) ─────────────────────────────
+      $api_pattern_prepare      = '#^/api/bl_prepare\.php(?:/.*)?$#';
+      $api_pattern_sign         = '#^/api/bl_sign\.php(?:/.*)?$#';
+      $api_pattern_combined     = '#^/api/combined_sign\.php(?:/.*)?$#';
+      $api_pattern_ticket_bls   = '#^/api/ticket_bls\.php(?:/.*)?$#';
 
-      \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
-         'gestion',
+      // ── Endpoints device kiosque (app APPAPPLETAB) ────────────────────────
+      $api_pattern_checkin      = '#^/api/device_checkin\.php(?:/.*)?$#';
+      $api_pattern_poll_v2      = '#^/api/device_poll_v2\.php(?:/.*)?$#';
+      $api_pattern_submit_v2    = '#^/api/device_submit_v2\.php(?:/.*)?$#';
+      $api_pattern_refuse_v2    = '#^/api/device_refuse_v2\.php(?:/.*)?$#';
+      $api_pattern_direct_sign  = '#^/api/device_direct_sign\.php(?:/.*)?$#';
+
+      $api_patterns_all = [
          $api_pattern_prepare,
-         \Glpi\Http\Firewall::STRATEGY_NO_CHECK
-      );
-      \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
-         'gestion',
          $api_pattern_sign,
-         \Glpi\Http\Firewall::STRATEGY_NO_CHECK
-      );
-      \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
-         'gestion',
          $api_pattern_combined,
-         \Glpi\Http\Firewall::STRATEGY_NO_CHECK
-      );
+         $api_pattern_ticket_bls,
+         $api_pattern_checkin,
+         $api_pattern_poll_v2,
+         $api_pattern_submit_v2,
+         $api_pattern_refuse_v2,
+         $api_pattern_direct_sign,
+      ];
+
+      foreach ($api_patterns_all as $pattern) {
+         \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
+            'gestion',
+            $pattern,
+            \Glpi\Http\Firewall::STRATEGY_NO_CHECK
+         );
+         \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $pattern);
+      }
+
+      // ── Aperçu PDF BL (view_pdf.php) ──────────────────────────────────────
+      // STRATEGY_NO_CHECK : le pare-feu GLPI 11 (Symfony Kernel) s'exécute AVANT
+      // le fichier PHP. Sans cette ligne, il applique STRATEGY_AUTHENTICATED et
+      // appelle Session::checkLoginUser() → erreur "session expirée" pour les
+      // utilisateurs non connectés, même avec un token valide.
+      // Le fichier gère lui-même l'auth :
+      //   - token temporaire présent → validation du token (tablette, navigation privée)
+      //   - pas de token            → Session::checkLoginUser() (web authentifié)
+      // NE PAS enregistrer comme stateless : la session doit rester disponible
+      // pour les utilisateurs connectés via leur session GLPI.
       \Glpi\Http\Firewall::addPluginStrategyForLegacyScripts(
          'gestion',
-         $api_pattern_ticket_bls,
+         '#^/view_pdf\.php$#',
          \Glpi\Http\Firewall::STRATEGY_NO_CHECK
       );
-
-      \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $api_pattern_prepare);
-      \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $api_pattern_sign);
-      \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $api_pattern_combined);
-      \Glpi\Http\SessionManager::registerPluginStatelessPath('gestion', $api_pattern_ticket_bls);
 
       if (Session::getLoginUserID()) {
          Plugin::registerClass('PluginGestionProfile', ['addtabon' => 'Profile']);

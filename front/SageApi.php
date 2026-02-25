@@ -27,6 +27,8 @@ function parseDocument(string $docId): array
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_CONNECTTIMEOUT => 5,
         CURLOPT_HTTPHEADER     => [
             'x-api-key: ' . $apiKey,
             'Accept: application/pdf'
@@ -139,6 +141,8 @@ function downloadDocument(string $docId, string $destinationFile): string
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_FILE           => $fp,
+        CURLOPT_TIMEOUT        => 60,
+        CURLOPT_CONNECTTIMEOUT => 5,
         CURLOPT_HTTPHEADER     => [
             'x-api-key: ' . $apiKey,
             'Accept: application/pdf'
@@ -184,6 +188,8 @@ function streamDocument(string $docId, string $filename = null): void
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 60,
+        CURLOPT_CONNECTTIMEOUT => 5,
         CURLOPT_HTTPHEADER     => [
             'x-api-key: ' . $apiKey,
             'Accept: application/pdf'
@@ -237,6 +243,8 @@ function documentExiste(string $docId, ?int &$httpStatus = null): bool
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,   // on doit le mettre pour récupérer les headers
         CURLOPT_NOBODY         => true,   // ne récupère pas le corps (économie de bande passante)
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_CONNECTTIMEOUT => 5,
         CURLOPT_HTTPHEADER     => [
             'x-api-key: ' . $apiKey,
             'Accept: application/pdf'

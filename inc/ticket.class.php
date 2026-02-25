@@ -89,7 +89,7 @@ class PluginGestionTicket extends CommonDBTM {
       echo '<script>
          window.GLPI_PLUG_GESTION = "' . PLUGIN_GESTION_WEBDIR . '";
       </script>';
-      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . time() . '" defer></script>';
+      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . (defined('PLUGIN_GESTION_VERSION') ? PLUGIN_GESTION_VERSION : '1') . '" defer></script>';
 
       function isMobile() {
          return preg_match('/(android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile)/i', $_SERVER['HTTP_USER_AGENT']);

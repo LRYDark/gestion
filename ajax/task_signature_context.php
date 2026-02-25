@@ -29,14 +29,16 @@ $state_ok   = in_array((int)$state, $trigger_states, true);
 
 // Récupérer les BL non signés liés au ticket
 $bls = [];
-$res = $DB->doQuery("SELECT id, bl FROM glpi_plugin_gestion_surveys WHERE tickets_id = $ticket_id AND signed = 0 ORDER BY id DESC");
-if ($res) {
-   while ($row = $DB->fetchassoc($res)) {
-      $bls[] = [
-         'id'    => (int)$row['id'],
-         'label' => (string)($row['bl'] ?? ('BL#'.$row['id']))
-      ];
-   }
+foreach ($DB->request([
+   'SELECT' => ['id', 'bl'],
+   'FROM'   => 'glpi_plugin_gestion_surveys',
+   'WHERE'  => ['tickets_id' => $ticket_id, 'signed' => 0],
+   'ORDER'  => ['id DESC'],
+]) as $row) {
+   $bls[] = [
+      'id'    => (int)$row['id'],
+      'label' => (string)($row['bl'] ?? ('BL#'.$row['id']))
+   ];
 }
 
 $rp_active = Plugin::isPluginActive('rp') && class_exists('PluginRpCri');

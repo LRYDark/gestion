@@ -1,171 +1,173 @@
 <?php
 /**
  * plugins/gestion/ajax/create_remote_signature.php
- * Version simplifiée pour créer une demande de signature distante
+ * Crée une demande de signature distante (PC → tablette kiosque APPAPPLETAB).
+ *
+ * Identification tablette : device_serial (sans token).
+ * Valide dans glpi_plugin_gestion_devices (status = 'active').
+ *
+ * @since 1.7.0_alpha1 — Suppression device_id / device_token.
  */
 
 include ('../../../inc/includes.php');
 header('Content-Type: application/json; charset=UTF-8');
 
 global $DB, $CFG_GLPI;
-$config = PluginGestionConfig::getInstance();
+$config  = PluginGestionConfig::getInstance();
 $rootdoc = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');
 
-// If missing, go to login
-if ($config->fields['RemoteSignatureOn'] == 0) {
-   exit;
+if (empty($config->fields['RemoteSignatureOn'])) {
+    http_response_code(503);
+    echo json_encode(['ok' => false, 'error' => 'remote_signature_disabled']);
+    exit;
 }
 
 try {
-   // Vérifier que l'utilisateur est connecté
-   Session::checkLoginUser();
+    Session::checkLoginUser();
+    // NOTE: Ne pas appeler Session::checkCSRF($_POST) ici.
+    // En GLPI 11, le CheckCsrfListener valide déjà le token avec preserve_token=true
+    // (token conservé en session pour les appels AJAX multiples).
+    // Un appel manuel checkCSRF() avec preserve_token=false (défaut) consommerait
+    // le token et casserait tous les appels AJAX suivants (ex: polling du statut).
 
-   // Récupérer les paramètres
-   $ticket_id = isset($_POST['ticket_id']) ? (int)$_POST['ticket_id'] : 0;
-   $device_id = isset($_POST['device_id']) ? trim($_POST['device_id']) : '';
-   $device_token = isset($_POST['device_token']) ? trim($_POST['device_token']) : '';
-   
-   // Récupérer les paramètres additionnels
-   $parameters = '';
+    // ── Paramètres ──────────────────────────────────────────────────────────
+    $ticket_id     = (int)($_POST['ticket_id'] ?? 0);
+    $device_serial = trim((string)($_POST['device_serial'] ?? ''));
 
-   if (isset($_POST['parameters_b64']) && $_POST['parameters_b64'] !== '') {
-      $raw = base64_decode($_POST['parameters_b64'], true);
-      if ($raw === false) {
-         http_response_code(400);
-         echo json_encode(['ok' => false, 'error' => 'Paramètres (Base64) invalides']);
-         exit;
-      }
-      $parameters = trim($raw);
-   } elseif (isset($_POST['parameters'])) {
-      $parameters = trim($_POST['parameters']);
-   }
+    // Paramètres optionnels (JSON encodé en base64 ou brut)
+    $parameters      = '';
+    $parameters_json = null;
 
-   // Valider que c'est du JSON valide si fourni
-   $parameters_json = null;
-   if ($parameters !== '') {
-      // error_log('[RemoteSign] RAW parameters=' . $parameters);
-      $decoded = json_decode($parameters, true);
-      if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
-         http_response_code(400);
-         echo json_encode(['ok' => false, 'error' => 'Paramètres JSON invalides: ' . json_last_error_msg()]);
-         exit;
-      }
-      // Normaliser le JSON pour la base
-      $parameters_json = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-   }
+    if (!empty($_POST['parameters_b64'])) {
+        $raw = base64_decode($_POST['parameters_b64'], true);
+        if ($raw === false) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Paramètres (Base64) invalides']);
+            exit;
+        }
+        $parameters = trim($raw);
+    } elseif (!empty($_POST['parameters'])) {
+        $parameters = trim($_POST['parameters']);
+    }
 
-   // Validation des paramètres
-   if ($ticket_id <= 0) {
-      http_response_code(400);
-      echo json_encode(['ok' => false, 'error' => 'ID ticket manquant']);
-      exit;
-   }
-   
-   if ($device_id === '') {
-      http_response_code(400);
-      echo json_encode(['ok' => false, 'error' => 'ID device manquant']);
-      exit;
-   }
-   
-   if ($device_token === '') {
-      http_response_code(400);
-      echo json_encode(['ok' => false, 'error' => 'Token device manquant']);
-      exit;
-   }
+    if ($parameters !== '') {
+        $decoded = json_decode($parameters, true);
+        if ($decoded === null && json_last_error() !== JSON_ERROR_NONE) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Paramètres JSON invalides: ' . json_last_error_msg()]);
+            exit;
+        }
+        // Supprimer base_description / base_info s'ils arrivent en legacy
+        unset($decoded['base_description'], $decoded['base_info'], $decoded['base_items']);
+        $parameters_json = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
 
-   // Vérifier que la tablette existe et est active
-   $device_sql = "SELECT id, device_id, device_token, is_active 
-                  FROM glpi_plugin_gestion_signaturedevices 
-                  WHERE device_id = '" . $DB->escape($device_id) . "' 
-                  AND is_active = 1 
-                  LIMIT 1";
-   
-   $device_result = $DB->doQuery($device_sql);
-   if (!$device_result || $DB->numrows($device_result) === 0) {
-      http_response_code(403);
-      echo json_encode(['ok' => false, 'error' => 'Device non trouvé ou inactif']);
-      exit;
-   }
-   
-   $device_row = $DB->fetchAssoc($device_result);
-   if ($device_row['device_token'] !== $device_token) {
-      http_response_code(403);
-      echo json_encode(['ok' => false, 'error' => 'Token device invalide']);
-      exit;
-   }
+    // ── Validation ───────────────────────────────────────────────────────────
+    if ($ticket_id <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'ID ticket manquant']);
+        exit;
+    }
 
-    // Vérifier s'il existe déjà une demande en attente pour ce ticket
-   $check_sql = "SELECT id, status 
-                 FROM glpi_plugin_gestion_remote_sign_requests 
-                 WHERE tickets_id = " . (int)$ticket_id . " 
-                 AND status IN ('pending', 'cancelled') 
-                 ORDER BY id DESC
-                 LIMIT 1";
-   
-   $check_result = $DB->doQuery($check_sql);
-   if ($check_result && $DB->numrows($check_result) > 0) {
-      $existing_row = $DB->fetchAssoc($check_result);
-      
-      // Si la demande est en attente, la retourner
-      if ($existing_row['status'] === 'pending') {
-         echo json_encode([
-            'ok' => true, 
-            'request_id' => (int)$existing_row['id'], 
-            'message' => 'Demande existante trouvée'
-         ]);
-         exit;
-      }
-      
-      // Si la demande a été annulée/refusée, la remettre en pending
-      if ($existing_row['status'] === 'cancelled') {
-         $now = date('Y-m-d H:i:s');
-         $update_sql = "UPDATE glpi_plugin_gestion_remote_sign_requests 
-                        SET status = 'pending', 
-                            date_creation = '" . $now . "',
-                            parameters = " . ($parameters_json ? "'" . $DB->escape($parameters_json) . "'" : "NULL") . ",
-                            signer_name = NULL,
-                            signer_email = NULL,
-                            signature_base64 = NULL
-                        WHERE id = " . (int)$existing_row['id'];
-         
-         if ($DB->doQuery($update_sql)) {
+    if ($device_serial === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Numéro de série tablette manquant']);
+        exit;
+    }
+    if (strlen($device_serial) > 255 || preg_match('/[\x00-\x1F]/', $device_serial)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Numéro de série tablette invalide']);
+        exit;
+    }
+
+    // ── Vérifier que l'appareil existe et est actif ──────────────────────────
+    $devRes = $DB->doQuery(
+        "SELECT `id`, `status`, `name`
+         FROM `glpi_plugin_gestion_devices`
+         WHERE `serial` = '" . $DB->escape($device_serial) . "'
+         LIMIT 1"
+    );
+
+    if (!$devRes || $DB->numrows($devRes) === 0) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Appareil inconnu', 'serial' => $device_serial]);
+        exit;
+    }
+
+    $devRow = $DB->fetchAssoc($devRes);
+    if ($devRow['status'] === 'banned') {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Appareil banni', 'serial' => $device_serial]);
+        exit;
+    }
+
+    // ── Vérifier demande existante pour ce ticket + ce serial ────────────────
+    $checkRes = $DB->doQuery(
+        "SELECT `id`, `status`
+         FROM `glpi_plugin_gestion_remote_sign_requests`
+         WHERE `tickets_id` = {$ticket_id}
+           AND `device_serial` = '" . $DB->escape($device_serial) . "'
+           AND `status` IN ('pending', 'cancelled')
+         ORDER BY `id` DESC
+         LIMIT 1"
+    );
+
+    if ($checkRes && $DB->numrows($checkRes) > 0) {
+        $existing = $DB->fetchAssoc($checkRes);
+
+        if ($existing['status'] === 'pending') {
             echo json_encode([
-               'ok' => true, 
-               'request_id' => (int)$existing_row['id'],
-               'message' => 'Demande réactivée après refus'
+                'ok'         => true,
+                'request_id' => (int)$existing['id'],
+                'message'    => 'Demande existante trouvée',
             ]);
             exit;
-         } else {
-            // En cas d'erreur de mise à jour, créer une nouvelle demande
-         }
-      }
-   }
+        }
 
-   // Créer une nouvelle demande de signature
-   $now = date('Y-m-d H:i:s');
-   $insert_sql = "INSERT INTO glpi_plugin_gestion_remote_sign_requests 
-                  (tickets_id, device_id, device_token, parameters, status, date_creation) 
-                  VALUES (" . (int)$ticket_id . ", 
-                          '" . $DB->escape($device_id) . "', 
-                          '" . $DB->escape($device_token) . "', 
-                          " . ($parameters_json ? "'" . $DB->escape($parameters_json) . "'" : "NULL") . ", 
-                          'pending', 
-                          '" . $now . "')";
+        // Réactiver une demande annulée
+        if ($existing['status'] === 'cancelled') {
+            $ok = $DB->update('glpi_plugin_gestion_remote_sign_requests', [
+                'status'          => 'pending',
+                'date_creation'   => date('Y-m-d H:i:s'),
+                'parameters'      => $parameters_json,
+                'signer_name'     => null,
+                'signer_email'    => null,
+                'signature_base64' => null,
+            ], ['id' => (int)$existing['id']]);
 
-   if ($DB->doQuery($insert_sql)) {
-      $request_id = $DB->insertId();
-      echo json_encode([
-         'ok' => true, 
-         'request_id' => (int)$request_id,
-         'message' => 'Demande de signature créée'
-      ]);
-   } else {
-      http_response_code(500);
-      echo json_encode(['ok' => false, 'error' => 'Erreur lors de la création de la demande']);
-   }
+            if ($ok) {
+                echo json_encode([
+                    'ok'         => true,
+                    'request_id' => (int)$existing['id'],
+                    'message'    => 'Demande réactivée après refus',
+                ]);
+                exit;
+            }
+            // En cas d'erreur de mise à jour → créer une nouvelle demande ci-dessous
+        }
+    }
+
+    // ── Créer une nouvelle demande ────────────────────────────────────────────
+    $ok = $DB->insert('glpi_plugin_gestion_remote_sign_requests', [
+        'tickets_id'    => $ticket_id,
+        'device_serial' => $device_serial,
+        'parameters'    => $parameters_json,
+        'status'        => 'pending',
+        'date_creation' => date('Y-m-d H:i:s'),
+    ]);
+
+    if ($ok) {
+        echo json_encode([
+            'ok'         => true,
+            'request_id' => (int)$DB->insertId(),
+            'message'    => 'Demande de signature créée',
+        ]);
+    } else {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'Erreur lors de la création de la demande']);
+    }
 
 } catch (Exception $e) {
-   http_response_code(500);
-   echo json_encode(['ok' => false, 'error' => 'Erreur serveur: ' . $e->getMessage()]);
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Erreur serveur: ' . $e->getMessage()]);
 }
-?>

@@ -280,6 +280,7 @@ $bl_input = trim((string)($input['bl'] ?? ''));
 $signer_name = trim((string)($input['signer_name'] ?? $input['name'] ?? ''));
 $signer_email = trim((string)($input['signer_email'] ?? $input['email'] ?? ''));
 $signature = (string)($input['signature'] ?? $input['url'] ?? '');
+$technician_override = trim((string)($input['technician_login'] ?? $input['technician'] ?? ''));
 $mail_to_client = api_combined_bool($input['mail_to_client'] ?? $input['mailtoclient'] ?? ($signer_email !== '' ? '1' : '0'));
 $comment = trim((string)($input['comment'] ?? $input['comments'] ?? $input['commentaire'] ?? ''));
 $counter_invoice_client = api_combined_bool(
@@ -434,6 +435,10 @@ if ($needs_bl) {
       'comment'                => $comment,
       'counter_invoice_client' => $counter_invoice_client ? 1 : 0,
    ];
+   if ($technician_override !== '') {
+      $bl_payload['technician_login'] = $technician_override;
+      $bl_payload['technician'] = $technician_override;
+   }
 
    $bl_call = api_combined_http_call(
       'POST',
@@ -513,4 +518,3 @@ if ($needs_report) {
 }
 
 api_combined_end(200, $out);
-

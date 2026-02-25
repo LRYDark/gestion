@@ -152,7 +152,7 @@ if ($TECHNICIAN_INPUT === '' && $tech_id <= 0) {
 // Ne PAS forcer la session en mode signature rapide avec saisie libre
 // Ainsi, si aucun utilisateur ne correspond et que c'est du quick-sign,
 // $tech_id peut rester 0 pour que le PDF affiche la saisie libre.
-$id_document = $_POST['id_document'];
+$id_document = (int)($_POST['id_document'] ?? 0);
 
 if (empty($_POST['email'])) $_POST['email'] = "vide"; // #GLPI11#
 $EMAIL = $_POST["email"];
@@ -163,7 +163,7 @@ $MAILTOCLIENT = $_POST["mailtoclient"];
 // Générer un nombre entier aléatoire entre 1 et 100
 $nombreAleatoire = rand(1, 100000);
 
-$DOC = $DB->doQuery("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$id_document'")->fetch_object();
+$DOC = $DB->doQuery("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = $id_document")->fetch_object();
 
 ob_start(); // Démarre la mise en tampon de sortie
 
@@ -509,7 +509,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         }
         if($DOC->save == "Local"){
             try {
-                $queryDelete = "DELETE FROM `glpi_documents` WHERE `id` = '$DOC->doc_id';";
+                $queryDelete = "DELETE FROM `glpi_documents` WHERE `id` = " . (int)$DOC->doc_id;
                 if ($DB->doQuery($queryDelete)) {
                     unlink($existingPdfPath); // si fichier local alors delete le fichier non signer (configmode = 0 alors suppression du fichier)
                 }
@@ -528,7 +528,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         if ($DOC->entities_id == 0 || $DOC->entities_id == NULL){
             $EntitiesName = "AUTRES";
         }else{
-            $entityResult = $DB->doQuery("SELECT name FROM glpi_entities WHERE id = $DOC->entities_id")->fetch_object();
+            $entityResult = $DB->doQuery("SELECT name FROM glpi_entities WHERE id = " . (int)$DOC->entities_id)->fetch_object();
             $EntitiesName = $entityResult->name;
         }
 
@@ -598,12 +598,20 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             }
         }
 
-        $name_esc = $DB->escape($NAME);
-        $tech_ext_sql = '';
+        $updateFinal = [
+            'doc_url'  => (string)($fileUrl ?? ''),
+            'url_bl'   => (string)$folderPath,
+            'doc_id'   => (int)$NewDoc,
+            'save'     => (string)$FolderDes,
+            'signed'   => 1,
+            'doc_date' => date('Y-m-d H:i:s'),
+            'users_id' => (int)$tech_id,
+            'users_ext'=> (string)$NAME,
+        ];
         if ($is_quick && $TECHNICIAN_INPUT !== '') {
-            $tech_ext_sql = ", tech_ext = '".$DB->escape($TECHNICIAN_INPUT)."'";
+            $updateFinal['tech_ext'] = $TECHNICIAN_INPUT;
         }
-        if ($DB->doQuery("UPDATE glpi_plugin_gestion_surveys SET doc_url = '$fileUrl', url_bl = '$folderPath', doc_id = $NewDoc, save = '$FolderDes', signed = 1, doc_date = NOW(), users_id = $tech_id, users_ext = '$name_esc' $tech_ext_sql WHERE id = $id_document")){            //unlink($existingPdfPath);
+        if ($DB->update('glpi_plugin_gestion_surveys', $updateFinal, ['id' => $id_document])) {            //unlink($existingPdfPath);
             unlink($signaturePath);
             if ($combined_mode) {
                 $GLOBALS['GESTION_LAST_SIGNED_BL_PDF'] = $outputPathTemp;

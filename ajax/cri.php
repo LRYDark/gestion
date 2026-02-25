@@ -91,6 +91,22 @@ switch ($action) {
 /**
  * Prepare a local copy of the signed PDF to send as attachment.
  */
+function plugin_gestion_http_get_bytes(string $url, int $timeout = 15)
+{
+   $context = stream_context_create([
+      'http' => [
+         'timeout' => $timeout,
+         'ignore_errors' => true,
+      ],
+      'https' => [
+         'timeout' => $timeout,
+         'ignore_errors' => true,
+      ],
+   ]);
+
+   return @file_get_contents($url, false, $context);
+}
+
 function plugin_gestion_build_signed_pdf_copy(PluginGestionSurvey $survey, PluginGestionSharepoint $sharepoint): string {
    global $CFG_GLPI;
 
@@ -113,7 +129,7 @@ function plugin_gestion_build_signed_pdf_copy(PluginGestionSurvey $survey, Plugi
       if (!$downloadUrl) {
          throw new RuntimeException("Impossible de recuperer le fichier sur SharePoint.");
       }
-      $content = @file_get_contents($downloadUrl);
+      $content = plugin_gestion_http_get_bytes((string)$downloadUrl);
       if ($content === false) {
          throw new RuntimeException("Telechargement du document signe impossible.");
       }
@@ -143,7 +159,7 @@ function plugin_gestion_build_signed_pdf_copy(PluginGestionSurvey $survey, Plugi
 
       if (!$sourceFound && !empty($survey->fields['doc_id'])) {
          $downloadUrl = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/') . '/front/document.send.php?docid=' . (int)$survey->fields['doc_id'];
-         $content = @file_get_contents($downloadUrl);
+         $content = plugin_gestion_http_get_bytes((string)$downloadUrl);
          if ($content !== false) {
             file_put_contents($tempPath, $content);
             $sourceFound = true;
@@ -156,7 +172,7 @@ function plugin_gestion_build_signed_pdf_copy(PluginGestionSurvey $survey, Plugi
    } else {
       $downloadUrl = $survey->fields['doc_url'] ?? $survey->fields['url_bl'];
       if ($downloadUrl) {
-         $content = @file_get_contents($downloadUrl);
+         $content = plugin_gestion_http_get_bytes((string)$downloadUrl);
          if ($content !== false) {
             file_put_contents($tempPath, $content);
             $sourceFound = true;

@@ -8,11 +8,24 @@ require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de
 use Smalot\PdfParser\Parser;
 
 class PluginGestionSharepoint extends CommonDBTM {
+    private const HTTP_TIMEOUT = 30;
+    private const HTTP_CONNECT_TIMEOUT = 5;
+    private ?string $cachedAccessToken = null;
+    private int $cachedAccessTokenExpiresAt = 0;
+
+    private function applyCurlTimeouts($ch, int $timeout = self::HTTP_TIMEOUT, int $connectTimeout = self::HTTP_CONNECT_TIMEOUT): void {
+        curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $connectTimeout);
+    }
+
 
     /**
      * Fonction pour obtenir un token d'accès à partir d'Azure AD
      */
     public function getAccessToken() {
+        if ($this->cachedAccessToken !== null && $this->cachedAccessToken !== '' && time() < $this->cachedAccessTokenExpiresAt) {
+            return $this->cachedAccessToken;
+        }
         $config         = new PluginGestionConfig();
         $tenantId       = $config->TenantID();
         $clientId       = $config->ClientID();
@@ -31,6 +44,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($token_data));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
     
         $response = curl_exec($ch);
         if (curl_errno($ch)) {
@@ -46,7 +60,10 @@ class PluginGestionSharepoint extends CommonDBTM {
     
         curl_close($ch);
         $token_response = json_decode($response, true);
-        return $token_response['access_token'];
+        $this->cachedAccessToken = $token_response['access_token'] ?? null;
+        $expiresIn = (int)($token_response['expires_in'] ?? 3000);
+        $this->cachedAccessTokenExpiresAt = time() + max(60, $expiresIn - 60);
+        return $this->cachedAccessToken;
     }
 
     /**
@@ -66,6 +83,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
 
         $response = curl_exec($ch);
         curl_close($ch);
@@ -96,6 +114,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
 
         $response = curl_exec($ch);
         curl_close($ch);
@@ -210,6 +229,7 @@ class PluginGestionSharepoint extends CommonDBTM {
                     ]);
                     curl_setopt($ch, CURLOPT_POSTFIELDS, $search_data_json);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
     
                     $response = curl_exec($ch);
     
@@ -273,6 +293,8 @@ class PluginGestionSharepoint extends CommonDBTM {
                 $ch = curl_init($url);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => self::HTTP_TIMEOUT,
+            CURLOPT_CONNECTTIMEOUT => self::HTTP_CONNECT_TIMEOUT,
                     CURLOPT_HTTPHEADER => [
                         "Authorization: Bearer $accessToken",
                         "Content-Type: application/json",
@@ -306,6 +328,8 @@ class PluginGestionSharepoint extends CommonDBTM {
                 $ch = curl_init($urlGetId);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => self::HTTP_TIMEOUT,
+            CURLOPT_CONNECTTIMEOUT => self::HTTP_CONNECT_TIMEOUT,
                     CURLOPT_HTTPHEADER => [
                         "Authorization: Bearer $accessToken",
                         "Content-Type: application/json"
@@ -323,6 +347,8 @@ class PluginGestionSharepoint extends CommonDBTM {
                     $ch = curl_init($url);
                     curl_setopt_array($ch, [
                         CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => self::HTTP_TIMEOUT,
+            CURLOPT_CONNECTTIMEOUT => self::HTTP_CONNECT_TIMEOUT,
                         CURLOPT_HTTPHEADER => [
                             "Authorization: Bearer $accessToken",
                             "Content-Type: application/json",
@@ -367,6 +393,8 @@ class PluginGestionSharepoint extends CommonDBTM {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => self::HTTP_TIMEOUT,
+            CURLOPT_CONNECTTIMEOUT => self::HTTP_CONNECT_TIMEOUT,
             CURLOPT_HTTPHEADER => [
                 "Authorization: Bearer $accessToken",
                 "Content-Type: application/json",
@@ -466,6 +494,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_URL, $urlSite);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
     
         $responseSite = curl_exec($ch);
         $httpStatusSite = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -512,6 +541,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
 
         $response = curl_exec($ch);
         $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -533,6 +563,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $downloadUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
 
         $response = curl_exec($ch);
         $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -565,6 +596,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
 
         $response = curl_exec($ch);
         $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -597,6 +629,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "GET"); // Requête GET pour récupérer les métadonnées
 
         $response = curl_exec($ch);
@@ -631,6 +664,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
 
         $response = curl_exec($ch);
         $httpStatus = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -666,6 +700,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
         curl_setopt($ch, CURLOPT_POSTFIELDS, $fileContent);
 
@@ -699,6 +734,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
 
         $response = curl_exec($ch);
@@ -813,6 +849,7 @@ class PluginGestionSharepoint extends CommonDBTM {
                 ]);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $search_data_json);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
 
                 $response = curl_exec($ch);
 
@@ -1406,6 +1443,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         ]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $search_data_json);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
 
         $response = curl_exec($ch);
         if (curl_errno($ch)) {
@@ -1431,6 +1469,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $this->applyCurlTimeouts($ch);
         
         if ($method === "POST") {
             curl_setopt($ch, CURLOPT_POST, true);

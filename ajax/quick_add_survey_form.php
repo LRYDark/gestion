@@ -20,6 +20,7 @@ function json_end(int $status, array $payload): void {
 
 try {
    Session::checkLoginUser();
+   Session::checkCSRF($_POST, true);
 
    if (!Session::haveRightsOr('plugin_gestion_survey', [CREATE, UPDATE])) {
       json_end(403, ['ok' => false, 'error' => 'access_denied']);
@@ -136,6 +137,16 @@ try {
 
    if (!$DB->doQuery($sql)) {
       json_end(500, ['ok' => false, 'error' => 'db_insert_failed', 'db_error' => $DB->error()]);
+   }
+
+   $newSurveyId = (int)$DB->insertId();
+   if ($newSurveyId > 0) {
+      json_end(200, [
+         'ok' => true,
+         'id' => $newSurveyId,
+         'tickets_id' => (int)$tickets_id,
+         'bl' => $pdf_filename
+      ]);
    }
 
    $id_res = $DB->doQuery("SELECT id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$bl_esc' LIMIT 1");

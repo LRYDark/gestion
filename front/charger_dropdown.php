@@ -1,12 +1,16 @@
 <?php
 // Nettoyer tout output buffer existant et désactiver l'affichage des erreurs dans la sortie
-ob_clean();
+while (ob_get_level() > 0) {
+    ob_end_clean();
+}
 ini_set('display_errors', 0);
-error_reporting(E_ALL);
+error_reporting(E_ERROR | E_WARNING);
 
 header('Content-Type: application/json');
 
 include ('../../../inc/includes.php'); // Inclure les fichiers nécessaires de GLPI
+
+Session::checkLoginUser();
 require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
 require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
 require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
@@ -15,20 +19,28 @@ global $DB, $CFG_GLPI;
 
 $sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
-$bibliotheque = $config->Global();
+$mode = (int)$config->mode();
 
 // Vérifier si le paramètre 'ticketId' est défini dans la requête GET
-if (!isset($_GET['ticketId']) || empty($_GET['ticketId'])) {
+if (!isset($_GET['ticketId']) || (int)$_GET['ticketId'] <= 0) {
     http_response_code(400);
     echo json_encode(['error' => 'Le paramètre "ticketId" est manquant ou invalide.']);
     exit;
 }
 
-$ticketId = $_GET['ticketId'];
+$ticketId = (int)$_GET['ticketId'];
 
 // Gestion de la vérification d'un document pour le mode Sage (mode == 1)
-if (isset($_GET['verifyDoc']) && !empty($_GET['verifyDoc']) && $config->mode() == 1) {
-    $docId = trim($_GET['verifyDoc']);
+if (isset($_GET['verifyDoc']) && !empty($_GET['verifyDoc']) && $mode === 1) {
+    $docId = trim((string)$_GET['verifyDoc']);
+    if ($docId === '' || strlen($docId) > 255 || preg_match('/[\x00-\x1F\\\\]/', $docId) || str_contains($docId, '..') || str_contains($docId, '?') || str_contains($docId, '#')) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Identifiant document invalide'
+        ]);
+        exit;
+    }
     
     try {
         $httpStatus = null;
@@ -66,9 +78,10 @@ if (isset($_GET['verifyDoc']) && !empty($_GET['verifyDoc']) && $config->mode() =
 $groups = [];
 $selected_ids = [];
 
-if ($config->mode() == 0){
+if ($mode === 0){
     if(!empty($config->fields['Global'])) {
         try {
+            $bibliotheque = $config->Global();
             $contents = $sharepoint->searchSharePoint();            
             // Filtrer et ajouter les fichiers PDF
             foreach ($contents as $item) {
@@ -93,7 +106,7 @@ if ($config->mode() == 0){
     }
 }
 
-if ($config->mode() == 2){
+if ($mode === 2){
     $relativePath = '_plugins/gestion/Documents';
     $dir = GLPI_ROOT . '/files/' . $relativePath;
     $groups = [];
@@ -107,22 +120,24 @@ if ($config->mode() == 2){
     }
 }
 
-if ($config->mode() == 1){
-    $result = $DB->doQuery("SELECT bl FROM glpi_plugin_gestion_surveys WHERE tickets_id = $ticketId AND signed = 0");
+if ($mode === 1){
+    $result = $DB->doQuery("SELECT bl FROM glpi_plugin_gestion_surveys WHERE tickets_id = " . (int)$ticketId . " AND signed = 0");
     while ($data = $result->fetch_assoc()) {
         $selected_ids[] = $data['bl'];
     }
 }
 
 // S'assurer qu'aucun contenu supplémentaire n'est envoyé
-ob_clean();
+while (ob_get_level() > 0) {
+    ob_end_clean();
+}
 
 // Formater la réponse JSON pour inclure 'folderPath' et 'data' dans un seul objet
 http_response_code(200);
 echo json_encode([
     'data' => $groups, 
     'selected_ids' => $selected_ids,
-    'mode' => $config->mode() // Ajouter le mode pour que le JavaScript sache comment gérer l'interface
+    'mode' => $mode // Ajouter le mode pour que le JavaScript sache comment gérer l'interface
 ]);
 
 // S'assurer qu'aucun contenu supplémentaire n'est ajouté après

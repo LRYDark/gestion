@@ -8,10 +8,12 @@ final class PluginGestionCrypto
    private const CONFIG_DIR = GLPI_ROOT.'/config/';
    private const PLUGIN_KEY = self::CONFIG_DIR.'glpicrypt_plugin_gestion.key';
    private const LEGACY_KEY = self::CONFIG_DIR.'glpicrypt.key';
+   private const SODIUM_PREFIX = 'sbox:';
 
    private const CIPHER    = 'aes-256-cbc';
    private const IV_BYTES  = 16;               // 128 bits
    private static ?string $key = null;        // mémoïsation
+   private static ?string $sodium_key = null; // clé dérivée mémoïsée
 
    /* ----------- clé 32 octets, générée au besoin ----------- */
    public static function key(): string
@@ -43,42 +45,111 @@ final class PluginGestionCrypto
       return self::$key = $k;
    }
 
-   /* ----------- chiffrement IV aléatoire + HMAC ----------- */
-   public static function encrypt(string $plain): string
+   private static function sodiumKey(): string
    {
-      $iv     = random_bytes(self::IV_BYTES);
-      $cipher = openssl_encrypt($plain, self::CIPHER, self::key(),
-                                OPENSSL_RAW_DATA, $iv);
-      if ($cipher === false) {
-         throw new RuntimeException(openssl_error_string());
+      if (self::$sodium_key !== null) {
+         return self::$sodium_key;
       }
-      $hmac = hash_hmac('sha256', $cipher, self::key(), true);
-      return base64_encode($iv.$hmac.$cipher);
+      if (!function_exists('sodium_crypto_secretbox_keygen')) {
+         throw new RuntimeException('Extension sodium requise pour le chiffrement des données du plugin.');
+      }
+
+      return self::$sodium_key = hash('sha256', self::key(), true);
    }
 
-   /* ----------- déchiffrement (nouveau › legacy) ----------- */
-   public static function decrypt(?string $stored): ?string
+   public static function isSodiumCiphertext(?string $stored): bool
    {
-      if ($stored === '' || $stored === null) return null;
+      return is_string($stored) && $stored !== '' && str_starts_with($stored, self::SODIUM_PREFIX);
+   }
 
-      /* nouveau format */
+   public static function migrateIfLegacy(?string $stored): ?string
+   {
+      if ($stored === null || $stored === '' || self::isSodiumCiphertext($stored)) {
+         return $stored;
+      }
+
+      $plain = self::decryptLegacy($stored);
+      if ($plain === null) {
+         return $stored;
+      }
+
+      return self::encrypt($plain);
+   }
+
+   /* ----------- chiffrement sodium (secretbox) ----------- */
+   public static function encrypt(string $plain): string
+   {
+      if ($plain === '') {
+         return '';
+      }
+
+      if (!function_exists('sodium_crypto_secretbox')) {
+         throw new RuntimeException('Extension sodium requise pour le chiffrement des données du plugin.');
+      }
+
+      $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+      $cipher = sodium_crypto_secretbox($plain, $nonce, self::sodiumKey());
+
+      return self::SODIUM_PREFIX . base64_encode($nonce . $cipher);
+   }
+
+   private static function decryptSodium(string $stored): ?string
+   {
+      if (!function_exists('sodium_crypto_secretbox_open')) {
+         throw new RuntimeException('Extension sodium requise pour le déchiffrement des données du plugin.');
+      }
+
+      $payload = substr($stored, strlen(self::SODIUM_PREFIX));
+      $bin = base64_decode($payload, true);
+      if ($bin === false || strlen($bin) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) {
+         return null;
+      }
+
+      $nonce  = substr($bin, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+      $cipher = substr($bin, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+      $plain  = sodium_crypto_secretbox_open($cipher, $nonce, self::sodiumKey());
+
+      return ($plain === false) ? null : $plain;
+   }
+
+   private static function decryptLegacy(string $stored): ?string
+   {
       $bin = base64_decode($stored, true);
+
       if ($bin !== false && strlen($bin) > (self::IV_BYTES + 32)) {
          $iv     = substr($bin, 0, self::IV_BYTES);
          $hmac   = substr($bin, self::IV_BYTES, 32);
          $cipher = substr($bin, self::IV_BYTES + 32);
-         if (hash_equals($hmac,
-               hash_hmac('sha256', $cipher, self::key(), true))) {
-            $plain = openssl_decrypt($cipher, self::CIPHER, self::key(),
-                                     OPENSSL_RAW_DATA, $iv);
-            if ($plain !== false) return $plain;
+         if (hash_equals($hmac, hash_hmac('sha256', $cipher, self::key(), true))) {
+            $plain = openssl_decrypt($cipher, self::CIPHER, self::key(), OPENSSL_RAW_DATA, $iv);
+            if ($plain !== false) {
+               return $plain;
+            }
          }
       }
 
-      /* ancien format – IV fixe + double B64 */
-      $legacy = openssl_decrypt(base64_decode($stored, true),
-                                self::CIPHER, self::key(), 0,
-                                '1234567890123456');
+      $legacy = openssl_decrypt(
+         $bin === false ? '' : $bin,
+         self::CIPHER,
+         self::key(),
+         0,
+         '1234567890123456'
+      );
+
       return $legacy === false ? null : $legacy;
+   }
+
+   /* ----------- déchiffrement (sodium › legacy OpenSSL) ----------- */
+   public static function decrypt(?string $stored): ?string
+   {
+      if ($stored === '' || $stored === null) {
+         return null;
+      }
+
+      if (self::isSodiumCiphertext($stored)) {
+         return self::decryptSodium($stored);
+      }
+
+      return self::decryptLegacy($stored);
    }
 }

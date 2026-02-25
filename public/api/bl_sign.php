@@ -196,6 +196,81 @@ function api_sign_call_traitement(array $payload, string $rootdoc, array $cfg): 
    return $fallback();
 }
 
+function api_sign_remote_signature_users(PluginGestionConfig $config): array
+{
+   try {
+      $ids = $config->RemoteSignatureUsers();
+      if (is_string($ids)) {
+         $decoded = json_decode($ids, true);
+         if (is_array($decoded)) {
+            $ids = $decoded;
+         }
+      }
+      if (!is_array($ids)) {
+         return [];
+      }
+      $out = [];
+      foreach ($ids as $id) {
+         $uid = (int)$id;
+         if ($uid > 0) {
+            $out[$uid] = $uid;
+         }
+      }
+      return array_values($out);
+   } catch (Throwable $e) {
+      return [];
+   }
+}
+
+function api_sign_resolve_technician_override(DBmysql $DB, PluginGestionConfig $config, string $raw): ?array
+{
+   $raw = trim($raw);
+   if ($raw === '') {
+      return null;
+   }
+
+   $allowed_ids = api_sign_remote_signature_users($config);
+   if (empty($allowed_ids)) {
+      return ['error' => 'technician_override_not_allowed'];
+   }
+
+   $in = implode(',', array_map('intval', $allowed_ids));
+   $where = '';
+   if (ctype_digit($raw)) {
+      $where = "u.id = " . (int)$raw;
+   } else {
+      $esc = $DB->escape($raw);
+      $where = "u.name = '$esc'";
+   }
+
+   $sql = "SELECT u.id, u.name, u.realname, u.firstname
+           FROM `glpi_users` u
+           WHERE u.is_deleted = 0
+             AND u.id IN ($in)
+             AND ($where)
+           LIMIT 1";
+   $res = $DB->doQuery($sql);
+   if (!$res || $DB->numrows($res) !== 1) {
+      return ['error' => 'invalid_technician_override'];
+   }
+
+   $row = $DB->fetchassoc($res);
+   $login = trim((string)($row['name'] ?? ''));
+   if ($login === '') {
+      return ['error' => 'invalid_technician_override'];
+   }
+   $label = trim((string)($row['realname'] ?? '') . ' ' . (string)($row['firstname'] ?? ''));
+   if ($label === '') {
+      $label = $login;
+   }
+
+   return [
+      'id'    => (int)($row['id'] ?? 0),
+      'login' => $login,
+      'label' => $label,
+   ];
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
    api_sign_end(405, ['ok' => false, 'error' => 'method_not_allowed']);
 }
@@ -232,6 +307,7 @@ $counter_invoice_client = api_sign_bool(
    ?? $input['counter']
    ?? '0'
 );
+$technician_override_raw = trim((string)($input['technician_login'] ?? $input['technician'] ?? ''));
 
 if ($survey_id <= 0 && $bl === '') {
    api_sign_end(422, ['ok' => false, 'error' => 'missing_survey_or_bl']);
@@ -258,6 +334,21 @@ if ((int)($survey['signed'] ?? 0) === 1) {
 }
 
 $technician_login = trim((string)($auth['tech_login'] ?? ''));
+$technician_label = trim((string)($auth['tech_label'] ?? ''));
+if ($technician_override_raw !== '') {
+   $resolved_override = api_sign_resolve_technician_override($DB, $config, $technician_override_raw);
+   if (is_array($resolved_override) && !empty($resolved_override['error'])) {
+      api_sign_end(422, [
+         'ok'      => false,
+         'error'   => (string)$resolved_override['error'],
+         'message' => 'Technicien invalide ou non autorise pour ce flux',
+      ]);
+   }
+   if (is_array($resolved_override) && !empty($resolved_override['login'])) {
+      $technician_login = (string)$resolved_override['login'];
+      $technician_label = (string)($resolved_override['label'] ?? $technician_login);
+   }
+}
 if ($technician_login === '') {
    api_sign_end(500, ['ok' => false, 'error' => 'missing_technician_login']);
 }
@@ -326,7 +417,7 @@ api_sign_end(200, [
    'users_ext'        => (string)($row['users_ext'] ?? ''),
    'doc_url'          => (string)($row['doc_url'] ?? ''),
    'technician_login' => $technician_login,
-   'technician_label' => (string)($auth['tech_label'] ?? ''),
+   'technician_label' => $technician_label,
    'comment'          => ($comment !== '' ? $comment : null),
    'counter_invoice_client' => $counter_invoice_client ? 1 : 0,
 ]);

@@ -64,11 +64,45 @@ function plugin_gestion_install() { // fonction installation du plugin
    }
    $migration->executeMigration();
 
+   // ── Migrations spécifiques par lot (version cible) ──────────────────────
+   // update_150_remote : remote_sign_requests + signaturedevices (ancienne structure)
+   $update150 = dirname(__FILE__) . '/install/update_150_remote.php';
+   if (file_exists($update150)) {
+      require_once $update150;
+      if (function_exists('update_150_remote')) {
+         update_150_remote();
+      }
+   }
+
+   // update_153_next : baseitems (sera droppé par update_170_alpha1)
+   $update153 = dirname(__FILE__) . '/install/update_153_next.php';
+   if (file_exists($update153)) {
+      require_once $update153;
+      // Note: update_153_next crée baseitems uniquement si absente.
+      // update_170_alpha1 la supprime ensuite → ordre correct.
+      if (function_exists('update_153_next')) {
+         update_153_next();
+      }
+   }
+
+   // update_170_alpha1 : migration 1.7.0_alpha1
+   //   - Crée glpi_plugin_gestion_devices (serial+ip+last_seen+status)
+   //   - Migre remote_sign_requests (device_serial remplace device_id/token)
+   //   - Supprime glpi_plugin_gestion_baseitems (Base Description / Info)
+   //   - Supprime glpi_plugin_gestion_signaturedevices (ancien schéma token)
+   $update170 = dirname(__FILE__) . '/install/update_170_alpha1.php';
+   if (file_exists($update170)) {
+      require_once $update170;
+      if (function_exists('update_170_alpha1')) {
+         update_170_alpha1();
+      }
+   }
+
    PluginGestionProfile::initProfile();
    PluginGestionProfile::createFirstAccess($_SESSION['glpiactiveprofile']['id']);
 
    CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
-   return true; 
+   return true;
 }
 
 function plugin_gestion_uninstall() { // fonction desintallation du plugin

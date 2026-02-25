@@ -215,48 +215,39 @@ function gestion_loadCriForm(action, modal, params) {
     plugin: currentPlugin,
     namespace: namespace,
     
-    async create({ ticket_id, device_id, device_token, parameters }) {
+    // v1.7.0_alpha1 : identification par device_serial (sans token)
+    async create({ ticket_id, device_serial, parameters }) {
       ticket_id = ticket_id || getTicketId();
-      if (!ticket_id) throw new Error('Ticket introuvable (id manquant)');
-      if (!device_id) throw new Error('Sélectionnez une tablette.');
-      if (!device_token) throw new Error('Token de tablette manquant : re-sélectionnez la tablette.');
-      
-      const payload = { ticket_id, id: ticket_id, device_id, device_token };
-      
-      // Utiliser les paramètres fournis ou les paramètres automatiques
+      if (!ticket_id)     throw new Error('Ticket introuvable (id manquant)');
+      if (!device_serial) throw new Error('Sélectionnez une tablette.');
+
+      const payload = { ticket_id, id: ticket_id, device_serial };
+
+      // Paramètres automatiques (infos ticket)
       let finalParameters = parameters;
-      
       if (!finalParameters && typeof window.REMOTE_SIGN_AUTO_PARAMS === 'object' && window.REMOTE_SIGN_AUTO_PARAMS) {
         finalParameters = JSON.stringify(window.REMOTE_SIGN_AUTO_PARAMS);
       }
-      
+
       if (finalParameters) {
-        //payload.parameters = finalParameters;
-        const json = JSON.stringify(window.REMOTE_SIGN_AUTO_PARAMS);
+        const json      = JSON.stringify(window.REMOTE_SIGN_AUTO_PARAMS);
         const utf8Bytes = new TextEncoder().encode(json);
         let binary = '';
         utf8Bytes.forEach(b => binary += String.fromCharCode(b));
         payload.parameters_b64 = btoa(binary);
       }
-      
+
       return postForm(base + '/ajax/create_remote_signature.php', payload);
     },
 
     async pollTicket(ticket_id, device) {
       ticket_id = ticket_id || getTicketId();
       const payload = { ticket_id, id: ticket_id };
-      if (device && device.device_id)   payload.device_id = device.device_id;
-      if (device && device.device_token) payload.device_token = device.device_token;
+      // device_serial optionnel (affine la recherche côté serveur)
+      if (device && device.device_serial) payload.device_serial = device.device_serial;
       return postJSON(base + '/ajax/request_poll.php', payload);
-    },
-
-    async devicePoll({ device_id, device_token }) {
-      return postJSON(base + '/ajax/device_poll.php', { device_id, device_token });
-    },
-
-    async deviceSubmit({ request_id, signature_base64, signer_name, device_id, device_token }) {
-      return postJSON(base + '/ajax/device_submit.php', { request_id, signature: signature_base64, signer_name, device_id, device_token });
     }
+    // devicePoll() et deviceSubmit() supprimés (étaient appelés par device_sign.php — supprimé en v1.7.0_alpha1)
   };
 
   function attachButtonHandler(remoteSignInstance) {
@@ -277,21 +268,20 @@ function gestion_loadCriForm(action, modal, params) {
       btn.disabled = true;
 
       try {
-        const opt          = sel.options[sel.selectedIndex];
-        const device_id    = opt?.value || '';
-        const device_token = opt?.getAttribute('data-token') || '';
-        const tid          = getTicketId();
-        
+        const opt           = sel.options[sel.selectedIndex];
+        const device_serial = opt?.value || '';  // serial de la tablette (v1.7.0_alpha1)
+        const tid           = getTicketId();
+
         if (stat) stat.textContent = "Envoi de la demande…";
-        
-        await remoteSignInstance.create({ ticket_id: tid, device_id, device_token });
-        
+
+        await remoteSignInstance.create({ ticket_id: tid, device_serial });
+
         if (stat) stat.textContent = "En attente de la tablette…";
 
         let tries = 0;
         const loop = async ()=>{
           try {
-            const r = await remoteSignInstance.pollTicket(tid, { device_id, device_token });
+            const r = await remoteSignInstance.pollTicket(tid, { device_serial });
             const sig = r.signature || r.signature_base64 || null;
             const ready = (r.ready === true) || (r.status === 'done') || (!!sig && !r.none);
             

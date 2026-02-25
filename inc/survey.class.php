@@ -273,7 +273,7 @@ class PluginGestionSurvey extends CommonDBTM {
       echo '<script>
          window.GLPI_PLUG_GESTION = "' . PLUGIN_GESTION_WEBDIR . '";
       </script>';
-      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . time() . '" defer></script>';
+      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . (defined('PLUGIN_GESTION_VERSION') ? PLUGIN_GESTION_VERSION : '1') . '" defer></script>';
 
       $params = ['job'           => $ID,
                  'root_doc'      => PLUGIN_GESTION_WEBDIR,
@@ -286,7 +286,10 @@ class PluginGestionSurvey extends CommonDBTM {
       $this->initForm($ID, $options);
       $this->showFormHeader($options);
 
-      if ($_GET['id'] != null){
+      // Distinguish creation (ID 0 / empty) from an existing record.
+      $isExistingSurvey = ((int)$ID > 0);
+
+      if ($isExistingSurvey){
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __('Non du document : ') . "</td>";
                echo "<td>";
@@ -410,7 +413,7 @@ class PluginGestionSurvey extends CommonDBTM {
             echo "</tr>";
          }
          if ($this->fields['signed'] == 1 && isset($modalId)) {
-            $csrfToken = Session::getNewCSRFToken();
+            $csrfToken = Session::getNewCSRFToken(true);
             $ajaxUrl   = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/') . '/plugins/gestion/ajax/cri.php';
             ?>
             <div class="modal fade" id="<?php echo $modalId; ?>" tabindex="-1" aria-labelledby="<?php echo $modalId; ?>Label" aria-hidden="true">
@@ -421,7 +424,7 @@ class PluginGestionSurvey extends CommonDBTM {
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                      </div>
                      <div class="modal-body">
-                        <form id="gestion-resend-mail-form-<?php echo $ID; ?>">
+                        <div id="gestion-resend-mail-form-<?php echo $ID; ?>">
                            <input type="hidden" name="_glpi_csrf_token" value="<?php echo $csrfToken; ?>">
                            <input type="hidden" name="survey_id" value="<?php echo $ID; ?>">
                            <div class="mb-3">
@@ -442,7 +445,7 @@ class PluginGestionSurvey extends CommonDBTM {
                               <label class="form-label">Copie (CC)</label>
                               <input type="text" name="cc" class="form-control" placeholder="Emails en copie, separes par des virgules">
                            </div>
-                        </form>
+                        </div>
                         <div class="text-danger gestion-send-mail-feedback" style="display:none;"></div>
                      </div>
                      <div class="modal-footer">
@@ -695,10 +698,13 @@ class PluginGestionSurvey extends CommonDBTM {
          echo "</td><td colspan='2'></td></tr>";
       }
          
+      echo Html::hidden('plugin_gestion_survey_csrf_token', ['value' => Session::getNewCSRFToken(true)]);
+
       if (Session::haveRightsOr('plugin_gestion_survey', [CREATE, UPDATE])) {
          $this->showFormButtons($options);
+      } else {
+         Html::closeForm();
       }
-      Html::closeForm();
 
       return true;
    }

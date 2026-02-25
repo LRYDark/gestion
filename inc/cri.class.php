@@ -17,7 +17,7 @@ class PluginGestionCri extends CommonDBTM {
       echo '<script>
          window.GLPI_PLUG_GESTION = "' . PLUGIN_GESTION_WEBDIR . '";
       </script>';
-      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . time() . '" defer></script>';
+      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . (defined('PLUGIN_GESTION_VERSION') ? PLUGIN_GESTION_VERSION : '1') . '" defer></script>';
 
       // Style CSS inline pour hauteur responsive
          $responsiveIframeStyle = "
@@ -293,8 +293,14 @@ class PluginGestionCri extends CommonDBTM {
                   }
                   $uid = (int)Session::getLoginUserID();
                   $can_remote = (bool)$enabled && (empty($allowed_users) || in_array($uid, $allowed_users, true));
-                  if ($can_remote) {
-                     $resdev = $DB->doQuery("SELECT id, device_id, serial, device_token, is_active FROM glpi_plugin_gestion_signaturedevices WHERE is_active = 1 ORDER BY device_id ASC");
+                  if ($can_remote && $DB->tableExists('glpi_plugin_gestion_devices')) {
+                     // v1.7.0_alpha1 : nouveau schéma sans token
+                     $resdev = $DB->doQuery(
+                        "SELECT `id`, `serial`, `name`, `ip`, `last_seen`
+                         FROM `glpi_plugin_gestion_devices`
+                         WHERE `status` = 'active'
+                         ORDER BY `last_seen` DESC"
+                     );
                      if ($resdev) {
                         while ($r = $DB->fetchassoc($resdev)) { $devices[] = $r; }
                      }
@@ -310,40 +316,38 @@ class PluginGestionCri extends CommonDBTM {
                echo '  <div class="form-content">';
                echo '    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
             
-               // (re)build device list with tokens directly from DB
+               // Chargement des appareils kiosque enregistrés (v1.7.0_alpha1 — sans token)
+               // Identification : serial uniquement
                global $DB;
                $rows = [];
-               $res = $DB->doQuery("SELECT device_id, serial, device_token FROM glpi_plugin_gestion_signaturedevices WHERE is_active = 1");
-               if ($res) {
-                  while ($r = $DB->fetchassoc($res)) { $rows[] = $r; }
+               if ($DB->tableExists('glpi_plugin_gestion_devices')) {
+                  $devRes = $DB->doQuery(
+                     "SELECT `serial`, `name`, `ip`, `last_seen`
+                      FROM `glpi_plugin_gestion_devices`
+                      WHERE `status` = 'active'
+                      ORDER BY `last_seen` DESC"
+                  );
+                  if ($devRes) {
+                     while ($r = $DB->fetchassoc($devRes)) { $rows[] = $r; }
+                  }
                }
 
                echo '      <select id="remote-device" style="padding:6px">';
                foreach ($rows as $d) {
-                  $did = Html::entities_deep($d['device_id']);
-                  $tok = Html::entities_deep($d['device_token']);
-                  $ser = Html::entities_deep($d['serial']);
-                  $label = $did . ($ser ? ' · ' . $ser : '');
-                  echo '        <option value="'.$did.'" data-token="'.$tok.'" data-has-token="'.(!empty($tok) ? '1' : '0').'">'.$label.'</option>';
+                  $serial = Html::entities_deep((string)($d['serial'] ?? ''));
+                  $name   = Html::entities_deep((string)($d['name']   ?? ''));
+                  $label  = $name !== '' ? $name . ' (' . $serial . ')' : $serial;
+                  // value = serial (pas de token)
+                  echo '        <option value="' . $serial . '">' . $label . '</option>';
                }
-               
                echo '      </select>';
-               // expose ticket id for JS in a robust way
+
                $ticket_id_js = isset($ID) ? (int)$ID : 0;
-               echo '<input type="hidden" id="remote-ticket-id" value="'.$ticket_id_js.'">';
+               echo '<input type="hidden" id="remote-ticket-id" value="' . $ticket_id_js . '">';
 
-               // Alerts after actual DB-backed tokens
-               $no_rows = (count($rows) === 0);
-               $no_token = true;
-               foreach ($rows as $d) { if (!empty($d['device_token'])) { $no_token = false; break; } }
-
-               if ($no_rows) {
+               if (count($rows) === 0) {
                   echo '<div class="alert alert-important alert-danger glpi-debug-alert" style="z-index:10000">';
-                  echo __('Aucune tablette active. Ajoutez-en au moins une dans la configuration.', 'gestion');
-                  echo '</div>';
-               } else if ($no_token) {
-                  echo '<div class="alert alert-important alert-danger glpi-debug-alert" style="z-index:10000">';
-                  echo __('Aucun token de tablette détecté : supprimez puis ré-ajoutez la tablette dans la configuration pour générer un token.', 'gestion');
+                  echo __('Aucune tablette active. Lancez l\'app APPAPPLETAB sur la tablette pour l\'enregistrer automatiquement.', 'gestion');
                   echo '</div>';
                }
 
@@ -361,54 +365,68 @@ class PluginGestionCri extends CommonDBTM {
                   $autoParams['document_name'] = $Doc_Name;
                }
 
-               // Document URL avec token temporaire (depuis la variable existante)
+               // Document URL avec token temporaire valide pour la tablette
                if (!empty($fileDownloadUrl)) {
-                  // Fonction pour générer le token temporaire
-                  function generateTempToken($doc_id, $secret_key = 'GLPI_PDF_SECRET_2024') {
-                     $today = date('Y-m-d');
-                     return hash('sha256', $doc_id . $today . $secret_key);
+                  // Extraire le doc_id depuis l'URL existante
+                  // (le $DOC->url_bl contient l'identifiant Sage, ex: 'BL199550')
+                  $doc_id_remote = '';
+                  if (!empty($DOC->url_bl)) {
+                     // Priorité : utiliser url_bl directement (identifiant Sage propre)
+                     $doc_id_remote = trim((string)$DOC->url_bl);
+                  } elseif (preg_match('/[?&]id=([^&#]+)/', $fileDownloadUrl, $matches)) {
+                     $doc_id_remote = urldecode($matches[1]);
+                  } elseif (preg_match('/[?&]docid=([^&#]+)/', $fileDownloadUrl, $matches)) {
+                     $doc_id_remote = urldecode($matches[1]);
                   }
-                  
-                  // Extraire l'ID du document depuis l'URL existante
-                  $doc_id = '';
-                  if (preg_match('/[?&]id=([^&]+)/', $fileDownloadUrl, $matches)) {
-                     $doc_id = $matches[1];
-                  } elseif (preg_match('/docid=([^&]+)/', $fileDownloadUrl, $matches)) {
-                     $doc_id = $matches[1];
-                  }
-                  
-                  if (!empty($doc_id)) {
-                     // Générer le token temporaire
-                     $temp_token = generateTempToken($doc_id);
-                     
-                     // Créer l'URL avec token
-                     $separator = (strpos($fileDownloadUrl, '?') !== false) ? '&' : '?';
-                     $tokenized_url = $fileDownloadUrl . $separator . 'token=' . $temp_token;
-                     
-                     // CORRECTION : Assigner à document_url, pas document_name
-                     // ET s'assurer qu'il n'y a pas d'encodage HTML
-                     $autoParams['document_url'] = html_entity_decode($tokenized_url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+                  if (!empty($doc_id_remote)) {
+                     // Utiliser generateTempTokenForPreview (définie ligne 48, même logique
+                     // que _pdf_preview_secret() dans view_pdf.php) pour garantir la cohérence.
+                     // NE PAS utiliser la clé littérale 'GLPI_PDF_SECRET_2024' :
+                     // view_pdf.php la remplace par _pdf_preview_secret() → tokens incompatibles.
+                     $temp_token_remote = generateTempTokenForPreview($doc_id_remote);
+
+                     if (strpos($fileDownloadUrl, 'view_pdf.php') !== false) {
+                        // Reconstruire une URL propre (sans doublon de token=)
+                        $base_view = strtok($fileDownloadUrl, '?');
+                        $autoParams['document_url'] = $base_view
+                           . '?id='    . rawurlencode($doc_id_remote)
+                           . '&token=' . $temp_token_remote;
+                     } else {
+                        // URL non-view_pdf (ex: SharePoint) : ajouter le token en paramètre
+                        $sep = (strpos($fileDownloadUrl, '?') !== false) ? '&' : '?';
+                        $autoParams['document_url'] = html_entity_decode($fileDownloadUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8')
+                           . $sep . 'token=' . $temp_token_remote;
+                     }
                   } else {
-                     // Fallback si on n'arrive pas à extraire l'ID
+                     // Fallback : URL sans token (SharePoint autonome, etc.)
                      $autoParams['document_url'] = html_entity_decode($fileDownloadUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                   }
                }
                
-               // Entity (récupérer l'entité du ticket)
+               // Entity : priorité à glpi_plugin_gestion_surveys.entities_id (entité directe du BL)
+               // Fallback : entité du ticket associé (quand entities_id vaut 0)
                $entity_name = '';
                try {
-                  $entity_sql = "SELECT e.name FROM glpi_entities e 
-                              JOIN glpi_tickets t ON e.id = t.entities_id 
-                              WHERE t.id = " . (int)$ID . " LIMIT 1";
-                  $entity_result = $DB->doQuery($entity_sql);
-                  if ($entity_result && $DB->numrows($entity_result) > 0) {
-                     $entity_row = $DB->fetchAssoc($entity_result);
-                     $entity_name = $entity_row['name'];
+                  $bl_entity_id = (int)($DOC->entities_id ?? 0);
+                  if ($bl_entity_id > 0) {
+                     $ent_res = $DB->doQuery("SELECT name FROM `glpi_entities` WHERE id = $bl_entity_id LIMIT 1");
+                     if ($ent_res && $DB->numrows($ent_res) > 0) {
+                        $entity_name = trim((string)($DB->fetchAssoc($ent_res)['name'] ?? ''));
+                     }
+                  }
+                  // Fallback : entité du ticket si entities_id du BL n'est pas renseigné
+                  if (empty($entity_name) && (int)$ID > 0) {
+                     $ent_res2 = $DB->doQuery("SELECT e.name FROM `glpi_entities` e
+                                               JOIN `glpi_tickets` t ON e.id = t.entities_id
+                                               WHERE t.id = " . (int)$ID . " LIMIT 1");
+                     if ($ent_res2 && $DB->numrows($ent_res2) > 0) {
+                        $entity_name = trim((string)($DB->fetchAssoc($ent_res2)['name'] ?? ''));
+                     }
                   }
                } catch (Exception $e) {
                   $entity_name = '';
                }
-               
                if (!empty($entity_name)) {
                   $autoParams['entity_name'] = $entity_name;
                }
@@ -454,13 +472,12 @@ class PluginGestionCri extends CommonDBTM {
                      try {
                      const sel = document.getElementById("remote-device");
                      if (!sel) return;
-                     
-                     const opt = sel.options[sel.selectedIndex];
-                     const device_id = opt.value;
-                     const device_token = opt.getAttribute("data-token");
-                     const ticket_id = '.((int)$ID).';
-                     
-                     const r = await RemoteSign.pollTicket(ticket_id, { device_id, device_token });
+
+                     const opt           = sel.options[sel.selectedIndex];
+                     const device_serial = opt.value;  // serial uniquement (v1.7.0_alpha1)
+                     const ticket_id     = '.((int)$ID).';
+
+                     const r = await RemoteSign.pollTicket(ticket_id, { device_serial });
                      
                      if (r.ok && r.ready && r.signature_base64) {
                         // Remplir le champ caché

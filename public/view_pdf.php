@@ -2,7 +2,7 @@
 // view_pdf.php - Version sécurisée SANS exposition du token valide
 
 // IMPORTANT : Définir NOLOGIN avant includes si on a un token
-$token = $_GET['token'] ?? '';
+$token = trim((string)($_GET['token'] ?? ''));
 if (!empty($token)) {
     define('NOLOGIN', 1);
     define('NOHEADER', 1);
@@ -15,7 +15,11 @@ if (!isset($_GET['id'])) {
     exit("Missing document ID");
 }
 
-$id = $_GET['id'];
+$id = trim((string)$_GET['id']);
+if ($id === '' || strlen($id) > 255 || preg_match('/[\x00-\x1F\\\\]/', $id) || str_contains($id, '..') || str_contains($id, '?') || str_contains($id, '#')) {
+    http_response_code(400);
+    exit("Invalid document ID");
+}
 
 // Fonction pour générer/valider les tokens temporaires
 function _pdf_preview_secret() {
@@ -73,7 +77,8 @@ if (!empty($token)) {
     } catch (Exception $e) {
         // Si pas de token ET pas de session, rediriger vers login
         $redirect_url = urlencode($_SERVER['REQUEST_URI']);
-        header("Location: /glpi/front/login.php?redirect=" . $redirect_url);
+        $root_doc = rtrim((string)($CFG_GLPI['root_doc'] ?? '/glpi'), '/');
+        header("Location: " . $root_doc . "/front/login.php?redirect=" . $redirect_url);
         exit;
     }
 }

@@ -86,7 +86,10 @@ class PluginGestionConfig extends CommonDBTM
       }
 
       $config->showFormHeader(['colspan' => 4]);
-      echo '</table>'; 
+      // showFormHeader() opens <table><tr><td>; close them properly before rendering card layout
+      echo '</td></tr></table>'; 
+      // Dedicated standalone CSRF token for this plugin form/actions (avoids shared token consumption by other requests)
+      echo Html::hidden('plugin_gestion_csrf_token', ['value' => Session::getNewCSRFToken(true)]);
 
       $api_hl_enabled = Config::isHlApiEnabled();
       $api_legacy_enabled = !empty($CFG_GLPI['enable_api']);
@@ -206,12 +209,11 @@ class PluginGestionConfig extends CommonDBTM
                   <?php if ($api_legacy_enabled): ?>
                   <span class="badge bg-warning text-dark"><?php echo __('API legacy active', 'gestion'); ?></span>
                   <?php endif; ?>
-                  <button type="button"
-                           class="btn btn-outline-primary btn-sm"
-                           data-bs-toggle="modal"
-                           data-bs-target="#gestionApiDocModal">
+                  <a class="btn btn-outline-primary btn-sm"
+                     href="<?php echo Html::entities_deep($api_rootdoc . '/plugins/gestion/front/api_docs.php'); ?>"
+                     target="_blank" rel="noopener">
                      <?php echo __('Voir la documentation API', 'gestion'); ?>
-                  </button>
+                  </a>
                </div>
                <div class="form-text text-muted">
                   <?php echo __('Compatible OAuth v2 (Bearer) et legacy (App-Token + user_token/session_token). En v2.2, utiliser un token utilisateur.', 'gestion'); ?>
@@ -348,12 +350,6 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
 }</code></pre>
                </div>
                <div class="modal-footer">
-                  <button type="button"
-                          class="btn btn-outline-primary"
-                          data-bs-target="#gestionApiTesterModal"
-                          data-bs-toggle="modal">
-                     <?php echo __('Tester API/Auth', 'gestion'); ?>
-                  </button>
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('Fermer', 'gestion'); ?></button>
                </div>
             </div>
@@ -437,7 +433,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   </div>
                </div>
                <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-bs-target="#gestionApiDocModal" data-bs-toggle="modal"><?php echo __('Retour doc API', 'gestion'); ?></button>
+                  <a class="btn btn-secondary" target="_blank" rel="noopener" href="<?php echo Html::entities_deep($api_rootdoc . '/plugins/gestion/front/api_docs.php'); ?>"><?php echo __('Voir doc API', 'gestion'); ?></a>
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('Fermer', 'gestion'); ?></button>
                </div>
             </div>
@@ -1735,53 +1731,30 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       </div>
       <?php
 
-      // --------------------- SECTION : SIGNATURE DÉPORTÉE (tablette) ---------------------  
-      // -------- URL builder (ton code) --------
-      // Fonction PHP pour générer l'URL de signature
-      function generateSignatureUrl($device_id, $token) {
-         global $CFG_GLPI;
-         // Détection du protocole (HTTP ou HTTPS)
-         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-         // Récupération du nom de domaine
-         $domain = $_SERVER['SERVER_NAME'];
-         // Construction du chemin GLPI - détection intelligente
-         $glpiPath = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');
-         // Construction de l'URL finale
-         $url = $protocol . $domain . $glpiPath . '/plugins/gestion/device_sign.php?device_id=' . urlencode($device_id) . '&token=' . urlencode($token);
-         return $url;
-      }
-
-      // -------- Lecture des lignes existantes --------
-      $sig_items = $DB->request([
-         'FROM'  => 'glpi_plugin_gestion_signaturedevices',
-         'ORDER' => 'id ASC'
-      ]);
-
-      // Base pour calcul JS (nouvelle ligne)
-      $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-      $domain   = $_SERVER['SERVER_NAME'];
-      $rootdoc  = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');
-      $jsBase   = $protocol . $domain . $rootdoc . '/plugins/gestion/device_sign.php';
+      // --------------------- SECTION : SIGNATURE DÉPORTÉE (tablette — APPAPPLETAB) ---------------------
+      // Lecture des appareils kiosque enregistrés (auto-enregistrés par l'app, sans token)
+      $devicesExist = $DB->tableExists('glpi_plugin_gestion_devices');
+      $kiosk_devices = $devicesExist
+         ? $DB->request(['FROM' => 'glpi_plugin_gestion_devices', 'ORDER' => 'last_seen DESC'])
+         : [];
       ?>
 
       <div class="card mb-3">
-         <div class="card-header">
-            <h3 class="card-title"><?php echo __('Signature déportée (tablette)', 'gestion'); ?></h3>
+         <div class="card-header d-flex align-items-center gap-2">
+            <i class="fa-solid fa-tablet-screen-button me-1"></i>
+            <h3 class="card-title mb-0"><?php echo __('Signature déportée', 'gestion'); ?></h3>
          </div>
          <div class="card-body">
             <?php
-            // valeurs actuelles
             $RemoteSignatureOn = (int)$config->RemoteSignatureOn();
-            $selectedUsers     = $config->RemoteSignatureUsers(); // array d'IDs
+            $selectedUsers     = $config->RemoteSignatureUsers();
             ?>
             <div class="row g-3 mb-3">
-               <!-- ON/OFF -->
                <div class="col-md-6">
                   <label for="RemoteSignatureOn_switch" class="form-label mb-1">
                      <?php echo __('Activer la signature déportée', 'gestion'); ?>
                   </label>
                   <div class="form-check form-switch">
-                     <!-- fallback à 0 si la case est décochée -->
                      <input type="hidden" name="RemoteSignatureOn" value="0">
                      <input class="form-check-input"
                            type="checkbox"
@@ -1791,222 +1764,108 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                            <?php echo ($RemoteSignatureOn === 1 ? 'checked' : ''); ?>>
                   </div>
                </div>
-
-               <!-- Utilisateurs autorisés -->
                <div class="col-md-6">
                   <label class="form-label mb-1">
                      <?php echo __('Utilisateurs GLPI autorisés à déclencher', 'gestion'); ?>
                   </label>
                   <?php
                      Dropdown::show('User', [
-                     'name'     => 'RemoteSignatureUsers[]',
-                     'multiple' => true,
-                     'value'    => $selectedUsers,
-                     'width'    => '100%',
+                        'name'     => 'RemoteSignatureUsers[]',
+                        'multiple' => true,
+                        'value'    => $selectedUsers,
+                        'width'    => '100%',
                      ]);
                   ?>
                </div>
             </div>
             <hr class="my-3">
 
+            <!-- ─── Tableau des appareils kiosque connectés ──────────────────── -->
+            <h5 class="mb-2">
+               <i class="fa fa-mobile-screen me-1"></i>
+               <?php echo __('Appareils connectés', 'gestion'); ?>
+            </h5>
             <div class="table-responsive">
-            <table class="table table-sm align-middle" id="sigTable">
-               <thead>
+            <table class="table table-sm table-hover align-middle" id="devicesTable">
+               <thead class="table-light">
                   <tr>
-                  <th style="width:22%"><?php echo __('Device ID', 'gestion'); ?></th>
-                  <th style="width:24%"><?php echo __('N° de série', 'gestion'); ?></th>
-                  <th style="width:42%"><?php echo __('Token', 'gestion'); ?></th>
-                  <th style="width:4%"><?php  echo __('Actif', 'gestion'); ?></th>
-                  <th class="text-center align-middle" style="width:4%"><?php echo __('Info', 'gestion'); ?></th>
-                  <th style="width:4%"></th>
+                     <th><?php echo __('N° de série', 'gestion'); ?></th>
+                     <th><?php echo __('Nom', 'gestion'); ?></th>
+                     <th><?php echo __('Adresse IP', 'gestion'); ?></th>
+                     <th><?php echo __('Dernière vue', 'gestion'); ?></th>
+                     <th class="text-center"><?php echo __('Statut', 'gestion'); ?></th>
+                     <th class="text-center"><?php echo __('Actions', 'gestion'); ?></th>
                   </tr>
                </thead>
                <tbody>
-               <?php foreach ($sig_items as $row): 
-                     $id           = (int)$row['id'];
-                     $device_id    = htmlspecialchars((string)($row['device_id']    ?? ''), ENT_QUOTES);
-                     $serial       = htmlspecialchars((string)($row['serial']       ?? ''), ENT_QUOTES);
-                     $device_token = htmlspecialchars((string)($row['device_token'] ?? ''), ENT_QUOTES);
-                     $is_active    = (int)($row['is_active'] ?? 1);
-                     $signatureUrl = generateSignatureUrl(($row['device_id'] ?? ''), ($row['device_token'] ?? ''));
+               <?php
+               $hasDevices = false;
+               foreach ($kiosk_devices as $dev):
+                  $hasDevices  = true;
+                  $devId       = (int)$dev['id'];
+                  $devSerial   = htmlspecialchars((string)($dev['serial']    ?? ''), ENT_QUOTES);
+                  $devName     = htmlspecialchars((string)($dev['name']      ?? ''), ENT_QUOTES);
+                  $devIp       = htmlspecialchars((string)($dev['ip']        ?? ''), ENT_QUOTES);
+                  $devLastSeen = htmlspecialchars((string)($dev['last_seen'] ?? ''), ENT_QUOTES);
+                  $devStatus   = (string)($dev['status'] ?? 'active');
+                  $isBanned    = ($devStatus === 'banned');
+                  $badgeClass  = $isBanned ? 'bg-danger' : 'bg-success';
+                  $badgeLabel  = $isBanned ? __('Banni', 'gestion') : __('Actif', 'gestion');
                ?>
-                  <tr data-id="<?php echo $id; ?>">
-                  <td>
-                     <input type="text"
-                           name="sig[<?php echo $id; ?>][device_id]"
-                           class="form-control form-control-sm"
-                           value="<?php echo $device_id; ?>"
-                           placeholder="<?php echo __('Ex: TAB-001', 'gestion'); ?>">
-                  </td>
-                  <td>
-                     <input type="text"
-                           name="sig[<?php echo $id; ?>][serial]"
-                           class="form-control form-control-sm"
-                           value="<?php echo $serial; ?>"
-                           placeholder="<?php echo __('Ex: S/N R58M...', 'gestion'); ?>">
-                  </td>
-                  <td>
-                     <input type="text"
-                           name="sig[<?php echo $id; ?>][device_token]"
-                           class="form-control form-control-sm"
-                           value="<?php echo $device_token; ?>"
-                           placeholder="<?php echo __('Ex: ABCDEF...', 'gestion'); ?>">
+               <tr class="<?php echo $isBanned ? 'table-danger' : ''; ?>">
+                  <td><code><?php echo $devSerial; ?></code></td>
+                  <td><?php echo $devName !== '' ? $devName : '<span class="text-muted">—</span>'; ?></td>
+                  <td><small><?php echo $devIp !== '' ? $devIp : '—'; ?></small></td>
+                  <td><small><?php echo $devLastSeen !== '' ? $devLastSeen : '—'; ?></small></td>
+                  <td class="text-center">
+                     <span class="badge <?php echo $badgeClass; ?>"><?php echo $badgeLabel; ?></span>
                   </td>
                   <td class="text-center">
-                     <div class="form-check form-switch m-0">
-                        <input class="form-check-input"
-                              type="checkbox"
-                              name="sig[<?php echo $id; ?>][is_active]"
-                              <?php echo ($is_active === 1 ? 'checked' : ''); ?>>
-                     </div>
-                  </td>
-                  <td class="text-center">
-                     <button type="button"
-                              class="btn btn-outline-info btn-sm"
-                              title="<?php echo __('Voir le lien', 'gestion'); ?>"
-                              onclick="showSignatureUrl('<?php echo addslashes($signatureUrl); ?>')">
-                        <i class="fa fa-link"></i>
+                     <?php if ($isBanned): ?>
+                     <button type="submit"
+                             name="device_action_submit"
+                             value="<?php echo 'unban:' . $devId; ?>"
+                             formnovalidate
+                             class="btn btn-success btn-sm d-inline"
+                             title="<?php echo __('Débannir', 'gestion'); ?>">
+                        <i class="fa fa-check"></i> <?php echo __('Débannir', 'gestion'); ?>
                      </button>
-                  </td>
-                  <td class="text-end">
-                     <button type="button" class="btn btn-outline-danger btn-sm sig-del-row"
-                              title="<?php echo __('Supprimer'); ?>">
+                     <?php else: ?>
+                     <button type="submit"
+                             name="device_action_submit"
+                             value="<?php echo 'ban:' . $devId; ?>"
+                             formnovalidate
+                             class="btn btn-warning btn-sm d-inline"
+                             title="<?php echo __('Bannir', 'gestion'); ?>"
+                             onclick="return confirm('<?php echo __('Confirmer le bannissement de cet appareil ?', 'gestion'); ?>')">
+                        <i class="fa fa-ban"></i> <?php echo __('Bannir', 'gestion'); ?>
+                     </button>
+                     <?php endif; ?>
+                     <button type="submit"
+                             name="device_action_submit"
+                             value="<?php echo 'delete:' . $devId; ?>"
+                             formnovalidate
+                             class="btn btn-outline-danger btn-sm d-inline ms-1"
+                             title="<?php echo __('Supprimer', 'gestion'); ?>"
+                             onclick="return confirm('<?php echo __('Supprimer définitivement cet appareil ?', 'gestion'); ?>')">
                         <i class="fa fa-trash"></i>
                      </button>
-                     <input type="hidden" name="sig[<?php echo $id; ?>][_delete]" value="0">
                   </td>
-                  </tr>
+               </tr>
                <?php endforeach; ?>
+               <?php if (!$hasDevices): ?>
+               <tr>
+                  <td colspan="6" class="text-center text-muted py-3">
+                     <i class="fa fa-circle-info me-1"></i>
+                     <?php echo __('Aucun appareil enregistré. Lancez l\'app APPAPPLETAB sur la tablette pour l\'enregistrer automatiquement.', 'gestion'); ?>
+                  </td>
+               </tr>
+               <?php endif; ?>
                </tbody>
             </table>
             </div>
-
-            <button type="button" class="btn btn-outline-primary btn-sm" id="sigAddRow">
-            <i class="fa fa-plus"></i> <?php echo __('Ajouter une tablette', 'gestion'); ?>
-            </button>
          </div>
       </div>
-
-      <!-- Modal pour afficher l'URL de signature -->
-      <div class="modal fade" id="signatureUrlModal" tabindex="-1" aria-labelledby="signatureUrlModalLabel" aria-hidden="true">
-         <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-               <div class="modal-header">
-                  <h5 class="modal-title" id="signatureUrlModalLabel"><?php echo __('Lien de signature pour tablette', 'gestion'); ?></h5>
-                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<?php echo __('Fermer'); ?>"></button>
-               </div>
-               <div class="modal-body">
-                  <p><?php echo __('Voici le lien pour accéder à la page de signature sur la tablette :', 'gestion'); ?></p>
-                  <div class="input-group">
-                     <input type="text" class="form-control" id="signatureUrlInput" readonly>
-                     <button class="btn btn-outline-secondary" type="button" onclick="copySignatureUrl(event)">
-                        <i class="fa fa-copy"></i> <?php echo __('Copier', 'gestion'); ?>
-                     </button>
-                  </div>
-                  <div class="mt-2">
-                     <small class="text-muted"><?php echo __('Ce lien permet à la tablette d\'accéder à l\'interface de signature déportée.', 'gestion'); ?></small>
-                  </div>
-               </div>
-               <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('Fermer', 'gestion'); ?></button>
-               </div>
-            </div>
-         </div>
-      </div>
-
-      <script>
-      (function(){
-      const tbody  = document.querySelector('#sigTable tbody');
-      const addBtn = document.getElementById('sigAddRow');
-      const jsBase = <?php echo json_encode($jsBase); ?>; // base URL pour les nouvelles lignes
-
-      // Ajout d'une nouvelle ligne
-      addBtn?.addEventListener('click', function(){
-         const uid = 'new_' + Date.now();
-         const tr = document.createElement('tr');
-         tr.innerHTML = `
-            <td><input type="text" name="sig[${uid}][device_id]" class="form-control form-control-sm" placeholder="<?php echo __('Ex: TAB-001', 'gestion'); ?>"></td>
-            <td><input type="text" name="sig[${uid}][serial]" class="form-control form-control-sm" placeholder="<?php echo __('Ex: S/N R58M...', 'gestion'); ?>"></td>
-            <td><input type="text" name="sig[${uid}][device_token]" class="form-control form-control-sm" placeholder="<?php echo __('Ex: ABCDEF... (Laisser vide pour en généré automatiquement)', 'gestion'); ?>"></td>
-            <td class="text-center">
-            <div class="form-check form-switch m-0">
-               <input class="form-check-input" type="checkbox" name="sig[${uid}][is_active]" checked>
-            </div>
-            </td>
-            <td class="text-center">
-            <button type="button" class="btn btn-outline-info btn-sm sig-info-btn" title="<?php echo __('Voir le lien', 'gestion'); ?>" disabled>
-               <i class="fa fa-link"></i>
-            </button>
-            </td>
-            <td class="text-end">
-            <button type="button" class="btn btn-outline-danger btn-sm sig-del-row" title="<?php echo __('Supprimer'); ?>">
-               <i class="fa fa-trash"></i>
-            </button>
-            <input type="hidden" name="sig[${uid}][_delete]" value="0">
-            </td>`;
-         tbody.appendChild(tr);
-
-         // activer le bouton info quand device_id & token sont saisis (URL calculée côté JS)
-         const dev = tr.querySelector(`input[name="sig[${uid}][device_id]"]`);
-         const tok = tr.querySelector(`input[name="sig[${uid}][device_token]"]`);
-         const btn = tr.querySelector('.sig-info-btn');
-
-         const refreshBtn = () => {
-            const d = (dev.value || '').trim();
-            const t = (tok.value || '').trim();
-            if (d && t) {
-            btn.onclick = () => showSignatureUrl(jsBase + '?device_id=' + encodeURIComponent(d) + '&token=' + encodeURIComponent(t));
-            btn.removeAttribute('disabled');
-            } else {
-            btn.onclick = null;
-            btn.setAttribute('disabled', 'disabled');
-            }
-         };
-         dev.addEventListener('input', refreshBtn);
-         tok.addEventListener('input', refreshBtn);
-      });
-
-      // suppression (marquage pour existants / suppr DOM pour nouveaux)
-      document.addEventListener('click', function(e){
-         const delBtn = e.target.closest('.sig-del-row');
-         if (delBtn) {
-            const tr = delBtn.closest('tr');
-            const hidden = tr.querySelector('input[type="hidden"][name*="_delete"]');
-            if (hidden && tr.dataset.id) {
-            hidden.value = '1';
-            tr.style.opacity = '0.4';
-            } else {
-            tr.remove();
-            }
-         }
-      });
-      })();
-
-      // ----- Modal helpers -----
-      function showSignatureUrl(url) {
-         document.getElementById('signatureUrlInput').value = url;
-         var modal = new bootstrap.Modal(document.getElementById('signatureUrlModal'));
-         modal.show();
-      }
-
-      function copySignatureUrl(event) {
-         var input = document.getElementById('signatureUrlInput');
-         input.select();
-         input.setSelectionRange(0, 99999);
-         navigator.clipboard.writeText(input.value).then(function() {
-            var btn = event.target.closest('button');
-            var originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fa fa-check"></i> <?php echo __('Copié !', 'gestion'); ?>';
-            btn.classList.remove('btn-outline-secondary');
-            btn.classList.add('btn-success');
-            setTimeout(function() {
-               btn.innerHTML = originalHtml;
-               btn.classList.remove('btn-success');
-               btn.classList.add('btn-outline-secondary');
-            }, 1500);
-         });
-      }
-      </script>
       <?php
       //---------------------------------------------------------------------------------------------------------------------
 
@@ -2077,99 +1936,8 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       </div>
       <?php
 
-      // Charger la liste des items existants
-      $items = $DB->request([
-         'FROM'  => 'glpi_plugin_gestion_baseitems',
-         'ORDER' => 'id ASC'
-      ]);
-      ?>
-
-         <div class="card mb-3">
-            <div class="card-header">
-               <h3 class="card-title"><?php echo __('Base Description / Info', 'gestion'); ?></h3>
-            </div>
-            <div class="card-body">
-
-               <div class="table-responsive">
-                  <table class="table table-sm align-middle" id="biTable">
-                     <thead>
-                        <tr>
-                           <th style="width:50%"><?php echo __('Description', 'gestion'); ?></th>
-                           <th style="width:45%"><?php echo __('Information', 'gestion'); ?></th>
-                           <th style="width:5%"></th>
-                        </tr>
-                     </thead>
-                     <tbody>
-                     <?php foreach ($items as $row): ?>
-                        <tr data-id="<?php echo (int)$row['id']; ?>">
-                           <td>
-                              <input type="text"
-                                    name="bi[<?php echo (int)$row['id']; ?>][description]"
-                                    class="form-control form-control-sm"
-                                    value="<?php echo htmlspecialchars($row['description'], ENT_QUOTES); ?>">
-                           </td>
-                           <td>
-                              <input type="text"
-                                    name="bi[<?php echo (int)$row['id']; ?>][info]"
-                                    class="form-control form-control-sm"
-                                    value="<?php echo htmlspecialchars($row['info'], ENT_QUOTES); ?>">
-                           </td>
-                           <td class="text-end">
-                              <button type="button" class="btn btn-outline-danger btn-sm bi-del-row" title="<?php echo __('Supprimer'); ?>">
-                                 <i class="ti ti-trash"></i>
-                              </button>
-                              <input type="hidden" name="bi[<?php echo (int)$row['id']; ?>][_delete]" value="0">
-                           </td>
-                        </tr>
-                     <?php endforeach; ?>
-                     </tbody>
-                  </table>
-               </div>
-
-               <button type="button" class="btn btn-outline-primary btn-sm" id="biAddRow">
-                  <i class="ti ti-plus"></i> <?php echo __('Ajouter une ligne', 'gestion'); ?>
-               </button>
-
-            </div>
-
-      <script>
-      (function(){
-      const tbody = document.querySelector('#biTable tbody');
-      const addBtn = document.getElementById('biAddRow');
-
-      addBtn?.addEventListener('click', function(){
-         const uid = 'new_' + Date.now();
-         const tr = document.createElement('tr');
-         tr.innerHTML = `
-            <td><input type="text" name="bi[${uid}][description]" class="form-control form-control-sm" placeholder="<?php echo __('Ex: Clavier AZERTY', 'gestion'); ?>"></td>
-            <td><input type="text" name="bi[${uid}][info]" class="form-control form-control-sm" placeholder="<?php echo __('Ex: FR / rétroéclairé', 'gestion'); ?>"></td>
-            <td class="text-end">
-            <button type="button" class="btn btn-outline-danger btn-sm bi-del-row" title="<?php echo __('Supprimer'); ?>">
-               <i class="ti ti-trash"></i>
-            </button>
-            <input type="hidden" name="bi[${uid}][_delete]" value="0">
-            </td>`;
-         tbody.appendChild(tr);
-      });
-
-      document.addEventListener('click', function(e){
-         const btn = e.target.closest('.bi-del-row');
-         if (!btn) return;
-         const tr = btn.closest('tr');
-         const hidden = tr.querySelector('input[type="hidden"][name*="_delete"]');
-         if (hidden && tr.dataset.id) {
-            // ligne existante : on marque pour suppression, visuel grisé
-            hidden.value = '1';
-            tr.style.opacity = '0.4';
-         } else {
-            // ligne nouvelle non encore en base : suppression directe du DOM
-            tr.remove();
-         }
-      });
-      })();
-      </script>
-      <?php     
-      echo '</dv></div>';
+      // Base Description / Info : SUPPRIMÉ (v1.7.0_alpha1 — ne plus utiliser)
+      // La table glpi_plugin_gestion_baseitems est droppée en migration.
 
       echo "<table class='tab_cadre_fixe'>";
          echo "<tr class='tab_bg_1'>";
@@ -2178,6 +1946,9 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
             echo "</td>";
          echo "</tr>";
       echo "</table>";
+
+      // showFormButtons() closes a table before rendering buttons; open a minimal one to keep valid HTML
+      echo "<table class='tab_cadre_fixe'>";
       $config->showFormButtons(['candel' => false]);
       return false;
    }
@@ -2363,9 +2134,49 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
    }
 
    function decryptData($data) {
-      // Clé de cryptage - Doit correspondre à la clé utilisée pour le cryptage
-      $encryption_key = 'votre_clé_de_cryptage';
-      return openssl_decrypt(base64_decode($data), 'aes-256-cbc', $encryption_key, 0, '1234567890123456');
+      return PluginGestionCrypto::decrypt((string)$data);
+   }
+
+   private static function migrateEncryptedFieldsToSodium(Migration $migration): void
+   {
+      global $DB;
+
+      $table = self::getTable();
+      if (!$DB->tableExists($table)) {
+         return;
+      }
+
+      $row = $DB->request([
+         'SELECT' => ['id', 'TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken'],
+         'FROM'   => $table,
+         'WHERE'  => ['id' => 1],
+         'LIMIT'  => 1
+      ])->current();
+
+      if (!is_array($row)) {
+         return;
+      }
+
+      $updates = [];
+      foreach (['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken'] as $field) {
+         $raw = (string)($row[$field] ?? '');
+         if ($raw === '') {
+            continue;
+         }
+         try {
+            $migrated = PluginGestionCrypto::migrateIfLegacy($raw);
+         } catch (Throwable $e) {
+            continue;
+         }
+         if (is_string($migrated) && $migrated !== $raw) {
+            $updates[$field] = $migrated;
+         }
+      }
+
+      if (!empty($updates)) {
+         $DB->update($table, $updates, ['id' => (int)$row['id']]);
+         $migration->displayMessage('Migration chiffrement config Gestion vers sodium');
+      }
    }
   
    static function install(Migration $migration)
@@ -2504,6 +2315,8 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
          include(PLUGIN_GESTION_DIR . "/install/update_170_next.php");
          update_170_next();
       }
+
+      self::migrateEncryptedFieldsToSodium($migration);
    }
 
    static function uninstall(Migration $migration)
@@ -2525,7 +2338,24 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
          $migration->displayMessage("Uninstalling $table");
          $migration->dropTable($table);
       }
+      // glpi_plugin_gestion_signaturedevices : supprimé en migration 1.7.0_alpha1
+      // (remplacé par glpi_plugin_gestion_devices — géré dans update_170_alpha1.php)
+      // Sécurité : si la table existe encore (migration non jouée), on la supprime ici aussi.
       $table = 'glpi_plugin_gestion_signaturedevices';
+      if ($DB->TableExists($table)) {
+         $migration->displayMessage("Uninstalling (legacy) $table");
+         $migration->dropTable($table);
+      }
+
+      // glpi_plugin_gestion_baseitems : supprimé en migration 1.7.0_alpha1
+      $table = 'glpi_plugin_gestion_baseitems';
+      if ($DB->TableExists($table)) {
+         $migration->displayMessage("Uninstalling (legacy) $table");
+         $migration->dropTable($table);
+      }
+
+      // glpi_plugin_gestion_devices : nouvelle table (1.7.0_alpha1)
+      $table = 'glpi_plugin_gestion_devices';
       if ($DB->TableExists($table)) {
          $migration->displayMessage("Uninstalling $table");
          $migration->dropTable($table);

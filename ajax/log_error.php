@@ -9,6 +9,12 @@ require_once dirname(__DIR__, 3) . '/inc/includes.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 
+if (!Session::getLoginUserID()) {
+   http_response_code(401);
+   echo json_encode(['ok' => false]);
+   exit;
+}
+
 function get_log_path(): string {
    if (defined('GLPI_LOG_DIR') && GLPI_LOG_DIR) $base = GLPI_LOG_DIR;
    elseif ($t = ini_get('sys_temp_dir'))        $base = $t;
