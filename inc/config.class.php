@@ -2146,8 +2146,20 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
          return;
       }
 
+      $encrypted_fields = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken'];
+      $available_fields = [];
+      foreach ($encrypted_fields as $field) {
+         if ($DB->fieldExists($table, $field, false)) {
+            $available_fields[] = $field;
+         }
+      }
+
+      if (empty($available_fields)) {
+         return;
+      }
+
       $row = $DB->request([
-         'SELECT' => ['id', 'TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken'],
+         'SELECT' => array_merge(['id'], $available_fields),
          'FROM'   => $table,
          'WHERE'  => ['id' => 1],
          'LIMIT'  => 1
@@ -2158,7 +2170,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       }
 
       $updates = [];
-      foreach (['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken'] as $field) {
+      foreach ($available_fields as $field) {
          $raw = (string)($row[$field] ?? '');
          if ($raw === '') {
             continue;
