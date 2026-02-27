@@ -73,9 +73,9 @@ try {
          $pdf_filename = preg_replace('/\.pdf$/i', '', $searchKey);
       }
 
-      $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-      $host  = $_SERVER['SERVER_NAME'] ?? 'localhost';
-      $doc_url = $proto . $host . PLUGIN_GESTION_WEBDIR . '/view_pdf.php?id=' . rawurlencode($searchKey);
+      $doc_url = function_exists('plugin_gestion_build_view_pdf_url')
+         ? plugin_gestion_build_view_pdf_url($searchKey, true)
+         : (rtrim((string)($CFG_GLPI['url_base'] ?? ''), '/') . '/' . trim((string)PLUGIN_GESTION_NOTFULL_WEBDIR, '/') . '/view_pdf.php?id=' . rawurlencode($searchKey));
    } else if ($save === 'SharePoint') {
       $doc_url = $pdf_folder;
       $tracker = null;

@@ -45,6 +45,7 @@ function api_ticket_bls_end(int $status, array $payload): void
 
 function api_ticket_bls_preview_from_row(array $row, string $rootdoc): string
 {
+   $rootdoc = rtrim($rootdoc, '/');
    $preview = trim((string)($row['doc_url'] ?? ''));
    if ($preview === '') {
       return '';
@@ -54,7 +55,6 @@ function api_ticket_bls_preview_from_row(array $row, string $rootdoc): string
       if (preg_match('#^https?://#i', $preview)) {
          return $preview;
       }
-      $rootdoc = rtrim($rootdoc, '/');
       if (str_starts_with($preview, $rootdoc . '/')) {
          return $preview;
       }
@@ -66,6 +66,9 @@ function api_ticket_bls_preview_from_row(array $row, string $rootdoc): string
 
    $preview = str_replace('/ajax/view_pdf.php', '/view_pdf.php', $preview);
    $preview = str_replace('/plugins/gestion/public/view_pdf.php', '/plugins/gestion/view_pdf.php', $preview);
+   if ($rootdoc !== '') {
+      $preview = str_replace($rootdoc . $rootdoc . '/plugins/gestion/view_pdf.php', $rootdoc . '/plugins/gestion/view_pdf.php', $preview);
+   }
    return $preview;
 }
 

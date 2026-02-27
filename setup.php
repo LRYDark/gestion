@@ -111,3 +111,64 @@ function plugin_version_gestion() { // fonction version du plugin (verification 
 function plugin_gestion_check_prerequisites() {
    return true;
 }
+
+if (!function_exists('plugin_gestion_build_view_pdf_url')) {
+   /**
+    * Build the preview URL for a Sage PDF.
+    * Uses url_base + PLUGIN_GESTION_NOTFULL_WEBDIR to avoid duplicating root_doc.
+    */
+   function plugin_gestion_build_view_pdf_url(string $doc_id, bool $absolute = true): string {
+      global $CFG_GLPI;
+
+      $suffix = '/view_pdf.php?id=' . rawurlencode(trim($doc_id));
+      $full_webdir = '/' . trim((string)PLUGIN_GESTION_WEBDIR, '/');
+      $plain_webdir = '/' . trim((string)PLUGIN_GESTION_NOTFULL_WEBDIR, '/');
+      $fullPath = $full_webdir . $suffix;
+
+      if (!$absolute) {
+         return $fullPath;
+      }
+
+      $url_base = trim((string)($CFG_GLPI['url_base'] ?? ''));
+      if ($url_base !== '') {
+         return rtrim($url_base, '/') . $plain_webdir . $suffix;
+      }
+
+      $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+      $host   = trim((string)($_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '')));
+      if ($host !== '') {
+         $root_doc = rtrim((string)($CFG_GLPI['root_doc'] ?? ''), '/');
+         return $scheme . '://' . $host . $root_doc . $plain_webdir . $suffix;
+      }
+
+      return $fullPath;
+   }
+}
+
+if (!function_exists('plugin_gestion_normalize_view_pdf_url')) {
+   /**
+    * Normalize known legacy preview URL variants saved in DB.
+    */
+   function plugin_gestion_normalize_view_pdf_url(string $url): string {
+      global $CFG_GLPI;
+
+      $url = trim($url);
+      if ($url === '') {
+         return $url;
+      }
+
+      $url = str_replace('/ajax/view_pdf.php', '/view_pdf.php', $url);
+      $url = str_replace('/plugins/gestion/public/view_pdf.php', '/plugins/gestion/view_pdf.php', $url);
+
+      $root_doc = rtrim((string)($CFG_GLPI['root_doc'] ?? ''), '/');
+      if ($root_doc !== '') {
+         $url = str_replace(
+            $root_doc . $root_doc . '/plugins/gestion/view_pdf.php',
+            $root_doc . '/plugins/gestion/view_pdf.php',
+            $url
+         );
+      }
+
+      return $url;
+   }
+}

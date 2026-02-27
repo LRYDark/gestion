@@ -109,7 +109,9 @@ if (isset($_POST["add"])) {
       if ($pdf_save == 'Sage'){
          $tracker = $fields['tracker'];
          $valid = true;
-         $doc_url = rtrim($CFG_GLPI['url_base'] ?? '', '/') . PLUGIN_GESTION_WEBDIR . "/view_pdf.php?id=" . rawurlencode($search_pdf);
+         $doc_url = function_exists('plugin_gestion_build_view_pdf_url')
+            ? plugin_gestion_build_view_pdf_url($search_pdf, true)
+            : (rtrim((string)($CFG_GLPI['url_base'] ?? ''), '/') . '/' . trim((string)PLUGIN_GESTION_NOTFULL_WEBDIR, '/') . "/view_pdf.php?id=" . rawurlencode($search_pdf));
       }
    }
          

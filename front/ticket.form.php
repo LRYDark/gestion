@@ -59,11 +59,9 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
             $save = 'Sage';
             $fields = parseDocument($item);
             $file_path = $item.'_'.str_replace(' ', '_', $fields['client']);
-            if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
-                $fileUrl = "https://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/view_pdf.php?id=$item";
-            } else {
-                $fileUrl = "http://" . $_SERVER['SERVER_NAME'] . PLUGIN_GESTION_WEBDIR . "/view_pdf.php?id=$item";
-            }
+            $fileUrl = function_exists('plugin_gestion_build_view_pdf_url')
+                ? plugin_gestion_build_view_pdf_url($item, true)
+                : (rtrim((string)($CFG_GLPI['url_base'] ?? ''), '/') . '/' . trim((string)PLUGIN_GESTION_NOTFULL_WEBDIR, '/') . "/view_pdf.php?id=" . rawurlencode($item));
             $itemUrl = $item;
             $tracker = $fields['tracker'];
             $relatedInvoiceToBL = $fields['relatedInvoiceToBL'] ?? null;

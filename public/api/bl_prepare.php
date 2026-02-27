@@ -110,6 +110,9 @@ function api_prepare_preview_from_row(array $row, string $rootdoc): string
 
    $preview = str_replace('/ajax/view_pdf.php', '/view_pdf.php', $preview);
    $preview = str_replace('/plugins/gestion/public/view_pdf.php', '/plugins/gestion/view_pdf.php', $preview);
+   if ($rootdoc !== '') {
+      $preview = str_replace($rootdoc . $rootdoc . '/plugins/gestion/view_pdf.php', $rootdoc . '/plugins/gestion/view_pdf.php', $preview);
+   }
 
    // Régénère toujours un lien signé pour les anciens doc_url view_pdf.php (sans token / token expiré).
    $previewPath = (string)(parse_url($preview, PHP_URL_PATH) ?? '');
@@ -354,6 +357,9 @@ function api_prepare_quick_sanitize_preview(string $url, string $rootdoc): strin
    $rootdoc = rtrim($rootdoc, '/');
    $url = str_replace('/ajax/view_pdf.php', '/view_pdf.php', $url);
    $url = str_replace('/plugins/gestion/public/view_pdf.php', '/plugins/gestion/view_pdf.php', $url);
+   if ($rootdoc !== '') {
+      $url = str_replace($rootdoc . $rootdoc . '/plugins/gestion/view_pdf.php', $rootdoc . '/plugins/gestion/view_pdf.php', $url);
+   }
    if (str_contains($url, 'document.send.php')) {
       if (preg_match('#^https?://#i', $url)) {
          return $url;

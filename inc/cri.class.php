@@ -176,8 +176,10 @@ class PluginGestionCri extends CommonDBTM {
                      $DocUrlSharePoint = $fileDownloadUrl;
                   }
                   if ($DOC->save == 'Sage'){
-                     $DocUrlSharePoint = $DOC->doc_url;
-                     $fileDownloadUrl = $DOC->doc_url;
+                     $DocUrlSharePoint = function_exists('plugin_gestion_normalize_view_pdf_url')
+                        ? plugin_gestion_normalize_view_pdf_url((string)$DOC->doc_url)
+                        : (string)$DOC->doc_url;
+                     $fileDownloadUrl = $DocUrlSharePoint;
                   }
                
                   echo '<object data="' . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . '#view=FitH" '
@@ -850,8 +852,10 @@ class PluginGestionCri extends CommonDBTM {
                      $DocUrlSharePoint = $fileDownloadUrl;
                   }
                   if ($DOC->save == 'Sage'){
-                     $DocUrlSharePoint = $DOC->doc_url;
-                     $fileDownloadUrl = $DOC->doc_url;
+                     $DocUrlSharePoint = function_exists('plugin_gestion_normalize_view_pdf_url')
+                        ? plugin_gestion_normalize_view_pdf_url((string)$DOC->doc_url)
+                        : (string)$DOC->doc_url;
+                     $fileDownloadUrl = $DocUrlSharePoint;
                   }
                   
                   echo '<object data="' . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . '#view=FitH" '
@@ -971,8 +975,10 @@ class PluginGestionCri extends CommonDBTM {
                $DocUrlSharePoint = $fileDownloadUrl;
             }
             if ($DOC->save == 'Sage'){
-               $DocUrlSharePoint = $DOC->doc_url;
-               $fileDownloadUrl = $DOC->doc_url;
+               $DocUrlSharePoint = function_exists('plugin_gestion_normalize_view_pdf_url')
+                  ? plugin_gestion_normalize_view_pdf_url((string)$DOC->doc_url)
+                  : (string)$DOC->doc_url;
+               $fileDownloadUrl = $DocUrlSharePoint;
             }
          } catch (Exception $e) {
             $fileDownloadUrl = "";

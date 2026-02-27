@@ -107,6 +107,41 @@ function plugin_gestion_http_get_bytes(string $url, int $timeout = 15)
    return @file_get_contents($url, false, $context);
 }
 
+function plugin_gestion_to_absolute_url(string $url): string
+{
+   global $CFG_GLPI;
+
+   $url = trim($url);
+   if ($url === '' || preg_match('#^https?://#i', $url)) {
+      return $url;
+   }
+
+   $url_base = trim((string)($CFG_GLPI['url_base'] ?? ''));
+   if ($url_base !== '') {
+      $parts = parse_url($url_base);
+      if (is_array($parts) && !empty($parts['scheme']) && !empty($parts['host'])) {
+         $origin = $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? (':' . (int)$parts['port']) : '');
+         if (str_starts_with($url, '/')) {
+            return $origin . $url;
+         }
+         $root_doc = rtrim((string)($CFG_GLPI['root_doc'] ?? ''), '/');
+         return $origin . $root_doc . '/front/' . ltrim($url, '/');
+      }
+   }
+
+   $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+   $host   = trim((string)($_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '')));
+   if ($host !== '') {
+      if (str_starts_with($url, '/')) {
+         return $scheme . '://' . $host . $url;
+      }
+      $root_doc = rtrim((string)($CFG_GLPI['root_doc'] ?? ''), '/');
+      return $scheme . '://' . $host . $root_doc . '/front/' . ltrim($url, '/');
+   }
+
+   return $url;
+}
+
 function plugin_gestion_build_signed_pdf_copy(PluginGestionSurvey $survey, PluginGestionSharepoint $sharepoint): string {
    global $CFG_GLPI;
 
@@ -170,7 +205,11 @@ function plugin_gestion_build_signed_pdf_copy(PluginGestionSurvey $survey, Plugi
          throw new RuntimeException("Fichier signe introuvable en local.");
       }
    } else {
-      $downloadUrl = $survey->fields['doc_url'] ?? $survey->fields['url_bl'];
+      $downloadUrl = (string)($survey->fields['doc_url'] ?? $survey->fields['url_bl']);
+      if (function_exists('plugin_gestion_normalize_view_pdf_url')) {
+         $downloadUrl = plugin_gestion_normalize_view_pdf_url($downloadUrl);
+      }
+      $downloadUrl = plugin_gestion_to_absolute_url($downloadUrl);
       if ($downloadUrl) {
          $content = plugin_gestion_http_get_bytes((string)$downloadUrl);
          if ($content !== false) {
