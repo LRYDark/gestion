@@ -2146,11 +2146,14 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
          return;
       }
 
-      $encrypted_fields = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SagePwd', 'SageToken'];
+      $encrypted_fields = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SageToken'];
       $available_fields = [];
-      foreach ($encrypted_fields as $field) {
-         if ($DB->fieldExists($table, $field, false)) {
-            $available_fields[] = $field;
+      $columns_result = $DB->doQuery("SHOW COLUMNS FROM `" . $DB->escape($table) . "`");
+      if ($columns_result) {
+         while ($column = $DB->fetchAssoc($columns_result)) {
+            if (in_array($column['Field'], $encrypted_fields, true)) {
+               $available_fields[] = $column['Field'];
+            }
          }
       }
 

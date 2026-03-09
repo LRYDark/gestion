@@ -14,8 +14,8 @@ function update_150_remote() {
      `signature_base64` longtext DEFAULT NULL,
      `signer_name` varchar(191) DEFAULT NULL,
      `signer_email` varchar(191) DEFAULT NULL,
-     `date_creation` datetime NOT NULL DEFAULT current_timestamp(),
-     `date_mod` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+     `date_creation` timestamp NOT NULL DEFAULT current_timestamp(),
+     `date_mod` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp(),
      PRIMARY KEY (`id`),
      KEY `idx_ticket_status` (`tickets_id`,`status`),
      KEY `idx_date_creation` (`date_creation`)
@@ -24,7 +24,7 @@ function update_150_remote() {
 
    $create_signaturedevices = "
    CREATE TABLE IF NOT EXISTS `glpi_plugin_gestion_signaturedevices` (
-     `id` int(11) NOT NULL AUTO_INCREMENT,
+     `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
      `device_id` varchar(190) NOT NULL,
      `serial` varchar(190) DEFAULT NULL,
      `device_token` varchar(128) NOT NULL,
@@ -42,12 +42,15 @@ function update_150_remote() {
    $res = $DB->doQuery("SHOW COLUMNS FROM `glpi_plugin_gestion_configs`");
    $columns = [];
    if ($res) { while ($row = $res->fetch_assoc()) { $columns[] = $row['Field']; } }
-   $required_columns = ['RemoteSignatureOn','RemoteSignatureUsers'];
-   $missing = array_diff($required_columns, $columns);
-   if (!empty($missing)) {
-      $query= "ALTER TABLE `glpi_plugin_gestion_configs`
-               ADD COLUMN `RemoteSignatureOn` TINYINT(4) NOT NULL DEFAULT '0',
-               ADD COLUMN `RemoteSignatureUsers` LONGTEXT NULL;";
+   $alter_clauses = [];
+   if (!in_array('RemoteSignatureOn', $columns, true)) {
+      $alter_clauses[] = "ADD COLUMN `RemoteSignatureOn` TINYINT(4) NOT NULL DEFAULT '0'";
+   }
+   if (!in_array('RemoteSignatureUsers', $columns, true)) {
+      $alter_clauses[] = "ADD COLUMN `RemoteSignatureUsers` LONGTEXT NULL";
+   }
+   if (!empty($alter_clauses)) {
+      $query= "ALTER TABLE `glpi_plugin_gestion_configs` " . implode(', ', $alter_clauses) . ";";
       $DB->doQuery($query) or die($DB->error());
    }
 

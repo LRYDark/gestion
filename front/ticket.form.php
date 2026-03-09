@@ -136,11 +136,15 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                     $sql = "UPDATE glpi_plugin_gestion_surveys 
                             SET tickets_id = ?, 
                                 url_bl = ?,
-                                tracker = ?
+                                tracker = ?,
+                                relatedInvoiceToBL = ?
                             WHERE bl = ? OR url_bl = ?";
 
                     $stmt = $DB->prepare($sql);
-                    $stmt->execute([$ticketId, $itemUrl, $tracker, $relatedInvoiceToBL, $item, $item]);
+                    if (!$stmt->execute([$ticketId, $itemUrl, $tracker, $relatedInvoiceToBL, $item, $item])) {
+                        Session::addMessageAfterRedirect(__("Erreur lors de la mise a jour", 'gestion'), false, ERROR);
+                        $success = false;
+                    }
                 }elseif($existedoc->tickets_id != $ticketId){
                     Session::addMessageAfterRedirect(__($DB->escape($item)." déjà associé au ticket : ".$existedoc->tickets_id, 'gestion'), false, ERROR);
                     $success = false;

@@ -26,9 +26,9 @@ function update_170_alpha1(): bool
       `serial`        VARCHAR(190) NOT NULL,
       `ip`            VARCHAR(45)  NOT NULL DEFAULT '',
       `name`          VARCHAR(255)          DEFAULT NULL,
-      `last_seen`     DATETIME              DEFAULT NULL,
+      `last_seen`     TIMESTAMP             DEFAULT NULL,
       `status`        ENUM('active','banned') NOT NULL DEFAULT 'active',
-      `date_creation` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      `date_creation` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (`id`),
       UNIQUE KEY `uniq_serial` (`serial`),
       KEY `idx_status` (`status`)

@@ -7,8 +7,16 @@ if (!defined('GLPI_ROOT')) {
 //------------------------------------------------------------------------------------------
 class PluginGestionTicket extends CommonDBTM {
 
-   public static $rightname = 'gestion';
+   public static $rightname = 'plugin_gestion_sign';
    public  static  $gestion = 0 ;
+
+   public static function getTable($classname = null) {
+      if ($classname === null || $classname === static::class) {
+         return 'glpi_plugin_gestion_surveys';
+      }
+
+      return parent::getTable($classname);
+   }
 
 //*--------------------------------------------------------------------------------------------- GESTION ONGLET
    static function getIcon() {
