@@ -300,6 +300,9 @@ class PluginGestionSurvey extends CommonDBTM {
                if (function_exists('plugin_gestion_normalize_view_pdf_url')) {
                   $docUrl = plugin_gestion_normalize_view_pdf_url($docUrl);
                }
+               if (function_exists('plugin_gestion_ensure_pdf_token')) {
+                  $docUrl = plugin_gestion_ensure_pdf_token($docUrl);
+               }
                echo '<a href="' . Html::entities_deep($docUrl) . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
             echo "</td></tr>";
 

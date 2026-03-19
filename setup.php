@@ -172,3 +172,53 @@ if (!function_exists('plugin_gestion_normalize_view_pdf_url')) {
       return $url;
    }
 }
+
+if (!function_exists('_plugin_gestion_pdf_secret')) {
+   /**
+    * Return the shared secret used to sign PDF preview tokens.
+    * Centralised here so every caller uses the same value.
+    */
+   function _plugin_gestion_pdf_secret(): string {
+      if (defined('GLPI_PDF_PREVIEW_SECRET')) {
+         return GLPI_PDF_PREVIEW_SECRET;
+      }
+      $env = getenv('GLPI_PDF_PREVIEW_SECRET');
+      if ($env !== false && $env !== '') {
+         return $env;
+      }
+      return hash('sha256', realpath(__DIR__) . 'gestion_pdf_preview');
+   }
+}
+
+if (!function_exists('plugin_gestion_ensure_pdf_token')) {
+   /**
+    * If $url points to view_pdf.php, (re)generate a fresh daily token.
+    * For any other URL the value is returned unchanged.
+    */
+   function plugin_gestion_ensure_pdf_token(string $url): string {
+      $url = trim($url);
+      if ($url === '') {
+         return $url;
+      }
+
+      $path = (string)(parse_url($url, PHP_URL_PATH) ?? '');
+      if (strpos($path, '/view_pdf.php') === false) {
+         return $url;
+      }
+
+      parse_str((string)(parse_url($url, PHP_URL_QUERY) ?? ''), $params);
+      $doc_id = trim((string)($params['id'] ?? ''));
+      if ($doc_id === '') {
+         return $url;
+      }
+
+      $token = hash('sha256', $doc_id . date('Y-m-d') . _plugin_gestion_pdf_secret());
+      $params['token'] = $token;
+
+      $scheme = parse_url($url, PHP_URL_SCHEME);
+      $host   = parse_url($url, PHP_URL_HOST);
+      $base   = ($scheme && $host) ? ($scheme . '://' . $host) : '';
+
+      return $base . $path . '?' . http_build_query($params);
+   }
+}

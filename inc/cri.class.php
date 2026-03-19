@@ -179,6 +179,9 @@ class PluginGestionCri extends CommonDBTM {
                      $DocUrlSharePoint = function_exists('plugin_gestion_normalize_view_pdf_url')
                         ? plugin_gestion_normalize_view_pdf_url((string)$DOC->doc_url)
                         : (string)$DOC->doc_url;
+                     if (function_exists('plugin_gestion_ensure_pdf_token')) {
+                        $DocUrlSharePoint = plugin_gestion_ensure_pdf_token($DocUrlSharePoint);
+                     }
                      $fileDownloadUrl = $DocUrlSharePoint;
                   }
                
@@ -388,17 +391,20 @@ class PluginGestionCri extends CommonDBTM {
                      // view_pdf.php la remplace par _pdf_preview_secret() → tokens incompatibles.
                      $temp_token_remote = generateTempTokenForPreview($doc_id_remote);
 
+                     // Construire une URL absolue (https://...) pour que la tablette puisse y accéder
+                     $abs_base = rtrim((string)($CFG_GLPI['url_base'] ?? ''), '/');
+
                      if (strpos($fileDownloadUrl, 'view_pdf.php') !== false) {
-                        // Reconstruire une URL propre (sans doublon de token=)
-                        $base_view = strtok($fileDownloadUrl, '?');
-                        $autoParams['document_url'] = $base_view
-                           . '?id='    . rawurlencode($doc_id_remote)
+                        // Reconstruire une URL propre absolue (sans doublon de token=)
+                        $plain_webdir = '/' . trim((string)PLUGIN_GESTION_NOTFULL_WEBDIR, '/');
+                        $autoParams['document_url'] = $abs_base . $plain_webdir
+                           . '/view_pdf.php?id=' . rawurlencode($doc_id_remote)
                            . '&token=' . $temp_token_remote;
                      } else {
                         // URL non-view_pdf (ex: SharePoint) : ajouter le token en paramètre
-                        $sep = (strpos($fileDownloadUrl, '?') !== false) ? '&' : '?';
-                        $autoParams['document_url'] = html_entity_decode($fileDownloadUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8')
-                           . $sep . 'token=' . $temp_token_remote;
+                        $decoded_url = html_entity_decode($fileDownloadUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                        $sep = (strpos($decoded_url, '?') !== false) ? '&' : '?';
+                        $autoParams['document_url'] = $decoded_url . $sep . 'token=' . $temp_token_remote;
                      }
                   } else {
                      // Fallback : URL sans token (SharePoint autonome, etc.)
@@ -855,6 +861,9 @@ class PluginGestionCri extends CommonDBTM {
                      $DocUrlSharePoint = function_exists('plugin_gestion_normalize_view_pdf_url')
                         ? plugin_gestion_normalize_view_pdf_url((string)$DOC->doc_url)
                         : (string)$DOC->doc_url;
+                     if (function_exists('plugin_gestion_ensure_pdf_token')) {
+                        $DocUrlSharePoint = plugin_gestion_ensure_pdf_token($DocUrlSharePoint);
+                     }
                      $fileDownloadUrl = $DocUrlSharePoint;
                   }
                   
@@ -978,6 +987,9 @@ class PluginGestionCri extends CommonDBTM {
                $DocUrlSharePoint = function_exists('plugin_gestion_normalize_view_pdf_url')
                   ? plugin_gestion_normalize_view_pdf_url((string)$DOC->doc_url)
                   : (string)$DOC->doc_url;
+               if (function_exists('plugin_gestion_ensure_pdf_token')) {
+                  $DocUrlSharePoint = plugin_gestion_ensure_pdf_token($DocUrlSharePoint);
+               }
                $fileDownloadUrl = $DocUrlSharePoint;
             }
          } catch (Exception $e) {

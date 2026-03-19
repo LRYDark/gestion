@@ -69,6 +69,12 @@ function api_ticket_bls_preview_from_row(array $row, string $rootdoc): string
    if ($rootdoc !== '') {
       $preview = str_replace($rootdoc . $rootdoc . '/plugins/gestion/view_pdf.php', $rootdoc . '/plugins/gestion/view_pdf.php', $preview);
    }
+
+   // Regenerate a fresh token for view_pdf.php URLs (token may be expired or absent in DB)
+   if (function_exists('plugin_gestion_ensure_pdf_token')) {
+      $preview = plugin_gestion_ensure_pdf_token($preview);
+   }
+
    return $preview;
 }
 

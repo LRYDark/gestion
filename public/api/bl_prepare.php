@@ -442,7 +442,8 @@ function api_prepare_from_search_selection(
       } catch (Throwable $e) {
          $pdf_filename = preg_replace('/\.pdf$/i', '', $folder);
       }
-      $doc_url = api_prepare_quick_build_preview($folder, $rootdoc);
+      // Store URL WITHOUT token — token is added dynamically when serving
+      $doc_url = rtrim($rootdoc, '/') . '/plugins/gestion/view_pdf.php?id=' . rawurlencode($folder);
    } elseif (strcasecmp($save, 'Local') === 0) {
       $save = 'Local';
       $url_bl = $folder;
@@ -539,7 +540,7 @@ function api_prepare_from_search_selection(
       'already_signed'     => false,
       'id'                 => $new_id,
       'bl'                 => $pdf_filename,
-      'preview_url'        => $doc_url,
+      'preview_url'        => function_exists('plugin_gestion_ensure_pdf_token') ? plugin_gestion_ensure_pdf_token($doc_url) : $doc_url,
       'relatedInvoiceToBL' => $relatedInvoiceToBL,
       'amount_ht'          => $amount_ht,
       'amount_ttc'         => $amount_ttc,
@@ -687,7 +688,9 @@ try {
    $pdf_filename = $bl;
 }
 
-$preview_url = api_prepare_preview_url($bl, $rootdoc);
+// Store URL WITHOUT token in DB — token is added dynamically when serving
+$doc_url_db = rtrim($rootdoc, '/') . '/plugins/gestion/view_pdf.php?id=' . rawurlencode($bl);
+$preview_url = function_exists('plugin_gestion_ensure_pdf_token') ? plugin_gestion_ensure_pdf_token($doc_url_db) : api_prepare_preview_url($bl, $rootdoc);
 
 $tracker_sql = $tracker !== null && $tracker !== '' ? ("'" . $DB->escape($tracker) . "'") : 'NULL';
 $related_sql = $related !== null && $related !== '' ? ("'" . $DB->escape($related) . "'") : 'NULL';
@@ -695,7 +698,7 @@ $related_sql = $related !== null && $related !== '' ? ("'" . $DB->escape($relate
 $sql_insert = "INSERT INTO `glpi_plugin_gestion_surveys`
 (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`)
 VALUES
-(0, 0, $tracker_sql, $related_sql, '" . $DB->escape($bl) . "', '" . $DB->escape($pdf_filename) . "', 0, 0, '" . $DB->escape($preview_url) . "', 'Sage', NOW(), NULL)";
+(0, 0, $tracker_sql, $related_sql, '" . $DB->escape($bl) . "', '" . $DB->escape($pdf_filename) . "', 0, 0, '" . $DB->escape($doc_url_db) . "', 'Sage', NOW(), NULL)";
 
 if (!$DB->doQuery($sql_insert)) {
    api_prepare_end(500, ['ok' => false, 'error' => 'db_insert_failed']);
