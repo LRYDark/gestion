@@ -17,14 +17,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-if (!defined('GLPI_ROOT')) {
-   define('GLPI_ROOT', realpath(__DIR__ . '/../../..'));
-}
-
-if (!defined('PLUGIN_GESTION_DIR')) {
-   define('PLUGIN_GESTION_DIR', realpath(__DIR__ . '/../..'));
-}
-
 define('NOLOGIN', 1);
 define('NOHEADER', 1);
 define('NOTOKENRENEWAL', 1);

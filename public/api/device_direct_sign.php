@@ -20,12 +20,8 @@ if (!defined('NOLOGIN'))        { define('NOLOGIN',        1); }
 if (!defined('NOHEADER'))       { define('NOHEADER',       1); }
 if (!defined('NOTOKENRENEWAL')) { define('NOTOKENRENEWAL', 1); }
 
-require_once dirname(__DIR__, 4) . '/inc/includes.php';
-if (!defined('PLUGIN_GESTION_DIR')) {
-    define('PLUGIN_GESTION_DIR', realpath(__DIR__ . '/../..'));
-}
+require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
-@ini_set('display_errors', '0');
 
 global $DB;
 header('Content-Type: application/json; charset=UTF-8');

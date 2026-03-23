@@ -29,11 +29,7 @@ define('NOLOGIN',          1);
 define('NOHEADER',         1);
 define('NOTOKENRENEWAL',   1);
 
-$GLPI_ROOT = $_SERVER['DOCUMENT_ROOT'] . ($_SERVER['CONTEXT_PREFIX'] ?? '');
-if (!defined('PLUGIN_GESTION_DIR')) {
-    define('PLUGIN_GESTION_DIR', realpath(__DIR__ . '/../..'));
-}
-require $GLPI_ROOT . '/inc/includes.php';
+require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 
 header('Content-Type: application/json; charset=UTF-8');
