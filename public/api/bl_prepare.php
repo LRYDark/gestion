@@ -416,6 +416,7 @@ function api_prepare_from_search_selection(
                } else {
                   $pdf_filename = $base;
                }
+               $pdf_filename = sanitizeBLFilename($pdf_filename);
                if (!empty($fields['tracker'])) {
                   $tracker = (string)$fields['tracker'];
                }

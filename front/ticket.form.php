@@ -58,7 +58,7 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
         if ($config->mode() == 1){
             $save = 'Sage';
             $fields = parseDocument($item);
-            $file_path = $item.'_'.str_replace(' ', '_', $fields['client']);
+            $file_path = sanitizeBLFilename($item.'_'.str_replace(' ', '_', $fields['client']));
             $fileUrl = function_exists('plugin_gestion_build_view_pdf_url')
                 ? plugin_gestion_build_view_pdf_url($item, true)
                 : (rtrim((string)($CFG_GLPI['url_base'] ?? ''), '/') . '/' . trim((string)PLUGIN_GESTION_NOTFULL_WEBDIR, '/') . "/view_pdf.php?id=" . rawurlencode($item));

@@ -67,6 +67,7 @@ try {
          } else {
             $pdf_filename = $base;
          }
+         $pdf_filename = sanitizeBLFilename($pdf_filename);
          $tracker = $fields['tracker'] ?? null;
          $relatedInvoiceToBL = $fields['relatedInvoiceToBL'] ?? null;
       } catch (Throwable $e) {

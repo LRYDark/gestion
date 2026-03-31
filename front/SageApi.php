@@ -14,6 +14,26 @@ if (file_exists($vendor)) {
 use Smalot\PdfParser\Parser;
 
 /**
+ * Nettoie un nom de fichier BL pour supprimer les caractères interdits.
+ *  - ' → -
+ *  - Supprime < > : " / \ | ? *
+ *  - Supprime le . en fin de nom
+ *  - Si la partie client est vide après nettoyage, renvoie juste la base
+ */
+function sanitizeBLFilename(string $name): string
+{
+    // Remplacer les apostrophes par un tiret
+    $name = str_replace("'", '-', $name);
+    // Supprimer les caractères interdits dans un nom de fichier
+    $name = preg_replace('/[<>:"\/\\\\|?*]/', '', $name);
+    // Supprimer les points en fin de nom
+    $name = rtrim($name, '.');
+    // Supprimer les underscores en fin de nom (si client était vide après nettoyage)
+    $name = rtrim($name, '_');
+    return $name;
+}
+
+/**
  * 1) Télécharge le PDF et renvoie les infos extraites (BL, date, tracker, client).
  */
 function parseDocument(string $docId): array
