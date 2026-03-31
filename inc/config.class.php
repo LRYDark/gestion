@@ -1974,106 +1974,103 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
 
    // old
    function formulaire(){
-      return ($this->fields['formulaire']);
-   }
-   function AddFileSite(){
-      if (isset($this->fields['AddFileSite'])) return ($this->fields['AddFileSite']);
+      return $this->fields['formulaire'] ?? null;
    }
    function Global(){
-      return ($this->fields['Global']);
+      return $this->fields['Global'] ?? '';
    }
    function LastCronTask(){
-      return ($this->fields['LastCronTask']);
+      return $this->fields['LastCronTask'] ?? '';
    }
    function SignatureX(){
-      return ($this->fields['SignatureX']);
-   } 
+      return $this->fields['SignatureX'] ?? 36;
+   }
    function SignatureY(){
-      return ($this->fields['SignatureY']);
-   } 
+      return $this->fields['SignatureY'] ?? 44;
+   }
    function SignatureSize(){
-      return ($this->fields['SignatureSize']);
-   } 
+      return $this->fields['SignatureSize'] ?? 50;
+   }
    function ExtractYesNo(){
-      return ($this->fields['ExtractYesNo']);
-   } 
+      return $this->fields['ExtractYesNo'] ?? 0;
+   }
    function extract(){
-      return ($this->fields['extract']);
-   } 
+      return $this->fields['extract'] ?? '';
+   }
    function MailTrackerYesNo(){
-      return ($this->fields['MailTrackerYesNo']);
-   } 
+      return $this->fields['MailTrackerYesNo'] ?? 0;
+   }
    function MailTracker(){
-      return ($this->fields['MailTracker']);
-   } 
+      return $this->fields['MailTracker'] ?? '';
+   }
    function EntitiesExtract(){
-      return ($this->fields['EntitiesExtract']);
-   } 
+      return $this->fields['EntitiesExtract'] ?? 0;
+   }
    function EntitiesExtractValue(){
-      return ($this->fields['EntitiesExtractValue']);
-   } 
+      return $this->fields['EntitiesExtractValue'] ?? '';
+   }
    function SignataireX(){
-      return ($this->fields['SignataireX']);
-   } 
+      return $this->fields['SignataireX'] ?? 20;
+   }
    function SignataireY(){
-      return ($this->fields['SignataireY']);
-   } 
+      return $this->fields['SignataireY'] ?? 56.5;
+   }
    function DateX(){
-      return ($this->fields['DateX']);
-   } 
+      return $this->fields['DateX'] ?? 20;
+   }
    function DateY(){
-      return ($this->fields['DateY']);
-   } 
+      return $this->fields['DateY'] ?? 51.3;
+   }
    function TechX(){
-      return ($this->fields['TechX']);
-   } 
+      return $this->fields['TechX'] ?? 145;
+   }
    function TechY(){
-      return ($this->fields['TechY']);
+      return $this->fields['TechY'] ?? 37;
    }
    function NumberViews(){
-      return ($this->fields['NumberViews']);
+      return $this->fields['NumberViews'] ?? 100;
    }
    function ZenDocMail(){
-      return ($this->fields['ZenDocMail']);
+      return $this->fields['ZenDocMail'] ?? '';
    }
    function SharePointLinkDisplay(){
-      return ($this->fields['SharePointLinkDisplay']);
+      return $this->fields['SharePointLinkDisplay'] ?? 0;
    }
    function DisplayPdfEnd(){
-      return ($this->fields['DisplayPdfEnd']);
+      return $this->fields['DisplayPdfEnd'] ?? 0;
    }
    function MailTo(){
-      return ($this->fields['MailTo']);
+      return $this->fields['MailTo'] ?? 0;
    }
    function CombinedMailMode(){
       return isset($this->fields['CombinedMailMode']) ? (int)$this->fields['CombinedMailMode'] : 0;
    }
    function gabarit(){
-      return ($this->fields['gabarit']);
+      return $this->fields['gabarit'] ?? 0;
    }
    function ConfigModes(){
-      return ($this->fields['ConfigModes']);
+      return $this->fields['ConfigModes'] ?? 0;
    }
    function gabarit_tracker(){
-      return ($this->fields['gabarit_tracker']);
+      return $this->fields['gabarit_tracker'] ?? 0;
    }
    function mode(){
-      return ($this->fields['mode']);
+      return $this->fields['mode'] ?? 2;
    }
    function SharePointOn(){
-      return ($this->fields['SharePointOn']);
+      return $this->fields['SharePointOn'] ?? 0;
    }
    function SageOn(){
-      return ($this->fields['SageOn']);
+      return $this->fields['SageOn'] ?? 0;
    }
    function SageSearch(){
-      return ($this->fields['SageSearch']);
+      return $this->fields['SageSearch'] ?? 0;
    }
    function SharePointSearch(){
-      return ($this->fields['SharePointSearch']);
+      return $this->fields['SharePointSearch'] ?? 0;
    }
    function LocalSearch(){
-      return ($this->fields['LocalSearch']);
+      return $this->fields['LocalSearch'] ?? 0;
    }
 
    // --- Remote signature getters ---
@@ -2218,7 +2215,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   `SitePath` TEXT NULL,
                   `Global` VARCHAR(255) NULL,
                   `ZenDocMail` VARCHAR(255) NULL,
-                  `NumberViews` INT(10) NOT NULL DEFAULT '800',
+                  `NumberViews` INT(10) NOT NULL DEFAULT '100',
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `CombinedMailMode` TINYINT NOT NULL DEFAULT '0',
