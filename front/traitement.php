@@ -328,78 +328,200 @@ try {
     exit;
 }
 
-// Récupérer la photo encodée en base64
-$photoBase64 = $_POST['photo_base64'] ?? '';
+// Récupérer les photos encodées en base64 (6 max, 2 par page)
+$photoPaths = [];
+for ($pi = 1; $pi <= 6; $pi++) {
+    $photoBase64 = $_POST['photo_base64_' . $pi] ?? '';
+    // Rétrocompatibilité : ancien champ unique photo_base64
+    if ($pi === 1 && empty($photoBase64)) {
+        $photoBase64 = $_POST['photo_base64'] ?? '';
+    }
 
-if (!empty($photoBase64) && strpos($photoBase64, 'data:image') === 0) {
+    if (empty($photoBase64) || strpos($photoBase64, 'data:image') !== 0) {
+        continue;
+    }
+
     // Retirer le préfixe de type MIME
-    $photoBase64 = preg_replace('#^data:image/\w+;base64,#i', '', $photoBase64);
-    $photoData = base64_decode($photoBase64);
+    $photoBase64Clean = preg_replace('#^data:image/\w+;base64,#i', '', $photoBase64);
+    $photoData = base64_decode($photoBase64Clean);
 
     if ($photoData === false) {
-        gestion_message("Erreur lors du décodage de l'image.", ERROR);
+        gestion_message("Erreur lors du décodage de l'image $pi.", ERROR);
+        continue;
     }
 
     // Enregistrer temporairement l'image décodée sous forme brute
-    $tempPath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/temp_photo'.$nombreAleatoire.'';
+    $tempPath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/temp_photo' . $nombreAleatoire . '_' . $pi;
     if (file_put_contents($tempPath, $photoData) === false) {
-        gestion_message("Erreur lors de la sauvegarde de l'image de la photo.", ERROR);
+        gestion_message("Erreur lors de la sauvegarde de l'image $pi.", ERROR);
+        continue;
     }
 
     // Déterminer le type de l'image (PNG ou JPEG) et convertir si nécessaire
     $imageInfo = getimagesize($tempPath);
     if ($imageInfo === false) {
-        unlink($tempPath); // Supprimer le fichier temporaire
-        gestion_message("Le fichier image n'est pas valide.", ERROR);
+        unlink($tempPath);
+        gestion_message("Le fichier image $pi n'est pas valide.", ERROR);
+        continue;
     }
 
-    $photoPath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/photo_capture'.$nombreAleatoire.'.png'; // Le chemin final de l'image en PNG
+    // Sauvegarder en JPEG compressé (beaucoup plus léger que PNG)
+    $photoPath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/photo_capture' . $nombreAleatoire . '_' . $pi . '.jpg';
+    $maxDimension = 1600; // Résolution max en pixels (largeur ou hauteur)
+    $jpegQuality = 75;    // Qualité JPEG (0-100)
 
-    // Si l'image est au format JPEG, la convertir en PNG et corriger l'orientation
+    $image = null;
     if ($imageInfo['mime'] === 'image/jpeg') {
         $image = imagecreatefromjpeg($tempPath);
-        if ($image === false) {
-            unlink($tempPath);
-            gestion_message("Erreur lors de la création de l'image JPEG.", ERROR);
-        }
-
-        // Corriger l'orientation de l'image à l'aide des métadonnées EXIF
-        $exif = exif_read_data($tempPath);
-        if (!empty($exif['Orientation'])) {
+        // Corriger l'orientation EXIF
+        $exif = @exif_read_data($tempPath);
+        if ($image && !empty($exif['Orientation'])) {
             switch ($exif['Orientation']) {
-                case 3:
-                    $image = imagerotate($image, 180, 0);
-                    break;
-                case 6:
-                    $image = imagerotate($image, -90, 0);
-                    break;
-                case 8:
-                    $image = imagerotate($image, 90, 0);
-                    break;
+                case 3: $image = imagerotate($image, 180, 0); break;
+                case 6: $image = imagerotate($image, -90, 0); break;
+                case 8: $image = imagerotate($image, 90, 0); break;
             }
         }
-
-        if (!imagepng($image, $photoPath)) {
-            imagedestroy($image);
-            unlink($tempPath);
-            gestion_message("Erreur lors de la conversion de l'image JPEG en PNG.", ERROR);
-        }
-        imagedestroy($image);
     } elseif ($imageInfo['mime'] === 'image/png') {
-        // Si l'image est déjà un PNG, on la copie simplement
-        if (!rename($tempPath, $photoPath)) {
-            unlink($tempPath);
-            gestion_message("Erreur lors de la sauvegarde de l'image PNG.", ERROR);
-        }
+        $image = imagecreatefrompng($tempPath);
     } else {
         unlink($tempPath);
-        gestion_message("Type d'image non pris en charge.", ERROR);
+        gestion_message("Type d'image $pi non pris en charge.", ERROR);
+        continue;
     }
 
-    // Ajouter une nouvelle page pour la photo dans le PDF
-    $pdf->AddPage();
-    $pdf->Image($photoPath, 10, 10, 180); // Positionner la photo pour remplir la majorité de la page
-    unlink($photoPath); // Supprimer l'image temporaire
+    if ($image === false || $image === null) {
+        unlink($tempPath);
+        gestion_message("Erreur lors de la lecture de l'image $pi.", ERROR);
+        continue;
+    }
+
+    // Redimensionner si trop grand
+    $origW = imagesx($image);
+    $origH = imagesy($image);
+    if ($origW > $maxDimension || $origH > $maxDimension) {
+        $ratio = min($maxDimension / $origW, $maxDimension / $origH);
+        $newW = (int)round($origW * $ratio);
+        $newH = (int)round($origH * $ratio);
+        $resized = imagecreatetruecolor($newW, $newH);
+        imagecopyresampled($resized, $image, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+        imagedestroy($image);
+        $image = $resized;
+    }
+
+    if (!imagejpeg($image, $photoPath, $jpegQuality)) {
+        imagedestroy($image);
+        unlink($tempPath);
+        gestion_message("Erreur lors de la compression de l'image $pi.", ERROR);
+        continue;
+    }
+    imagedestroy($image);
+    if (file_exists($tempPath)) {
+        unlink($tempPath);
+    }
+
+    $photoPaths[] = $photoPath;
+}
+
+// Ajouter les photos au PDF : 2 images par page
+// Page A4 = 210 x 297mm. Marge 10mm. Zone utile par image : 190 x 130mm max.
+if (!empty($photoPaths)) {
+    $photoChunks = array_chunk($photoPaths, 2);
+    foreach ($photoChunks as $chunk) {
+        $pdf->AddPage();
+
+        // Calcule les dimensions pour qu'une image tienne dans 190 x 130mm max
+        // tout en gardant les proportions
+        $maxW = 190;
+        $maxH = 130;
+
+        // Image 1 : en haut de page (Y = 10)
+        $imgSize1 = getimagesize($chunk[0]);
+        if ($imgSize1) {
+            $ratio1 = min($maxW / $imgSize1[0], $maxH / $imgSize1[1]);
+            $w1 = $imgSize1[0] * $ratio1;
+            $h1 = $imgSize1[1] * $ratio1;
+            $x1 = 10 + ($maxW - $w1) / 2; // centré horizontalement
+            $pdf->Image($chunk[0], $x1, 10, $w1, $h1);
+        } else {
+            $h1 = $maxH;
+            $pdf->Image($chunk[0], 10, 10, $maxW);
+        }
+        unlink($chunk[0]);
+
+        // Image 2 : en bas de page (si présente)
+        if (isset($chunk[1])) {
+            // Trait séparateur entre les 2 images
+            $separatorY = 10 + $h1 + 5;
+            $pdf->Line(20, $separatorY, 190, $separatorY);
+
+            $startY2 = $separatorY + 5;
+            $imgSize2 = getimagesize($chunk[1]);
+            if ($imgSize2) {
+                $ratio2 = min($maxW / $imgSize2[0], $maxH / $imgSize2[1]);
+                $w2 = $imgSize2[0] * $ratio2;
+                $h2 = $imgSize2[1] * $ratio2;
+                $x2 = 10 + ($maxW - $w2) / 2;
+                $pdf->Image($chunk[1], $x2, $startY2, $w2, $h2);
+            } else {
+                $pdf->Image($chunk[1], 10, $startY2, $maxW);
+            }
+            unlink($chunk[1]);
+        }
+    }
+}
+
+// Récupérer et fusionner le PDF joint (après les images)
+// FPDI ne supporte qu'un seul setSourceFile à la fois, donc on sauvegarde
+// le PDF intermédiaire puis on crée un nouveau FPDI pour fusionner les 2.
+$pdfBase64 = $_POST['pdf_base64'] ?? '';
+if (!empty($pdfBase64) && strpos($pdfBase64, 'data:application/pdf;base64,') === 0) {
+    $pdfBase64Clean = preg_replace('#^data:application/pdf;base64,#i', '', $pdfBase64);
+    $pdfData = base64_decode($pdfBase64Clean);
+
+    if ($pdfData !== false) {
+        $tempAttachedPath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/temp_attached_pdf_' . $nombreAleatoire . '.pdf';
+        $tempIntermediatePath = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/temp_intermediate_' . $nombreAleatoire . '.pdf';
+
+        if (file_put_contents($tempAttachedPath, $pdfData) !== false) {
+            try {
+                // Sauvegarder le PDF en cours (document signé + images)
+                $pdf->Output('F', $tempIntermediatePath);
+
+                // Créer un nouveau FPDI pour fusionner les 2 PDF
+                $pdfMerged = new FPDI();
+
+                // 1) Importer le PDF intermédiaire (signé + images)
+                $intermediateStream = StreamReader::createByFile($tempIntermediatePath);
+                $intermediatePageCount = $pdfMerged->setSourceFile($intermediateStream);
+                for ($ip = 1; $ip <= $intermediatePageCount; $ip++) {
+                    $pdfMerged->AddPage();
+                    $tplInt = $pdfMerged->importPage($ip);
+                    $pdfMerged->useTemplate($tplInt, 0, 0);
+                }
+
+                // 2) Importer le PDF joint
+                $attachedStream = StreamReader::createByFile($tempAttachedPath);
+                $attachedPageCount = $pdfMerged->setSourceFile($attachedStream);
+                for ($ap = 1; $ap <= $attachedPageCount; $ap++) {
+                    $pdfMerged->AddPage();
+                    $tplAttached = $pdfMerged->importPage($ap);
+                    $pdfMerged->useTemplate($tplAttached, 0, 0);
+                }
+
+                // Remplacer $pdf par le PDF fusionné
+                $pdf = $pdfMerged;
+            } catch (Exception $e) {
+                gestion_message("Erreur lors de la fusion du PDF joint : " . $e->getMessage(), ERROR);
+            }
+            if (file_exists($tempAttachedPath)) {
+                unlink($tempAttachedPath);
+            }
+            if (file_exists($tempIntermediatePath)) {
+                unlink($tempIntermediatePath);
+            }
+        }
+    }
 }
 
 if($config->fields['DisplayPdfEnd'] == 1){

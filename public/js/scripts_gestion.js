@@ -344,17 +344,32 @@ function gestion_loadCriForm(action, modal, params) {
 
 // Fonction d'initialisation globale appelée depuis le PHP
 function initializeSignatureGestion(uniqId) {
-  // ---------- Capture photo (si présente) ----------
-  const capturePhoto = document.getElementById("capture-photo");
-  if (capturePhoto) {
-    capturePhoto.addEventListener("change", function (event) {
+  // ---------- Capture fichiers (images + PDF) ----------
+  // La logique principale est gérée par le script inline dans cri.class.php
+  // Ce bloc est un fallback si le script inline n'a pas été initialisé
+  const captureFileInput = document.getElementById("capture-file-input");
+  if (captureFileInput && !captureFileInput.dataset.gestionFileInit) {
+    captureFileInput.dataset.gestionFileInit = "1";
+    let photoCount = 0;
+    const maxPhotos = 6;
+    let hasPdf = false;
+    captureFileInput.addEventListener("change", function (event) {
       const file = event.target.files[0];
       if (!file) return;
-      if (!file.type.startsWith("image/")) { alert("Le fichier sélectionné n'est pas une image."); return; }
-      if (file.type !== "image/png" && file.type !== "image/jpeg") { alert("Le fichier doit être au format PNG ou JPEG."); return; }
-      const reader = new FileReader();
-      reader.onload = e => { const out = document.getElementById("photo-base64"); if (out) out.value = e.target.result; };
-      reader.readAsDataURL(file);
+      if (file.type === "application/pdf") {
+        if (hasPdf) { alert("Un seul fichier PDF autorisé."); captureFileInput.value = ""; return; }
+        const reader = new FileReader();
+        reader.onload = e => { const out = document.getElementById("pdf-base64"); if (out) out.value = e.target.result; hasPdf = true; captureFileInput.value = ""; };
+        reader.readAsDataURL(file);
+      } else if (file.type === "image/png" || file.type === "image/jpeg") {
+        if (photoCount >= maxPhotos) { alert("Maximum " + maxPhotos + " images."); captureFileInput.value = ""; return; }
+        const reader = new FileReader();
+        reader.onload = e => { photoCount++; const out = document.getElementById("photo-base64-" + photoCount); if (out) out.value = e.target.result; captureFileInput.value = ""; };
+        reader.readAsDataURL(file);
+      } else {
+        alert("Format non supporté. Formats acceptés : PNG, JPEG, PDF.");
+        captureFileInput.value = "";
+      }
     });
   }
 

@@ -1230,10 +1230,13 @@ class PluginGestionSharepoint extends CommonDBTM {
     }
 
         // Pièce jointe optionnelle (vérif + taille)
+        $pdfTooLarge = false;
+        $pdfSizeMB = 0;
         if (!empty($outputPath) && is_string($outputPath) && file_exists($outputPath)) {
             $size = filesize($outputPath);
             if ($size !== false && $size > 15 * 1024 * 1024) {
-                // Préfixer le sujet d'un avertissement si >15MB
+                $pdfTooLarge = true;
+                $pdfSizeMB = round($size / 1024 / 1024, 1);
                 $Subject = "⚠️ " . ($Subject ?: "Notification GLPI");
             } else {
                 $emailObj->attachFromPath($outputPath);
@@ -1245,6 +1248,16 @@ class PluginGestionSharepoint extends CommonDBTM {
         $BodyHtml  = is_string($BodyHtml)  ? $BodyHtml  : '';
         $BodyText  = is_string($BodyText)  ? $BodyText  : '';
         $footerStr = is_string($footerValue) ? $footerValue : '';
+
+        // Ajouter un message d'avertissement dans le corps si PDF trop volumineux
+        if ($pdfTooLarge) {
+            $warningMsg = "<br><br><div style='padding:12px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;color:#856404;'>"
+                . "<strong>⚠️ Le fichier PDF n'a pas pu être joint à ce mail</strong> (taille : {$pdfSizeMB} Mo, limite : 15 Mo).<br>"
+                . "Veuillez le récupérer directement depuis GLPI ou SharePoint."
+                . "</div>";
+            $BodyHtml .= $warningMsg;
+            $BodyText .= "\r\n\r\n⚠️ Le fichier PDF n'a pas pu être joint (taille : {$pdfSizeMB} Mo, limite : 15 Mo). Veuillez le récupérer depuis GLPI ou SharePoint.";
+        }
 
         if ($Subject !== '') {
             $mmail->Subject = balise($Subject, $Balises);

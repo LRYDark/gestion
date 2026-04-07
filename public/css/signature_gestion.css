@@ -353,6 +353,60 @@
     text-decoration: none;
 }
 
+/* Bouton ajout fichiers (vert) */
+.file-add-btn {
+    display: inline-block;
+    color: #28a745;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 8px 16px;
+    border: 1px solid #28a745;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.file-add-btn:hover {
+    background: #28a745;
+    color: white;
+}
+
+/* Overlay loader signature */
+.gestion-loader-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.85);
+    z-index: 99999;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+.gestion-loader-overlay.active {
+    display: flex;
+}
+.gestion-loader-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #e0e0e0;
+    border-top: 5px solid #007bff;
+    border-radius: 50%;
+    animation: gestion-spin 0.8s linear infinite;
+}
+@keyframes gestion-spin {
+    to { transform: rotate(360deg); }
+}
+.gestion-loader-text {
+    margin-top: 15px;
+    font-size: 1.1em;
+    color: #333;
+    font-weight: 500;
+}
+
 /* === CARTE SIGNATURE - GRANDE CARTE GRISE === */
 .signature-card {
     background: #e9ecef;

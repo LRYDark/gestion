@@ -162,14 +162,12 @@ class PluginGestionCri extends CommonDBTM {
          
          // === CARTE PDF ===
          echo '<div class="form-card">';
-            echo '<div class="form-label">Visualisation du document</div>';
-            echo '<div class="form-content">';
-            
+
             if ($config->fields['SharePointLinkDisplay'] == 1) {
                try {
                   if ($DOC->save == 'SharePoint'){
                      $DocUrlSharePoint = $DOC->doc_url;
-                     $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);  
+                     $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);
                   }
                   if ($DOC->save == 'Local'){
                      $fileDownloadUrl = $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
@@ -184,33 +182,215 @@ class PluginGestionCri extends CommonDBTM {
                      }
                      $fileDownloadUrl = $DocUrlSharePoint;
                   }
-               
+
+                  echo '<div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">';
+                     echo '<span>Visualisation du document</span>';
+                     echo '<a href="' . $DocUrlSharePoint . '" target="_blank" class="pdf-link">Voir le PDF en plein écran</a>';
+                  echo '</div>';
+                  echo '<div class="form-content">';
                   echo '<object data="' . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . '#view=FitH" '
                      . 'type="application/pdf" class="pdf-viewer pdf-responsive" '
                      . 'style="' . htmlspecialchars($responsiveIframeStyle, ENT_QUOTES, 'UTF-8') . '">'
                      . 'Votre navigateur ne peut pas afficher le PDF.'
                      . '</object>';
+                  echo '</div>';
                } catch (Exception $e) {
+                  echo '<div class="form-label">Visualisation du document</div>';
+                  echo '<div class="form-content">';
                   echo "<p>Erreur lors du chargement du PDF</p>";
+                  echo '</div>';
+               }
+            } else {
+               echo '<div class="form-label">Visualisation du document</div>';
+               echo '<div class="form-content"></div>';
+            }
+
+         echo '</div>';
+
+         // === CARTE PIECES JOINTES (images 6 max + PDF 1 max) ===
+         echo '<div class="form-card">';
+            echo '<div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">';
+               echo '<span>Ajouter un fichier / image</span>';
+               echo '<input type="file" id="capture-file-input" accept="image/png,image/jpeg,application/pdf" multiple style="display:none;">';
+               echo '<button type="button" onclick="document.getElementById(\'capture-file-input\').click();" id="capture-file-btn" class="file-add-btn">Prendre Photos / Joindre PDF</button>';
+            echo '</div>';
+            echo '<div class="form-content">';
+               echo '<div style="margin-top:8px;font-size:0.85em;color:#666;">';
+                  echo '<span id="capture-photo-counter">0/6 image(s) ajoutée(s)</span>';
+                  echo ' &mdash; ';
+                  echo '<span id="capture-pdf-counter">0/1 PDF ajouté</span>';
+               echo '</div>';
+               echo '<div id="capture-file-list" style="margin-top:8px;"></div>';
+               for ($pi = 1; $pi <= 6; $pi++) {
+                  echo '<textarea name="photo_base64_' . $pi . '" id="photo-base64-' . $pi . '" style="display:none;"></textarea>';
+               }
+               echo '<textarea name="pdf_base64" id="pdf-base64" style="display:none;"></textarea>';
+            echo '</div>';
+         echo '</div>';
+
+         echo '<script>
+         (function(){
+            var input = document.getElementById("capture-file-input");
+            if (!input || input.dataset.gestionFileInit === "1") return;
+            input.dataset.gestionFileInit = "1";
+
+            var photoCount = 0;
+            var maxPhotos = 6;
+            var hasPdf = false;
+            var photoNames = [];
+            var pdfName = "";
+
+            function updateCounters() {
+               var pc = document.getElementById("capture-photo-counter");
+               if (pc) pc.textContent = photoCount + "/" + maxPhotos + " image(s) ajoutée(s)";
+               var pdfC = document.getElementById("capture-pdf-counter");
+               if (pdfC) pdfC.textContent = (hasPdf ? "1" : "0") + "/1 PDF ajouté";
+               var btn = document.getElementById("capture-file-btn");
+               if (photoCount >= maxPhotos && hasPdf) {
+                  if (btn) btn.style.display = "none";
+               } else {
+                  if (btn) btn.style.display = "";
                }
             }
-            
-            echo '<div style="margin-top: 15px;">';
-               echo '<a href="' . $DocUrlSharePoint . '" target="_blank" class="pdf-link">Voir le PDF en plein écran</a>';
-            echo '</div>';
-            
-            echo '</div>';
-         echo '</div>';
-         
-         // === CARTE FICHIER/IMAGE ===
-         echo '<div class="form-card">';
-            echo '<div class="form-label">Ajouter un fichier / image</div>';
-            echo '<div class="form-content">';
-               echo '<input type="file" id="capture-photo" accept="image/*" capture="environment">';
-               echo '<textarea name="photo_base64" id="photo-base64" style="display: none;"></textarea>';
-            echo '</div>';
-         echo '</div>';
-         
+
+            function rebuildList() {
+               var list = document.getElementById("capture-file-list");
+               if (!list) return;
+               var ignoredItems = list.querySelectorAll(".capture-file-ignored");
+               list.innerHTML = "";
+               for (var i = 0; i < photoNames.length; i++) {
+                  addListItem("img", i + 1, photoNames[i]);
+               }
+               if (hasPdf) {
+                  addListItem("pdf", "pdf", pdfName);
+               }
+               for (var k = 0; k < ignoredItems.length; k++) {
+                  list.appendChild(ignoredItems[k]);
+               }
+            }
+
+            function removeItem(type, idx) {
+               if (type === "pdf") {
+                  var pdfTa = document.getElementById("pdf-base64");
+                  if (pdfTa) pdfTa.value = "";
+                  hasPdf = false;
+                  pdfName = "";
+               } else {
+                  var allValues = [];
+                  var allNames = [];
+                  for (var i = 1; i <= maxPhotos; i++) {
+                     var t = document.getElementById("photo-base64-" + i);
+                     if (t && t.value !== "" && i !== idx) {
+                        allValues.push(t.value);
+                        allNames.push(photoNames[i - 1]);
+                     }
+                     if (t) t.value = "";
+                  }
+                  for (var j = 0; j < allValues.length; j++) {
+                     var t2 = document.getElementById("photo-base64-" + (j + 1));
+                     if (t2) t2.value = allValues[j];
+                  }
+                  photoCount = allValues.length;
+                  photoNames = allNames;
+               }
+               rebuildList();
+               updateCounters();
+            }
+
+            function addListItem(type, idx, fileName) {
+               var list = document.getElementById("capture-file-list");
+               if (!list) return;
+               var li = document.createElement("div");
+               li.id = "capture-file-item-" + type + "-" + idx;
+               li.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:5px 10px;margin-bottom:3px;border-radius:4px;font-size:0.85em;" +
+                  (type === "pdf" ? "background:#e8f4fd;" : "background:#f5f5f5;");
+               var left = document.createElement("span");
+               left.style.cssText = "display:flex;align-items:center;gap:6px;";
+               left.innerHTML = (type === "pdf" ? "&#128196;" : "&#128247;") + " " + fileName;
+               var btn = document.createElement("button");
+               btn.type = "button";
+               btn.textContent = "X";
+               btn.style.cssText = "background:#e74c3c;color:#fff;border:none;border-radius:3px;cursor:pointer;padding:2px 8px;font-size:0.8em;flex-shrink:0;";
+               (function(t, i) {
+                  btn.addEventListener("click", function() { removeItem(t, i); });
+               })(type, idx);
+               li.appendChild(left);
+               li.appendChild(btn);
+               list.appendChild(li);
+            }
+
+            function addIgnoredItem(fileName, reason) {
+               var list = document.getElementById("capture-file-list");
+               if (!list) return;
+               var li = document.createElement("div");
+               li.className = "capture-file-ignored";
+               li.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:5px 10px;margin-bottom:3px;border-radius:4px;font-size:0.85em;background:#fdeaea;opacity:0.7;";
+               var left = document.createElement("span");
+               left.style.cssText = "text-decoration:line-through;color:#999;";
+               left.textContent = fileName;
+               var tag = document.createElement("span");
+               tag.style.cssText = "font-size:0.8em;color:#e74c3c;font-style:italic;flex-shrink:0;";
+               tag.textContent = reason;
+               li.appendChild(left);
+               li.appendChild(tag);
+               list.appendChild(li);
+               setTimeout(function() { li.remove(); }, 15000);
+            }
+
+            function processFile(file, slot) {
+               if (file.type === "application/pdf") {
+                  var reader = new FileReader();
+                  reader.onload = function(e) {
+                     var ta = document.getElementById("pdf-base64");
+                     if (ta) ta.value = e.target.result;
+                     hasPdf = true;
+                     pdfName = file.name;
+                     rebuildList();
+                     updateCounters();
+                  };
+                  reader.readAsDataURL(file);
+                  return;
+               }
+               var reader2 = new FileReader();
+               reader2.onload = function(e) {
+                  var ta = document.getElementById("photo-base64-" + slot);
+                  if (ta) ta.value = e.target.result;
+                  photoNames[slot - 1] = file.name;
+                  rebuildList();
+                  updateCounters();
+               };
+               reader2.readAsDataURL(file);
+            }
+
+            // === Input fichier (galerie / PDF) - pas de ré-ouverture auto ===
+            input.addEventListener("change", function(event) {
+               var files = event.target.files;
+               if (!files || files.length === 0) return;
+               var ignored = [];
+               for (var f = 0; f < files.length; f++) {
+                  var file = files[f];
+                  if (file.type === "application/pdf") {
+                     if (hasPdf) { ignored.push({name: file.name, reason: "PDF déjà ajouté"}); continue; }
+                     hasPdf = true;
+                     processFile(file, 0);
+                  } else if (file.type === "image/png" || file.type === "image/jpeg") {
+                     if (photoCount >= maxPhotos) { ignored.push({name: file.name, reason: "Limite de " + maxPhotos + " images atteinte"}); continue; }
+                     photoCount++;
+                     processFile(file, photoCount);
+                  } else {
+                     ignored.push({name: file.name, reason: "Format non supporté"});
+                  }
+               }
+               for (var g = 0; g < ignored.length; g++) {
+                  addIgnoredItem(ignored[g].name, ignored[g].reason);
+               }
+               input.value = "";
+            });
+
+            updateCounters();
+         })();
+         </script>';
+
          // === CARTE SIGNATURE ===
          echo '<div class="form-card signature-card">';
             echo '<div class="form-label">SIGNATURE CLIENT</div>';
@@ -808,10 +988,32 @@ class PluginGestionCri extends CommonDBTM {
                   echo '<input type="submit" name="add_cri" id="sig-submitBtn" value="Signer le PDF" class="submit-btn">';
                echo '</div>';
             echo '</div>';
-            
+
             echo '<textarea readonly name="url" id="sig-dataUrl" class="form-control" rows="0" cols="150" style="display: none;"></textarea>';
          }
-         
+
+         // Loader overlay
+         echo '<div class="gestion-loader-overlay" id="gestion-loader">';
+            echo '<div class="gestion-loader-spinner"></div>';
+            echo '<div class="gestion-loader-text">Signature en cours, veuillez patienter...</div>';
+         echo '</div>';
+
+         echo '<script>
+         (function(){
+            var form = document.getElementById("sig-submitBtn");
+            if (!form) return;
+            var submitted = false;
+            form.closest("form").addEventListener("submit", function(e) {
+               if (submitted) { e.preventDefault(); return; }
+               submitted = true;
+               form.disabled = true;
+               form.value = "Signature en cours...";
+               var loader = document.getElementById("gestion-loader");
+               if (loader) loader.classList.add("active");
+            });
+         })();
+         </script>';
+
          echo '</div>'; // Fin form-container
 
       } else { // ----------------------------------- SIGNÉ -----------------------------------         
@@ -844,14 +1046,12 @@ class PluginGestionCri extends CommonDBTM {
          
          // === CARTE PDF SIGNÉ ===
          echo '<div class="form-card">';
-            echo '<div class="form-label">Document signé</div>';
-            echo '<div class="form-content">';
-            
+
             if ($config->fields['SharePointLinkDisplay'] == 1) {
                try {
                   if ($DOC->save == 'SharePoint'){
                      $DocUrlSharePoint = $DOC->doc_url;
-                     $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);  
+                     $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);
                   }
                   if ($DOC->save == 'Local'){
                      $fileDownloadUrl = $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
@@ -866,24 +1066,31 @@ class PluginGestionCri extends CommonDBTM {
                      }
                      $fileDownloadUrl = $DocUrlSharePoint;
                   }
-                  
+
+                  echo '<div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">';
+                     echo '<span>Document signé</span>';
+                     echo '<a href="' . $DocUrlSharePoint . '" target="_blank" class="pdf-link">Voir le PDF en plein écran</a>';
+                  echo '</div>';
+                  echo '<div class="form-content">';
                   echo '<object data="' . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . '#view=FitH" '
                      . 'type="application/pdf" class="pdf-viewer pdf-responsive" '
                      . 'style="' . htmlspecialchars($responsiveIframeStyle, ENT_QUOTES, 'UTF-8') . '">'
                      . 'Votre navigateur ne peut pas afficher le PDF.'
                      . '</object>';
+                  echo '</div>';
                } catch (Exception $e) {
+                  echo '<div class="form-label">Document signé</div>';
+                  echo '<div class="form-content">';
                   echo "<p>Erreur lors du chargement du PDF</p>";
+                  echo '</div>';
                }
+            } else {
+               echo '<div class="form-label">Document signé</div>';
+               echo '<div class="form-content"></div>';
             }
-            
-            echo '<div style="margin-top: 15px;">';
-               echo '<a href="' . $DocUrlSharePoint . '" target="_blank" class="pdf-link">Voir le PDF en plein écran</a>';
-            echo '</div>';
-            
-            echo '</div>';
+
          echo '</div>';
-         
+
          echo '</div>'; // Fin form-container
          
       } // ----------------------------------- FIN SIGNÉ -----------------------------------
@@ -1015,7 +1222,12 @@ class PluginGestionCri extends CommonDBTM {
       </div>
 
       <div class="form-card">
-         <div class="form-label">Visualisation du document</div>
+         <div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>Visualisation du document</span>
+            <?php if (!empty($DocUrlSharePoint)) { ?>
+               <a href="<?php echo $DocUrlSharePoint; ?>" target="_blank" class="pdf-link">Voir le PDF en plein écran</a>
+            <?php } ?>
+         </div>
          <div class="form-content">
             <?php if ($config->fields['SharePointLinkDisplay'] == 1 && !empty($fileDownloadUrl)) { ?>
                <object data="<?php echo htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8'); ?>#view=FitH"
@@ -1023,35 +1235,188 @@ class PluginGestionCri extends CommonDBTM {
                   Votre navigateur ne peut pas afficher le PDF.
                </object>
             <?php } ?>
-            <?php if (!empty($DocUrlSharePoint)) { ?>
-               <div style="margin-top: 15px;">
-                  <a href="<?php echo $DocUrlSharePoint; ?>" target="_blank" class="pdf-link">Voir le PDF en plein écran</a>
-               </div>
-            <?php } ?>
          </div>
       </div>
 
       <div class="form-card">
-         <div class="form-label">Ajouter un fichier / image</div>
+         <div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>Ajouter un fichier / image</span>
+            <input type="file" id="capture-file-input" accept="image/png,image/jpeg,application/pdf" multiple style="display:none;">
+            <button type="button" onclick="document.getElementById('capture-file-input').click();" id="capture-file-btn" class="file-add-btn">Prendre Photos / Joindre PDF</button>
+         </div>
          <div class="form-content">
-            <input type="file" id="capture-photo" accept="image/*" capture="environment">
-            <textarea name="photo_base64" id="photo-base64" style="display:none;"></textarea>
+            <div style="margin-top:8px;font-size:0.85em;color:#666;">
+               <span id="capture-photo-counter">0/6 image(s) ajoutée(s)</span>
+               &mdash;
+               <span id="capture-pdf-counter">0/1 PDF ajouté</span>
+            </div>
+            <div id="capture-file-list" style="margin-top:8px;"></div>
+            <?php for ($pi = 1; $pi <= 6; $pi++) { ?>
+               <textarea name="photo_base64_<?php echo $pi; ?>" id="photo-base64-<?php echo $pi; ?>" style="display:none;"></textarea>
+            <?php } ?>
+            <textarea name="pdf_base64" id="pdf-base64" style="display:none;"></textarea>
          </div>
       </div>
       <script>
       (function(){
-         const capturePhoto = document.getElementById("capture-photo");
-         if (!capturePhoto || capturePhoto.dataset.gestionPhotoInit === "1") return;
-         capturePhoto.dataset.gestionPhotoInit = "1";
-         capturePhoto.addEventListener("change", function (event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            if (!file.type.startsWith("image/")) { alert("Le fichier sélectionné n'est pas une image."); return; }
-            if (file.type !== "image/png" && file.type !== "image/jpeg") { alert("Le fichier doit être au format PNG ou JPEG."); return; }
-            const reader = new FileReader();
-            reader.onload = e => { const out = document.getElementById("photo-base64"); if (out) out.value = e.target.result; };
-            reader.readAsDataURL(file);
+         var input = document.getElementById("capture-file-input");
+         if (!input || input.dataset.gestionFileInit === "1") return;
+         input.dataset.gestionFileInit = "1";
+
+         var photoCount = 0;
+         var maxPhotos = 6;
+         var hasPdf = false;
+         var photoNames = []; // noms des fichiers images (index 0 = photo 1)
+         var pdfName = "";
+
+         function updateCounters() {
+            var pc = document.getElementById("capture-photo-counter");
+            if (pc) pc.textContent = photoCount + "/" + maxPhotos + " image(s) ajoutée(s)";
+            var pdfC = document.getElementById("capture-pdf-counter");
+            if (pdfC) pdfC.textContent = (hasPdf ? "1" : "0") + "/1 PDF ajouté";
+            var btn = document.getElementById("capture-file-btn");
+            if (photoCount >= maxPhotos && hasPdf) {
+               if (btn) btn.style.display = "none";
+            } else {
+               if (btn) btn.style.display = "";
+            }
+         }
+
+         function rebuildList() {
+            var list = document.getElementById("capture-file-list");
+            if (!list) return;
+            var ignoredItems = list.querySelectorAll(".capture-file-ignored");
+            list.innerHTML = "";
+            for (var i = 0; i < photoNames.length; i++) {
+               addListItem("img", i + 1, photoNames[i]);
+            }
+            if (hasPdf) {
+               addListItem("pdf", "pdf", pdfName);
+            }
+            for (var k = 0; k < ignoredItems.length; k++) {
+               list.appendChild(ignoredItems[k]);
+            }
+         }
+
+         function removeItem(type, idx) {
+            if (type === "pdf") {
+               var pdfTa = document.getElementById("pdf-base64");
+               if (pdfTa) pdfTa.value = "";
+               hasPdf = false;
+               pdfName = "";
+            } else {
+               // Réindexer les images
+               var allValues = [];
+               var allNames = [];
+               for (var i = 1; i <= maxPhotos; i++) {
+                  var t = document.getElementById("photo-base64-" + i);
+                  if (t && t.value !== "" && i !== idx) {
+                     allValues.push(t.value);
+                     allNames.push(photoNames[i - 1]);
+                  }
+                  if (t) t.value = "";
+               }
+               for (var j = 0; j < allValues.length; j++) {
+                  var t2 = document.getElementById("photo-base64-" + (j + 1));
+                  if (t2) t2.value = allValues[j];
+               }
+               photoCount = allValues.length;
+               photoNames = allNames;
+            }
+            rebuildList();
+            updateCounters();
+         }
+
+         function addListItem(type, idx, fileName) {
+            var list = document.getElementById("capture-file-list");
+            if (!list) return;
+            var li = document.createElement("div");
+            li.id = "capture-file-item-" + type + "-" + idx;
+            li.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:5px 10px;margin-bottom:3px;border-radius:4px;font-size:0.85em;" +
+               (type === "pdf" ? "background:#e8f4fd;" : "background:#f5f5f5;");
+            var left = document.createElement("span");
+            left.style.cssText = "display:flex;align-items:center;gap:6px;";
+            left.innerHTML = (type === "pdf" ? "&#128196;" : "&#128247;") + " " + fileName;
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.textContent = "X";
+            btn.style.cssText = "background:#e74c3c;color:#fff;border:none;border-radius:3px;cursor:pointer;padding:2px 8px;font-size:0.8em;flex-shrink:0;";
+            (function(t, i) {
+               btn.addEventListener("click", function() { removeItem(t, i); });
+            })(type, idx);
+            li.appendChild(left);
+            li.appendChild(btn);
+            list.appendChild(li);
+         }
+
+         function addIgnoredItem(fileName, reason) {
+            var list = document.getElementById("capture-file-list");
+            if (!list) return;
+            var li = document.createElement("div");
+            li.className = "capture-file-ignored";
+            li.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:5px 10px;margin-bottom:3px;border-radius:4px;font-size:0.85em;background:#fdeaea;opacity:0.7;";
+            var left = document.createElement("span");
+            left.style.cssText = "text-decoration:line-through;color:#999;";
+            left.textContent = fileName;
+            var tag = document.createElement("span");
+            tag.style.cssText = "font-size:0.8em;color:#e74c3c;font-style:italic;flex-shrink:0;";
+            tag.textContent = reason;
+            li.appendChild(left);
+            li.appendChild(tag);
+            list.appendChild(li);
+            setTimeout(function() { li.remove(); }, 15000);
+         }
+
+         function processFile(file, slot) {
+            if (file.type === "application/pdf") {
+               var reader = new FileReader();
+               reader.onload = function(e) {
+                  var ta = document.getElementById("pdf-base64");
+                  if (ta) ta.value = e.target.result;
+                  hasPdf = true;
+                  pdfName = file.name;
+                  rebuildList();
+                  updateCounters();
+               };
+               reader.readAsDataURL(file);
+               return;
+            }
+            var reader2 = new FileReader();
+            reader2.onload = function(e) {
+               var ta = document.getElementById("photo-base64-" + slot);
+               if (ta) ta.value = e.target.result;
+               photoNames[slot - 1] = file.name;
+               rebuildList();
+               updateCounters();
+            };
+            reader2.readAsDataURL(file);
+         }
+
+         input.addEventListener("change", function(event) {
+            var files = event.target.files;
+            if (!files || files.length === 0) return;
+            var ignored = [];
+            for (var f = 0; f < files.length; f++) {
+               var file = files[f];
+               if (file.type === "application/pdf") {
+                  if (hasPdf) { ignored.push({name: file.name, reason: "PDF déjà ajouté"}); continue; }
+                  hasPdf = true;
+                  processFile(file, 0);
+               } else if (file.type === "image/png" || file.type === "image/jpeg") {
+                  if (photoCount >= maxPhotos) { ignored.push({name: file.name, reason: "Limite de " + maxPhotos + " images atteinte"}); continue; }
+                  photoCount++;
+                  processFile(file, photoCount);
+               } else {
+                  ignored.push({name: file.name, reason: "Format non supporté"});
+               }
+            }
+            for (var g = 0; g < ignored.length; g++) {
+               addIgnoredItem(ignored[g].name, ignored[g].reason);
+            }
+            input.value = "";
          });
+
+         updateCounters();
       })();
       </script>
 
@@ -1131,6 +1496,30 @@ class PluginGestionCri extends CommonDBTM {
       $rpHtml = str_replace('value="GÃ©nÃ©ration du PDF"', 'value="Signer BL + Rapport"', $rpHtml);
 
       echo $rpHtml;
+
+      // Loader overlay + anti-double-clic
+      echo '<div class="gestion-loader-overlay" id="gestion-loader">';
+         echo '<div class="gestion-loader-spinner"></div>';
+         echo '<div class="gestion-loader-text">Signature en cours, veuillez patienter...</div>';
+      echo '</div>';
+      echo '<script>
+      (function(){
+         var forms = document.querySelectorAll("form");
+         forms.forEach(function(form) {
+            var submitBtn = form.querySelector("input[type=submit]");
+            if (!submitBtn) return;
+            var submitted = false;
+            form.addEventListener("submit", function(e) {
+               if (submitted) { e.preventDefault(); return; }
+               submitted = true;
+               submitBtn.disabled = true;
+               submitBtn.value = "Signature en cours...";
+               var loader = document.getElementById("gestion-loader");
+               if (loader) loader.classList.add("active");
+            });
+         });
+      })();
+      </script>';
    }
 }
 ?>
