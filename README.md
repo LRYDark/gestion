@@ -81,6 +81,7 @@ Exemples d'options utilisées dans cette zone:
   Utilité: choisir comment répartir ou fusionner les envois.
 - `gabarit` (`NotificationTemplate`): modèle de notification utilisé pour les mails.
 - `ZenDocMail`: envoi/archivage vers une adresse ou circuit documentaire (selon votre implémentation ZenDoc).
+- `InvoiceMail` (« Envoi facture par mail »): destinataire(s) du document scanné envoyé depuis la tablette via `device_send_invoice`. Plusieurs adresses possibles (séparées par `,` `;` ou espace) ; la 1ʳᵉ est en `To`, les suivantes en `Cc`.
 - `ConfigModes`, `SageOn`, `SharePointOn`, `LocalSearch`: activent les modes disponibles et la source principale de recherche.
 
 En résumé, cette zone décide "que fait le plugin une fois la signature faite" et "quelles sources sont autorisées".
@@ -181,7 +182,7 @@ Exemple d'usage:
 Options / zones associées:
 - `RemoteSignatureOn`
 - `RemoteSignatureUsers[]`
-- endpoints `device_checkin`, `device_poll_v2`, `device_submit_v2`, `device_refuse_v2`, `device_direct_sign`
+- endpoints `device_checkin`, `device_poll_v2`, `device_submit_v2`, `device_refuse_v2`, `device_direct_sign`, `device_send_invoice`
 
 À quoi ça sert:
 - faire signer le document sur un appareil dédié (tablette, borne, poste d'accueil)
@@ -243,6 +244,11 @@ Ces options servent à:
 - `public/api/device_submit_v2.php` : retour signature depuis l'appareil.
 - `public/api/device_refuse_v2.php` : refus de signature depuis l'appareil.
 - `public/api/device_direct_sign.php` : flux de signature direct selon votre implémentation.
+- `public/api/device_send_invoice.php` : reçoit un document scanné depuis la tablette et le transfère **par mail** aux destinataires configurés (`InvoiceMail`). Aucun stockage GLPI. (depuis 1.7.4)
+  - Auth : Token GLPI v1/v2 + header `X-Device-Serial` (même mécanisme que `device_submit_v2`).
+  - Corps : `multipart/form-data` champ `file` (recommandé) **ou** JSON `{ "file_base64": "...", "filename": "..." }`.
+  - Types : pdf / jpg / png (MIME détecté côté serveur), 15 Mo max.
+  - Réponse : `200 { ok:true, recipients_count:N, filename:"..." }`.
 
 ## Prérequis
 

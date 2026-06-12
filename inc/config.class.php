@@ -175,6 +175,11 @@ class PluginGestionConfig extends CommonDBTM
             </div>
 
             <div class="col-md-6">
+            <label for="InvoiceMail" class="form-label mb-1"><?php echo __('Envoi facture par mail', 'gestion'); ?></label>
+            <?php echo Html::input('InvoiceMail', ['value' => $config->InvoiceMail(), 'class' => 'form-control', 'id' => 'InvoiceMail']); ?>
+            </div>
+
+            <div class="col-md-6">
             <label class="form-label mb-1"><?php echo __("Conservation du PDF non signé après la signature", 'gestion'); ?></label>
             <?php Dropdown::showYesNo('ConfigModes', $config->ConfigModes(), -1); ?>
             </div>
@@ -2033,6 +2038,9 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
    function ZenDocMail(){
       return $this->fields['ZenDocMail'] ?? '';
    }
+   function InvoiceMail(){
+      return $this->fields['InvoiceMail'] ?? '';
+   }
    function SharePointLinkDisplay(){
       return $this->fields['SharePointLinkDisplay'] ?? 0;
    }
@@ -2215,6 +2223,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   `SitePath` TEXT NULL,
                   `Global` VARCHAR(255) NULL,
                   `ZenDocMail` VARCHAR(255) NULL,
+                  `InvoiceMail` VARCHAR(255) NULL,
                   `NumberViews` INT(10) NOT NULL DEFAULT '100',
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
@@ -2326,6 +2335,10 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.6.4'){ // NEW 1.7.0
          include(PLUGIN_GESTION_DIR . "/install/update_170_next.php");
          update_170_next();
+      }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.7.3'){ // NEW 1.7.4
+         include(PLUGIN_GESTION_DIR . "/install/update_174_next.php");
+         update_174_next();
       }
 
       self::migrateEncryptedFieldsToSodium($migration);

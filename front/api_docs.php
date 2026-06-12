@@ -281,7 +281,7 @@ curl -X GET "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/ticket
   -H "Authorization: Bearer &lt;token&gt;" -H "Accept: application/json"</code></pre>
   </div>
 
-  <div class="doc-card" data-doc-item data-search="device_poll_v2 device_submit_v2 device_refuse_v2 device_checkin device_direct_sign kiosk borne x-device-serial">
+  <div class="doc-card" data-doc-item data-search="device_poll_v2 device_submit_v2 device_refuse_v2 device_checkin device_direct_sign device_send_invoice facture scan document mail envoi invoice kiosk borne x-device-serial">
     <div class="doc-meta">KIOSQUE (auth X-Device-Serial)</div>
     <h4>Endpoints borne</h4>
     <p><?php echo __('Utilisés par APPAPPLETAB pour l’enregistrement de la borne, le polling de signatures déportées et le fallback de signature directe simplifiée.', 'gestion'); ?></p>
@@ -289,10 +289,58 @@ curl -X GET "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/ticket
 GET  <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/api/device_poll_v2.php', ENT_QUOTES); ?>
 POST <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/api/device_submit_v2.php', ENT_QUOTES); ?>
 POST <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/api/device_refuse_v2.php', ENT_QUOTES); ?>
-POST <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/api/device_direct_sign.php', ENT_QUOTES); ?></code></pre>
+POST <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/api/device_direct_sign.php', ENT_QUOTES); ?>
+POST <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/api/device_send_invoice.php', ENT_QUOTES); ?></code></pre>
     <div class="doc-note">
       <?php echo __('Ces endpoints borne utilisent généralement l’authentification par header `X-Device-Serial` (en plus de la configuration kiosque). Pour les signatures rapides enrichies, APPAPPLETAB utilise maintenant principalement les APIs `/plugins/gestion/api/*` et `/plugins/rp/api/*`.', 'gestion'); ?>
     </div>
+  </div>
+
+  <div class="doc-card" data-doc-item data-search="device_send_invoice facture scan document mail envoi invoice multipart base64 file filename x-device-serial pdf jpg png kiosk borne tablette invoicemail 1.7.4">
+    <div class="doc-meta">POST <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/api/device_send_invoice.php', ENT_QUOTES); ?></div>
+    <h4>`device_send_invoice.php` <span class="doc-tag">1.7.4</span></h4>
+    <p><?php echo __('Reçoit un document scanné depuis la tablette (borne) et le transfère PAR MAIL aux destinataires configurés. Aucun stockage GLPI : le fichier temporaire est supprimé après l’envoi.', 'gestion'); ?></p>
+    <div class="doc-note">
+      <span class="method method-post">POST</span>
+      <?php echo __('Auth Token v1/v2 + header `X-Device-Serial` (même mécanisme que `device_submit_v2`). Destinataires = config plugin « Envoi facture par mail » (`InvoiceMail`), 1ʳᵉ adresse en To, suivantes en Cc.', 'gestion'); ?>
+    </div>
+    <table class="doc-table">
+      <thead><tr><th><?php echo __('Champ', 'gestion'); ?></th><th><?php echo __('Type', 'gestion'); ?></th><th><?php echo __('Obligatoire', 'gestion'); ?></th><th><?php echo __('Notes', 'gestion'); ?></th></tr></thead>
+      <tbody>
+        <tr><td><code>file</code></td><td>multipart</td><td><?php echo __('Oui*', 'gestion'); ?></td><td><?php echo __('*Mode recommandé : `Content-Type: multipart/form-data`, champ fichier `file`.', 'gestion'); ?></td></tr>
+        <tr><td><code>file_base64</code></td><td>string</td><td><?php echo __('Oui*', 'gestion'); ?></td><td><?php echo __('*Alternative JSON. Data URL toléré (`data:image/jpeg;base64,...`). Alias accepté : `file`.', 'gestion'); ?></td></tr>
+        <tr><td><code>filename</code></td><td>string</td><td><?php echo __('Non', 'gestion'); ?></td><td><?php echo __('Nom souhaité de la pièce jointe (nettoyé ; extension imposée selon le type réel détecté).', 'gestion'); ?></td></tr>
+      </tbody>
+    </table>
+    <div class="doc-note">
+      <strong><?php echo __('Contraintes', 'gestion'); ?></strong> :
+      <?php echo __('types autorisés pdf / jpg / png (MIME détecté côté serveur, le nom de fichier client n’est pas fiable), taille max 15 Mo.', 'gestion'); ?>
+    </div>
+    <pre><code># multipart (recommandé)
+curl -X POST "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/api/device_send_invoice.php', ENT_QUOTES); ?>" \
+  -H "Authorization: Bearer &lt;token&gt;" \
+  -H "X-Device-Serial: &lt;serial&gt;" \
+  -F "file=@facture.pdf"
+
+# JSON base64 (alternative)
+curl -X POST "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/api/device_send_invoice.php', ENT_QUOTES); ?>" \
+  -H "Authorization: Bearer &lt;token&gt;" \
+  -H "X-Device-Serial: &lt;serial&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"file_base64":"data:image/jpeg;base64,...","filename":"facture.jpg"}'</code></pre>
+    <pre><code>// Réponse
+{
+  "ok": true,
+  "recipients_count": 2,
+  "filename": "facture.pdf",
+  "size": 234567,
+  "mime": "application/pdf"
+}</code></pre>
+    <div class="doc-note">
+      <strong><?php echo __('Erreurs fréquentes', 'gestion'); ?></strong> :
+      <code>missing_serial</code>, <code>device_unknown</code>, <code>device_banned</code>, <code>no_recipient_configured</code>, <code>missing_file</code>, <code>invalid_file_type</code>, <code>file_too_large</code>.
+    </div>
+    <div class="doc-tags"><span class="doc-tag">file (multipart)</span><span class="doc-tag">file_base64</span><span class="doc-tag">X-Device-Serial</span><span class="doc-tag">InvoiceMail</span></div>
   </div>
 
   <div class="doc-card" data-doc-item data-search="workflow quick sign signature rapide bl kiosk tablette sequence prepare sign ticket_bls combined_sign">

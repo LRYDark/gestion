@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.7.3'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.7.4'); // version du plugin
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 // Minimal GLPI version,
@@ -32,6 +32,7 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
       $api_pattern_submit_v2    = '#^/api/device_submit_v2\.php(?:/.*)?$#';
       $api_pattern_refuse_v2    = '#^/api/device_refuse_v2\.php(?:/.*)?$#';
       $api_pattern_direct_sign  = '#^/api/device_direct_sign\.php(?:/.*)?$#';
+      $api_pattern_send_invoice = '#^/api/device_send_invoice\.php(?:/.*)?$#';
 
       $api_patterns_all = [
          $api_pattern_prepare,
@@ -43,6 +44,7 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
          $api_pattern_submit_v2,
          $api_pattern_refuse_v2,
          $api_pattern_direct_sign,
+         $api_pattern_send_invoice,
       ];
 
       foreach ($api_patterns_all as $pattern) {

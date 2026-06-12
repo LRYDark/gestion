@@ -1280,6 +1280,10 @@ class PluginGestionSharepoint extends CommonDBTM {
 
         // Nettoyage adresses (facultatif ici)
         $mmail->ClearAddresses();
+
+        // Retourne l'état réel d'envoi (true = remis au transport). Ajout additif :
+        // tous les appelants existants ignorent la valeur de retour (aucune régression).
+        return $ok;
     }
 
     /* ##########################################################################  CHECK */
