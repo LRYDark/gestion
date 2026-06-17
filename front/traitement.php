@@ -56,14 +56,19 @@ try {
         $used_param = $data['params'];
 
         if ($used_param == 2) {
-            $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-            if(isset($result['status']) && $result['status'] === true){
-                $FolderDes = 'SharePoint';
-            }else{
+            if ($config->SharePointOn() == 1) {
+                $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
+                if(isset($result['status']) && $result['status'] === true){
+                    $FolderDes = 'SharePoint';
+                }else{
+                    $used_param = 3;
+                    gestion_message("Erreur d'enregistrement du PDF dans SharePoint, Enregistrement dans le dossier Local", WARNING);
+                }
+            } else {
+                // SharePoint desactive : ici params=2 = depot LOCAL (cf. libelle config) => pas de tentative SharePoint, pas d'alerte.
                 $used_param = 3;
-                gestion_message("Erreur d'enregistrement du PDF dans SharePoint, Enregistrement dans le dossier Local", WARNING);
             }
-        } 
+        }
 
         if ($used_param == 3) {
             $FolderDes = 'Local';

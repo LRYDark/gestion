@@ -332,7 +332,7 @@ if ($gestion->canView()) {
                   gestion_loadCriForm('showCriForm', surveyId, {
                      job: parseInt(data.tickets_id || '0', 10) || 0,
                      root_doc: base,
-                     root_modal: 'survey-form'
+                     root_modal: 'scan-form'
                   });
                } catch (e) {
                   showError('Creation impossible: ' + e.message);

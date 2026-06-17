@@ -471,10 +471,20 @@ function api_prepare_from_search_selection(
    }
 
    $bl_esc = $DB->escape($pdf_filename);
-   $check = $DB->doQuery("SELECT id, doc_url, signed, relatedInvoiceToBL
-                          FROM `glpi_plugin_gestion_surveys`
-                          WHERE bl = '$bl_esc'
-                          LIMIT 1");
+   // Dedoublonnage par NUMERO de BL (insensible casse/suffixe/nom client).
+   $bl_number = pluginGestionBlNumber($pdf_filename);
+   if ($bl_number !== '') {
+      $bl_number_esc = $DB->escape($bl_number);
+      $check = $DB->doQuery("SELECT id, doc_url, signed, relatedInvoiceToBL
+                             FROM `glpi_plugin_gestion_surveys`
+                             WHERE bl_number = '$bl_number_esc'
+                             LIMIT 1");
+   } else {
+      $check = $DB->doQuery("SELECT id, doc_url, signed, relatedInvoiceToBL
+                             FROM `glpi_plugin_gestion_surveys`
+                             WHERE bl = '$bl_esc'
+                             LIMIT 1");
+   }
    if ($check && $DB->numrows($check) === 1) {
       $row = $DB->fetchassoc($check);
       return [
@@ -495,8 +505,9 @@ function api_prepare_from_search_selection(
    $related_sql = $relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '' ? ("'" . $DB->escape($relatedInvoiceToBL) . "'") : 'NULL';
    $doc_date_sql = $signed === 1 ? 'NOW()' : 'NULL';
 
+   $bl_number_sql = ($bl_number !== '') ? "'" . $DB->escape($bl_number) . "'" : "NULL";
    $sql = "INSERT INTO `glpi_plugin_gestion_surveys`
-   (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`)
+   (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `bl_number`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`)
    VALUES
    (" . (int)$tickets_id . ",
     " . (int)$entities_id . ",
@@ -504,6 +515,7 @@ function api_prepare_from_search_selection(
     $related_sql,
     '" . $DB->escape($url_bl) . "',
     '" . $DB->escape($pdf_filename) . "',
+    $bl_number_sql,
     $signed,
     0,
     '" . $DB->escape($doc_url) . "',
@@ -688,10 +700,12 @@ $preview_url = function_exists('plugin_gestion_ensure_pdf_token') ? plugin_gesti
 $tracker_sql = $tracker !== null && $tracker !== '' ? ("'" . $DB->escape($tracker) . "'") : 'NULL';
 $related_sql = $related !== null && $related !== '' ? ("'" . $DB->escape($related) . "'") : 'NULL';
 
+$bl_number_ins = pluginGestionBlNumber($pdf_filename);
+$bl_number_ins_sql = ($bl_number_ins !== '') ? "'" . $DB->escape($bl_number_ins) . "'" : "NULL";
 $sql_insert = "INSERT INTO `glpi_plugin_gestion_surveys`
-(`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`)
+(`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `bl_number`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`)
 VALUES
-(0, 0, $tracker_sql, $related_sql, '" . $DB->escape($bl) . "', '" . $DB->escape($pdf_filename) . "', 0, 0, '" . $DB->escape($doc_url_db) . "', 'Sage', NOW(), NULL)";
+(0, 0, $tracker_sql, $related_sql, '" . $DB->escape($bl) . "', '" . $DB->escape($pdf_filename) . "', $bl_number_ins_sql, 0, 0, '" . $DB->escape($doc_url_db) . "', 'Sage', NOW(), NULL)";
 
 if (!$DB->doQuery($sql_insert)) {
    api_prepare_end(500, ['ok' => false, 'error' => 'db_insert_failed']);

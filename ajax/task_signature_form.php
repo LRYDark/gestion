@@ -59,7 +59,13 @@ switch ($mode) {
 
    case 'both':
       $cri = new PluginGestionCri();
-      $cri->showCombinedForm($ticket_id, $bl_id, []);
+      // >=2 BL non signes => formulaire GROUPE (tous les BL + 1 rapport => 1 PDF).
+      $unsigned_count = countElementsInTable('glpi_plugin_gestion_surveys', ['tickets_id' => $ticket_id, 'signed' => 0]);
+      if ($unsigned_count > 1) {
+         $cri->showCombinedMultiForm($ticket_id, []);
+      } else {
+         $cri->showCombinedForm($ticket_id, $bl_id, []);
+      }
       break;
 
    case 'bl':

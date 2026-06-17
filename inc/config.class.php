@@ -126,7 +126,12 @@ class PluginGestionConfig extends CommonDBTM
             </div>
 
             <div class="col-md-6">
-            <label class="form-label mb-1"><?php echo __("Mode d'envoi mail au client (Rapport + BL)", 'gestion'); ?></label>
+            <label class="form-label mb-1">
+               <?php echo __("Mode d'envoi mail au client (Rapport + BL)", 'gestion'); ?>
+               <i class='fa-solid fa-circle-info text-secondary ms-1'
+                  data-bs-toggle='tooltip' data-bs-placement='top'
+                  title="<?php echo __("S'applique à la signature d'UN BL + Rapport. « Un seul mail » = BL et Rapport fusionnés en 1 PDF dans un seul mail ; « Deux mails séparés » = le BL et le Rapport partent dans 2 mails distincts. Important : lors de la signature GROUPÉE de plusieurs BL (tous les BL + 1 Rapport fusionnés en 1 PDF), un seul mail fusionné est toujours envoyé, quel que soit ce réglage.", 'gestion'); ?>"></i>
+            </label>
             <?php
                $mailModeValues = [
                   0 => __('Un seul mail (BL + Rapport fusionnés)', 'gestion'),
@@ -149,6 +154,31 @@ class PluginGestionConfig extends CommonDBTM
                   echo '<div class="form-text text-muted">Necessite le plugin RP.</div>';
                }
             ?>
+            </div>
+
+            <div class="col-md-6">
+            <label class="form-label mb-1">
+               <?php echo __("Signature sur ticket sans tâche (rapport impossible)", 'gestion'); ?>
+               <i class='fa-solid fa-circle-info text-secondary ms-1'
+                  data-bs-toggle='tooltip' data-bs-placement='top'
+                  title="<?php echo __("S'applique dans l'onglet « Gestion BL » quand le plugin RP est actif et que le ticket associé n'a aucune tâche (le rapport ne peut pas être généré).", 'gestion'); ?>"></i>
+            </label>
+            <?php
+               Dropdown::showFromArray('NoTaskSignMode', [
+                  0 => __('Message + bouton « Signer le BL seul »', 'gestion'),
+                  1 => __('Bloquer : exiger au moins une tâche', 'gestion'),
+               ], ['value' => (int)$config->NoTaskSignMode()]);
+            ?>
+            </div>
+
+            <div class="col-md-6">
+            <label class="form-label mb-1">
+               <?php echo __("Association automatique des BL aux tickets", 'gestion'); ?>
+               <i class='fa-solid fa-circle-info text-secondary ms-1'
+                  data-bs-toggle='tooltip' data-bs-placement='top'
+                  title="<?php echo __("Associe automatiquement les BL détectés (BL + 6 chiffres) dans le ticket, à la création et à l'ouverture, en arrière-plan (mode Sage). Remplace l'association du plugin Warrantycheck.", 'gestion'); ?>"></i>
+            </label>
+            <?php Dropdown::showYesNo('AutoAssociateBl', $config->AutoAssociateBl(), -1); ?>
             </div>
 
             <div class="col-md-6">
@@ -2053,6 +2083,12 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
    function CombinedMailMode(){
       return isset($this->fields['CombinedMailMode']) ? (int)$this->fields['CombinedMailMode'] : 0;
    }
+   function NoTaskSignMode(){
+      return isset($this->fields['NoTaskSignMode']) ? (int)$this->fields['NoTaskSignMode'] : 0;
+   }
+   function AutoAssociateBl(){
+      return isset($this->fields['AutoAssociateBl']) ? (int)$this->fields['AutoAssociateBl'] : 1;
+   }
    function gabarit(){
       return $this->fields['gabarit'] ?? 0;
    }
@@ -2228,6 +2264,8 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `CombinedMailMode` TINYINT NOT NULL DEFAULT '0',
+                  `NoTaskSignMode` TINYINT NOT NULL DEFAULT '0',
+                  `AutoAssociateBl` TINYINT NOT NULL DEFAULT '1',
                   `PlanningBLSignatureOn` TINYINT NOT NULL DEFAULT '0',
                   `ConfigModes` TINYINT NOT NULL DEFAULT '0',
                   `DisplayPdfEnd` TINYINT NOT NULL DEFAULT '0',
@@ -2339,6 +2377,10 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.7.3'){ // NEW 1.7.4
          include(PLUGIN_GESTION_DIR . "/install/update_174_next.php");
          update_174_next();
+      }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.7.4'){ // NEW 1.7.5
+         include(PLUGIN_GESTION_DIR . "/install/update_175_next.php");
+         update_175_next();
       }
 
       self::migrateEncryptedFieldsToSodium($migration);

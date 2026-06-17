@@ -1,6 +1,22 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.7.4'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.7.5'); // version du plugin
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
+
+/**
+ * Normalise le numero d'un BL/BC : token de tete (BL|BC + chiffres), en MAJUSCULES,
+ * sans suffixe (.pdf), nom client ni espaces. Renvoie '' si non reconnu.
+ * Sert au dedoublonnage par numero (colonne bl_number + index unique).
+ * Ex : "bl206743_SELARL_DENTISTE.pdf" => "BL206743".
+ */
+if (!function_exists('pluginGestionBlNumber')) {
+   function pluginGestionBlNumber($bl): string {
+      $bl = (string)$bl;
+      if (preg_match('/^\s*(B[LC])\s*(\d+)/i', $bl, $m)) {
+         return strtoupper($m[1]) . $m[2];
+      }
+      return '';
+   }
+}
 
 // Minimal GLPI version,
 define("PLUGIN_GESTION_MIN_GLPI", "11.0.0");
@@ -84,6 +100,10 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
       }
 
       $PLUGIN_HOOKS['post_item_form']['gestion'] = ['PluginGestionTicket','AddDocForm']; // initialisation de la class formroutetime
+
+      // Association automatique des BL a la CREATION d'un ticket (item_add).
+      // (L'ouverture est geree en arriere-plan via ajax/auto_associate_bl.php + scripts_gestion.js.)
+      $PLUGIN_HOOKS['item_add']['gestion'] = ['Ticket' => ['PluginGestionTicket', 'autoAssociateBlOnAdd']];
 
       Plugin::registerClass('PluginGestionTicket', ['addtabon' => 'Ticket']);
 

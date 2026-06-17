@@ -107,8 +107,18 @@ function plugin_gestion_install() { // fonction installation du plugin
 
 function plugin_gestion_uninstall() { // fonction desintallation du plugin
 
+   // Suppression du dossier de documents : NON bloquante.
+   // Sur certains FS (disque reseau/mappe Windows), chmod echoue et GLPI 11 l'enveloppe
+   // dans Safe\chmod() qui leve une exception -> sans ce try/catch, toute la
+   // desinstallation s'interrompt (les tables ne seraient jamais supprimees).
    $rep_files_rp = GLPI_PLUGIN_DOC_DIR . "/gestion";
-   Toolbox::deleteDir($rep_files_rp);
+   try {
+      if (file_exists($rep_files_rp)) {
+         Toolbox::deleteDir($rep_files_rp);
+      }
+   } catch (Throwable $e) {
+      // On poursuit la desinstallation meme si le dossier n'a pas pu etre supprime.
+   }
 
    $migration = new Migration(PLUGIN_GESTION_VERSION);
 

@@ -6,12 +6,175 @@ require_once dirname(__DIR__) . '/front/SharePointGraph.php';
 Html::header_nocache();
 Session::checkLoginUser();
 
+global $DB, $CFG_GLPI;
+
+/**
+ * Radio « Signature Rapport » / « Signature Rapport + BL » en haut du modal combine.
+ * onchange => gestion_switchCombinedMode (recharge le formulaire dans le modal).
+ */
+if (!function_exists('gestion_render_combined_radio')) {
+   function gestion_render_combined_radio(string $mode, int $bl_id, array $params): string {
+      $base = $params;
+      unset($base['force_rp'], $base['force_combined'], $base['force_bl']);
+      $data = htmlspecialchars(json_encode($base), ENT_QUOTES);
+      $rp   = ($mode === 'rp')   ? 'checked' : '';
+      $both = ($mode === 'both') ? 'checked' : '';
+      $h  = '<div class="mb-3 text-center gestion-combined-mode" data-bl="' . $bl_id . '" data-params="' . $data . '">';
+      $h .= '<div class="form-check form-check-inline">';
+      $h .= '<input class="form-check-input" type="radio" name="gestion_combined_mode" id="gcm_rp" value="rp" ' . $rp . ' onchange="gestion_switchCombinedMode(this);">';
+      $h .= '<label class="form-check-label" for="gcm_rp">' . __('Signature Rapport', 'gestion') . '</label>';
+      $h .= '</div>';
+      $h .= '<div class="form-check form-check-inline">';
+      $h .= '<input class="form-check-input" type="radio" name="gestion_combined_mode" id="gcm_both" value="both" ' . $both . ' onchange="gestion_switchCombinedMode(this);">';
+      $h .= '<label class="form-check-label" for="gcm_both">' . __('Signature Rapport + BL', 'gestion') . '</label>';
+      $h .= '</div>';
+      $h .= '</div>';
+      return $h;
+   }
+}
+
 $action = $_POST['action'] ?? '';
 switch ($action) {
    case 'showCriForm' :
       $PluginGestionCri = new PluginGestionCri();
-      $params                  = $_POST["params"];
-      $PluginGestionCri->showForm($params["job"], ['modal' => $_POST["modal"], 'root_modal' => $params["root_modal"]]);
+      $params           = $_POST["params"] ?? [];
+      $bl_id            = (int)($_POST["modal"] ?? 0);
+      $force_bl         = !empty($params['force_bl']);       // « Signer le BL seul quand meme »
+      $force_combined   = !empty($params['force_combined']); // « Signer Rapport + BL »
+      $force_rp         = !empty($params['force_rp']);       // « Signature Rapport » seul (bascule radio)
+
+      // Charger le BL pour connaitre son ticket associe et son etat de signature.
+      $bl_row = null;
+      if ($bl_id > 0) {
+         $bl_row = $DB->request([
+            'SELECT' => ['id', 'tickets_id', 'signed'],
+            'FROM'   => 'glpi_plugin_gestion_surveys',
+            'WHERE'  => ['id' => $bl_id],
+            'LIMIT'  => 1,
+         ])->current();
+      }
+
+      $ticket_id = $bl_row ? (int)$bl_row['tickets_id'] : 0;
+      $is_signed = $bl_row ? ((int)$bl_row['signed'] === 1) : false;
+      $job       = $ticket_id > 0 ? $ticket_id : (int)($params['job'] ?? 0);
+      $rp_active = Plugin::isPluginActive('rp')
+                   && class_exists('PluginRpCri')
+                   && class_exists('PluginRpConfig');
+
+      // Radio « Rapport seul » / « Rapport + BL » : rendu du formulaire choisi DANS le modal.
+      // (force_combined = « Signer Rapport + BL » ; force_rp = bascule vers « Rapport seul ».)
+      if (($force_combined || $force_rp) && $rp_active && $ticket_id > 0 && !$is_signed) {
+         echo gestion_render_combined_radio($force_rp ? 'rp' : 'both', $bl_id, $params);
+         if ($force_rp) {
+            $_POST['modal'] = 'form_rapport';
+            $rp = new PluginRpCri();
+            $rp->showForm($ticket_id, ['modal' => 'form_rapport']);
+         } else {
+            $unsigned_count = countElementsInTable('glpi_plugin_gestion_surveys', ['tickets_id' => $ticket_id, 'signed' => 0]);
+            if ($unsigned_count > 1) {
+               $PluginGestionCri->showCombinedMultiForm($ticket_id, []);
+            } else {
+               $PluginGestionCri->showCombinedForm($ticket_id, $bl_id, []);
+            }
+         }
+         break;
+      }
+
+      // Parcours Rapport + BL (sauf si on force explicitement la signature BL seule / le rapport).
+      if (!$force_bl && !$force_combined && !$force_rp && $rp_active && $ticket_id > 0 && !$is_signed) {
+         $context   = (string)($params['root_modal'] ?? '');
+         $on_ticket = ($context === 'ticket-form');   // onglet « Gestion BL » du ticket
+         $is_scan   = ($context === 'scan-form');     // scanner OCR (survey.php)
+
+         $ticket_url = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/') . '/front/ticket.form.php?id=' . $ticket_id;
+
+         // Scanner OCR : on redirige TOUJOURS vers le ticket (inchange).
+         if ($is_scan) {
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['redirect' => $ticket_url, 'reason' => 'go_to_ticket'], JSON_UNESCAPED_SLASHES);
+            break;
+         }
+
+         // Comptage des taches (le formulaire RP exige >=1 tache). Identique au formulaire RP
+         // (jointure glpi_users + filtre is_private selon use_publictask).
+         $rp_config   = PluginRpConfig::getInstance();
+         $only_public = (int)($rp_config->fields['use_publictask'] ?? 0) === 1;
+         $private_sql = $only_public ? "AND gt.is_private = 0" : "";
+         $task_row    = $DB->doQuery(
+            "SELECT COUNT(gt.id) AS nb
+             FROM glpi_tickettasks gt
+             INNER JOIN glpi_users gu ON gt.users_id = gu.id
+             WHERE gt.tickets_id = " . $ticket_id . " " . $private_sql
+         )->fetch_object();
+         $task_count  = (int)($task_row->nb ?? 0);
+
+         // ---- Au moins une tache : rapport generable ----
+         if ($task_count > 0) {
+            if ($on_ticket) {
+               // Sur le ticket : radio (Rapport / Rapport + BL) + modal combinee (1 BL) ou groupee (>=2 BL).
+               echo gestion_render_combined_radio('both', $bl_id, $params);
+               $unsigned_count = countElementsInTable('glpi_plugin_gestion_surveys', ['tickets_id' => $ticket_id, 'signed' => 0]);
+               if ($unsigned_count > 1) {
+                  $PluginGestionCri->showCombinedMultiForm($ticket_id, []);
+               } else {
+                  $PluginGestionCri->showCombinedForm($ticket_id, $bl_id, []);
+               }
+            } else {
+               // Hors ticket (survey.form.php, planning) AVEC tache : popup 2 choix.
+               echo '<div class="alert alert-important alert-info d-flex">';
+               echo '<b>' . __("Un ticket est associé à ce BL. Signez le Rapport + BL ici, ou allez au ticket.", 'gestion') . '</b>';
+               echo '</div>';
+               echo '<div class="text-center mt-2 d-flex gap-2 justify-content-center flex-wrap">';
+               echo '<a href="' . htmlspecialchars($ticket_url, ENT_QUOTES) . '" class="btn btn-outline-primary">'
+                  . __("Aller au ticket", 'gestion') . '</a>';
+               $btn_params = $params;
+               $btn_params['force_combined'] = 1;
+               $onclick = "gestion_signBlOnly(this, '" . $bl_id . "', " . json_encode($btn_params) . "); return false;";
+               echo '<button type="button" class="btn btn-primary" onclick="' . htmlspecialchars($onclick, ENT_QUOTES) . '">'
+                  . __("Signer Rapport + BL", 'gestion') . '</button>';
+               echo '</div>';
+            }
+            break;
+         }
+
+         // ---- Aucune tache : comportement configurable (NoTaskSignMode) ----
+         //   1 = bloquer (exiger une tache) ; 0 = autoriser « Signer le BL seul »
+         $no_task_mode = (int)PluginGestionConfig::getInstance()->NoTaskSignMode();
+
+         echo '<div class="alert alert-important alert-warning d-flex">';
+         if ($on_ticket) {
+            echo '<b>' . __("Le ticket associé ne contient aucune tâche : le rapport ne peut pas être généré. Ajoutez une tâche au ticket pour signer le rapport.", 'gestion') . '</b>';
+         } else {
+            echo '<b>' . __("Un ticket est associé à ce BL : merci de créer une tâche au ticket pour générer le rapport.", 'gestion') . '</b>';
+         }
+         echo '</div>';
+
+         echo '<div class="text-center mt-2 d-flex gap-2 justify-content-center flex-wrap">';
+
+         // Hors ticket : bouton « Aller au ticket ».
+         if (!$on_ticket) {
+            echo '<a href="' . htmlspecialchars($ticket_url, ENT_QUOTES) . '" class="btn btn-primary">'
+               . __("Aller au ticket", 'gestion') . '</a>';
+         }
+
+         // « Signer le BL seul » uniquement si NoTaskSignMode = 0 (message + BL seul).
+         // gestion_signBlOnly REMPLACE le contenu du modal courant (pas un 2e modal de meme id).
+         if ($no_task_mode === 0) {
+            $btn_params = $params;
+            $btn_params['force_bl'] = 1;
+            $onclick = "gestion_signBlOnly(this, '" . $bl_id . "', " . json_encode($btn_params) . "); return false;";
+            $btn_class = $on_ticket ? 'btn btn-primary' : 'btn btn-outline-primary';
+            echo '<button type="button" class="' . $btn_class . '" onclick="' . htmlspecialchars($onclick, ENT_QUOTES) . '">'
+               . __("Signer le BL seul quand même", 'gestion') . '</button>';
+         }
+         echo '</div>';
+         break;
+      }
+
+      // Signature BL seule : force_bl, ou pas de ticket / rp inactif / deja signe.
+      // On passe le vrai ticket du BL comme "job" quand on le connait
+      // (corrige le ticket/emails errones depuis survey.form.php).
+      $PluginGestionCri->showForm($job, ['modal' => $bl_id, 'root_modal' => $params["root_modal"] ?? '']);
       break;
 
          case 'sendMail' :

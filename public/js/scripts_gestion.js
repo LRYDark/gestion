@@ -20,6 +20,11 @@ function gestion_loadCriForm(action, modal, params) {
       success: function (response, opts) {
          try {
             var json = $.parseJSON(response);
+            // Cas "ticket sans tache" : le serveur demande d'ouvrir le ticket a remplir.
+            if (json && json.redirect) {
+               window.location.href = json.redirect;
+               return;
+            }
             if (!json.success) {
                $("#gestion_cri_error").html(json.message).show().delay(2000).fadeOut('slow');
             }
@@ -133,6 +138,60 @@ function gestion_loadCriForm(action, modal, params) {
          alert('Impossible d\'ouvrir la signature pour le moment.');
       }
    });
+}
+
+// Signer le BL seul DANS le modal courant (cas "ticket sans tache" => bouton "Signer le
+// BL seul quand meme"). On REMPLACE le contenu du modal au lieu d'ouvrir un 2e modal de
+// meme id 'showCriForm' (qui restait invisible).
+function gestion_signBlOnly(btn, blId, params) {
+   try {
+      var container = (btn && btn.closest)
+         ? (btn.closest('.modal-body') || btn.closest('.modal-content'))
+         : null;
+      if (!container && btn) { container = btn.parentElement; }
+      if (!container) { return; }
+      $.ajax({
+         url: (params && params.root_doc ? params.root_doc : '') + '/ajax/cri.php',
+         type: 'POST',
+         dataType: 'html',
+         timeout: 12000,
+         data: { action: 'showCriForm', params: params, modal: blId }
+      }).done(function (html) {
+         // jQuery .html() execute les scripts inline ET charge les <script src> externes
+         // (necessaire pour le formulaire combine qui charge scripts_rp.js).
+         $(container).html(html);
+      }).fail(function () {
+         alert('Impossible de charger la signature.');
+      });
+   } catch (e) { console.error(e); }
+}
+
+// Bascule du radio « Signature Rapport » / « Signature Rapport + BL » en haut du modal :
+// recharge le formulaire correspondant DANS le modal courant (sans changer de page).
+function gestion_switchCombinedMode(radio) {
+   try {
+      var wrap = radio.closest ? radio.closest('[data-params]') : null;
+      if (!wrap) { return; }
+      var blId = wrap.getAttribute('data-bl');
+      var params = {};
+      try { params = JSON.parse(wrap.getAttribute('data-params') || '{}'); } catch (e) { params = {}; }
+      var p = $.extend({}, params);
+      delete p.force_rp; delete p.force_combined; delete p.force_bl;
+      if (radio.value === 'rp') { p.force_rp = 1; } else { p.force_combined = 1; }
+      var container = radio.closest('.modal-body') || radio.closest('.modal-content') || wrap.parentElement;
+      if (!container) { return; }
+      $.ajax({
+         url: (p.root_doc ? p.root_doc : '') + '/ajax/cri.php',
+         type: 'POST',
+         dataType: 'html',
+         timeout: 15000,
+         data: { action: 'showCriForm', params: p, modal: blId }
+      }).done(function (html) {
+         $(container).html(html); // jQuery .html() => execute/charge les scripts du formulaire
+      }).fail(function () {
+         alert('Impossible de charger le formulaire.');
+      });
+   } catch (e) { console.error(e); }
 }
 
 (function (global) {
@@ -1051,13 +1110,12 @@ function initializeSignatureGestion(uniqId) {
     fetchContext(pending.ticket_id, pending.state)
       .then(function(ctx){
         inflight = false;
-        if (ctx && ctx.ok && ctx.show) {
-          if (!ctx.rp_active && Array.isArray(ctx.bls) && ctx.bls.length === 1 && typeof gestion_loadCriForm === 'function') {
-            const params = { job: ctx.ticket_id, root_doc: root, root_modal: 'ticket-form' };
-            gestion_loadCriForm('showCriForm', String(ctx.bls[0].id), params);
-            return;
-          }
-          openSignatureModal(ctx);
+        if (ctx && ctx.ok && ctx.show && typeof gestion_loadCriForm === 'function') {
+          // MEME modal que l'onglet « Gestion BL » et survey.form.php : on passe par
+          // gestion_loadCriForm -> cri.php (radio Rapport / Rapport+BL + formulaire
+          // combine si 1 BL, ou groupe avec cases a cocher si >=2). Logique unique, identique partout.
+          var blId = ctx.default_bl_id || (Array.isArray(ctx.bls) && ctx.bls[0] ? ctx.bls[0].id : 0);
+          gestion_loadCriForm('showCriForm', String(blId), { job: ctx.ticket_id, root_doc: root, root_modal: 'ticket-form' });
         }
       })
       .catch(function(){
@@ -1765,5 +1823,44 @@ function initializeSignatureGestion(uniqId) {
     document.addEventListener('DOMContentLoaded', bootstrapPlanningBLLinks);
   } else {
     bootstrapPlanningBLLinks();
+  }
+})();
+
+// --------- Association automatique des BL en arriere-plan (a l'ouverture du ticket) ---------
+// Declenche un appel asynchrone APRES le rendu de la fiche ticket : zero ralentissement.
+// L'association reelle (extraction + Sage + dedoublon bl_number) est faite cote serveur.
+(function(){
+  const path = ((window.location && window.location.pathname) ? window.location.pathname : '').toLowerCase();
+  if (path.indexOf('ticket.form.php') === -1) return;
+
+  const params = new URLSearchParams(window.location.search || '');
+  const tid = parseInt(params.get('id') || '0', 10);
+  if (!tid || isNaN(tid)) return; // creation (id absent/0) => geree par le hook item_add
+
+  if (window.__gestionAutoAssocDone) return; // une seule fois par chargement
+  window.__gestionAutoAssocDone = true;
+
+  const root = (typeof GLPI_PLUG_GESTION !== 'undefined' && typeof GLPI_PLUG_GESTION === 'string' && GLPI_PLUG_GESTION.trim())
+    ? GLPI_PLUG_GESTION
+    : ((window.CFG_GLPI && window.CFG_GLPI.root_doc) ? (window.CFG_GLPI.root_doc + '/plugins/gestion') : '/glpi/plugins/gestion');
+
+  function run(){
+    try {
+      // $.ajax (jQuery) pour beneficier du token CSRF injecte globalement par GLPI
+      // (ajaxSetup), comme les autres endpoints du plugin. fetch() natif ne recoit
+      // PAS ce token => le CheckCsrfListener de GLPI 11 rejette la requete.
+      $.ajax({
+        url: root + '/ajax/auto_associate_bl.php',
+        method: 'POST',
+        data: { ticket_id: tid }
+      });
+    } catch (e) {}
+  }
+
+  // Apres le rendu, sans bloquer l'affichage.
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(run, { timeout: 3000 });
+  } else {
+    setTimeout(run, 1200);
   }
 })();

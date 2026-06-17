@@ -102,7 +102,14 @@ try {
    }
 
    $bl_esc = $DB->escape($pdf_filename);
-   $check = $DB->doQuery("SELECT id, signed, tickets_id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$bl_esc' LIMIT 1");
+   // Dedoublonnage par NUMERO de BL (insensible casse/suffixe/nom client).
+   $bl_number = pluginGestionBlNumber($pdf_filename);
+   if ($bl_number !== '') {
+      $bl_number_esc = $DB->escape($bl_number);
+      $check = $DB->doQuery("SELECT id, signed, tickets_id FROM `glpi_plugin_gestion_surveys` WHERE bl_number = '$bl_number_esc' LIMIT 1");
+   } else {
+      $check = $DB->doQuery("SELECT id, signed, tickets_id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$bl_esc' LIMIT 1");
+   }
    if ($check && $DB->numrows($check) === 1) {
       $row = $DB->fetchassoc($check);
       $already = (int)($row['signed'] ?? 0) === 1;
@@ -121,14 +128,16 @@ try {
    $doc_date_sql = ($signed === 1) ? "NOW()" : "NULL";
    $relatedInvoiceSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'" . $DB->escape($relatedInvoiceToBL) . "'" : "NULL";
 
+   $bl_number_sql = ($bl_number !== '') ? "'" . $DB->escape($bl_number) . "'" : "NULL";
    $sql = "INSERT INTO `glpi_plugin_gestion_surveys`
-           (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`)
+           (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `bl_number`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`)
            VALUES (" . (int)$tickets_id . ",
                    " . (int)$entities_id . ",
                    " . (is_null($tracker) ? 'NULL' : ("'" . $DB->escape($tracker) . "'")) . ",
                    " . $relatedInvoiceSql . ",
                    '" . $DB->escape($pdf_folder) . "',
                    '" . $bl_esc . "',
+                   $bl_number_sql,
                    0,
                    " . (int)$NewDoc . ",
                    '" . $DB->escape($doc_url) . "',

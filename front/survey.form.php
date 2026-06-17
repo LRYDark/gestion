@@ -79,12 +79,20 @@ if (isset($_POST["add"])) {
    }
 
    $pdf_filename_db = $DB->escape($pdf_filename);
-   $query = "SELECT bl, id FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename_db' LIMIT 1";
+   // Dedoublonnage par NUMERO de BL (insensible casse/suffixe/nom client).
+   $bl_number = pluginGestionBlNumber($pdf_filename);
+   if ($bl_number !== '') {
+      $bl_number_db = $DB->escape($bl_number);
+      $query = "SELECT bl, id, signed FROM `glpi_plugin_gestion_surveys` WHERE bl_number = '$bl_number_db' LIMIT 1";
+   } else {
+      $query = "SELECT bl, id, signed FROM `glpi_plugin_gestion_surveys` WHERE bl = '$pdf_filename_db' LIMIT 1";
+   }
    $result = $DB->doQuery($query);
 
    if ($result && $result->num_rows > 0) {
       $row = $DB->fetchassoc($result);
-      message('Document déjà existant : <a href="survey.form.php?id='. $row['id'] .'">Gestion - ID '.  $row['id'] .'</a>.', WARNING);
+      $etat = ((int)($row['signed'] ?? 0) === 1) ? ' (déjà signé)' : '';
+      message('Document déjà existant'.$etat.' : <a href="survey.form.php?id='. $row['id'] .'">Gestion - ID '.  $row['id'] .'</a>.', WARNING);
    }else{
       if ($pdf_save == 'Local'){
          $valid = true;
@@ -119,7 +127,8 @@ if (isset($_POST["add"])) {
       $doc_date_sql = ((int)$pdf_signed === 1) ? "NOW()" : "NULL";
       $relatedInvoiceSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'".$DB->escape($relatedInvoiceToBL)."'" : "NULL";
       $trackerSql = ($tracker !== null && $tracker !== '') ? "'" . $DB->escape((string)$tracker) . "'" : "NULL";
-      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`) VALUES (" . (int)$tickets_id . ", " . (int)$entities_id . ", $trackerSql, $relatedInvoiceSql, '" . $DB->escape($pdf_folder) . "', '$pdf_filename_db', " . (int)$pdf_signed . ", " . (int)$NewDoc . ", '" . $DB->escape((string)$doc_url) . "', '" . $DB->escape($pdf_save) . "', NOW(), $doc_date_sql);";
+      $blNumberSql = ($bl_number !== '') ? "'" . $DB->escape($bl_number) . "'" : "NULL";
+      $query= "INSERT INTO `glpi_plugin_gestion_surveys` (`tickets_id`, `entities_id`, `tracker`, `relatedInvoiceToBL`, `url_bl`, `bl`, `bl_number`, `signed`, `doc_id`, `doc_url`, `save`, `date_creation`, `doc_date`) VALUES (" . (int)$tickets_id . ", " . (int)$entities_id . ", $trackerSql, $relatedInvoiceSql, '" . $DB->escape($pdf_folder) . "', '$pdf_filename_db', $blNumberSql, " . (int)$pdf_signed . ", " . (int)$NewDoc . ", '" . $DB->escape((string)$doc_url) . "', '" . $DB->escape($pdf_save) . "', NOW(), $doc_date_sql);";
       if($DB->doQuery($query)){
          $idsurvey = (int)$DB->insertId();
          if ($idsurvey <= 0) {
