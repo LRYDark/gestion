@@ -3,7 +3,7 @@ if (!defined('GLPI_ROOT')) {
     die("Sorry. You can't access directly to this file");
 }
 
-require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
+require_once(__DIR__ . '/../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
 
 use Smalot\PdfParser\Parser;
 

@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 
 include ('../../../inc/includes.php'); // Inclure les fichiers nécessaires de GLPI
-require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
+require_once(__DIR__ . '/../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
 require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
 require_once PLUGIN_GESTION_DIR.'/front/SageApi.php'; // Assurer l'import de SageApi
 
