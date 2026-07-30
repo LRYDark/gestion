@@ -7,6 +7,61 @@ class PluginGestionCri extends CommonDBTM {
 
    static $rightname = 'plugin_gestion_cri_create';
 
+   /**
+    * Limite post_max_size de PHP en octets (0 = illimitee).
+    * Sert a bloquer COTE CLIENT les soumissions trop volumineuses : au-dela de
+    * cette limite, PHP vide entierement $_POST (photos/PDF en base64) et le
+    * kernel GLPI rejette alors la requete avec une erreur CSRF trompeuse.
+    */
+   static function getPostMaxBytes(): int {
+      $v = trim((string)ini_get('post_max_size'));
+      if ($v === '' || $v === '0' || $v === '-1') {
+         return 0;
+      }
+      $n = (float)$v;
+      switch (strtolower(substr($v, -1))) {
+         case 'g':
+            $n *= 1024;
+            // pas de break : cascade volontaire g->m->k
+         case 'm':
+            $n *= 1024;
+            // pas de break
+         case 'k':
+            $n *= 1024;
+      }
+      return (int)$n;
+   }
+
+   /**
+    * Corps JS de la fonction de controle de taille (a inserer dans les scripts
+    * de soumission des 3 formulaires). Estime la taille urlencoded du POST et
+    * bloque avec un message clair si elle depasse post_max_size.
+    */
+   static function getPostSizeCheckJs(): string {
+      $limit = self::getPostMaxBytes();
+      return '
+            var gestionPostMax = ' . $limit . ';
+            function gestionPostTooBig(f) {
+               if (!gestionPostMax || !f || !f.elements) return false;
+               var total = 0;
+               for (var gi = 0; gi < f.elements.length; gi++) {
+                  var el = f.elements[gi];
+                  if (el.name && !el.disabled && typeof el.value === "string") {
+                     total += el.name.length + el.value.length + 2;
+                  }
+               }
+               total = Math.round(total * 1.1);
+               if (total > gestionPostMax) {
+                  alert("Impossible de signer : les pièces jointes dépassent la limite du serveur ("
+                     + (total / 1048576).toFixed(1) + " Mo envoyés pour "
+                     + (gestionPostMax / 1048576).toFixed(1) + " Mo maximum)."
+                     + "\n\nRetirez ou allégez des photos / PDF puis réessayez.");
+                  return true;
+               }
+               return false;
+            }';
+   }
+
    function showForm($ID, $options = []) {
       global $DB, $CFG_GLPI;
       $uniq = 'cri'.mt_rand(10000,99999);
@@ -997,9 +1052,10 @@ class PluginGestionCri extends CommonDBTM {
          (function(){
             var form = document.getElementById("sig-submitBtn");
             if (!form) return;
-            var submitted = false;
+            var submitted = false;' . self::getPostSizeCheckJs() . '
             form.closest("form").addEventListener("submit", function(e) {
                if (submitted) { e.preventDefault(); return; }
+               if (gestionPostTooBig(form.closest("form"))) { e.preventDefault(); return; }
                submitted = true;
                form.disabled = true;
                form.value = "Signature en cours...";
@@ -1525,13 +1581,14 @@ class PluginGestionCri extends CommonDBTM {
       echo '</div>';
       echo '<script>
       (function(){
-         var forms = document.querySelectorAll("form");
+         var forms = document.querySelectorAll("form");' . self::getPostSizeCheckJs() . '
          forms.forEach(function(form) {
             var submitBtn = form.querySelector("input[type=submit]");
             if (!submitBtn) return;
             var submitted = false;
             form.addEventListener("submit", function(e) {
                if (submitted) { e.preventDefault(); return; }
+               if (gestionPostTooBig(form)) { e.preventDefault(); return; }
                submitted = true;
                submitBtn.disabled = true;
                submitBtn.value = "Signature en cours...";
@@ -1722,7 +1779,7 @@ class PluginGestionCri extends CommonDBTM {
       echo '</div>';
       echo '<script>
       (function(){
-         var forms = document.querySelectorAll("form");
+         var forms = document.querySelectorAll("form");' . self::getPostSizeCheckJs() . '
          forms.forEach(function(form) {
             var submitBtn = form.querySelector("input[type=submit]");
             if (!submitBtn) return;
@@ -1731,6 +1788,7 @@ class PluginGestionCri extends CommonDBTM {
                var checked = form.querySelectorAll("input[name=\'bl_ids[]\']:checked").length;
                if (checked === 0) { e.preventDefault(); alert("Sélectionnez au moins un BL."); return; }
                if (submitted) { e.preventDefault(); return; }
+               if (gestionPostTooBig(form)) { e.preventDefault(); return; }
                submitted = true;
                submitBtn.disabled = true;
                submitBtn.value = "Signature en cours...";
