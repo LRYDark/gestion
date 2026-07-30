@@ -111,7 +111,23 @@ function plugin_gestion_install() { // fonction installation du plugin
  * Utilise ici pour la colonne « Signature » (search option 14 de PluginGestionSurvey).
  */
 function plugin_gestion_giveItem($itemtype, $orig_id, $data, $num) {
-   if ($itemtype !== 'PluginGestionSurvey' || (int)$orig_id !== 14) {
+   if ($itemtype !== 'PluginGestionSurvey') {
+      return '';
+   }
+
+   // Colonne « Signé » (option 5) : rond vert / croix rouge a l'ecran,
+   // rendu standard (Oui/Non) conserve dans les exports.
+   if ((int)$orig_id === 5) {
+      if (Search::$output_type != Search::HTML_OUTPUT) {
+         return '';
+      }
+      $signed = (int)($data[$num][0]['name'] ?? 0);
+      return $signed === 1
+         ? '<i class="ti ti-check text-success" title="' . __s('Oui') . '"></i>'
+         : '<i class="ti ti-x text-danger" title="' . __s('Non') . '"></i>';
+   }
+
+   if ((int)$orig_id !== 14) {
       return '';
    }
 
@@ -126,12 +142,9 @@ function plugin_gestion_giveItem($itemtype, $orig_id, $data, $num) {
       return $signed === 1 ? __('Signé', 'gestion') : __('Non signé', 'gestion');
    }
 
-   if ($signed === 1) {
-      return '<i class="ti ti-circle-check text-success" style="font-size:1.2rem;" title="' . __s('Signé', 'gestion') . '"></i>';
-   }
-
-   // Bouton « Signer » : meme flux que survey.form.php (gestion_loadCriForm -> ajax/cri.php,
-   // qui retrouve lui-meme le ticket associe au BL). Repli : ouverture de la fiche.
+   // Meme flux que survey.form.php (gestion_loadCriForm -> ajax/cri.php, qui retrouve
+   // lui-meme le ticket associe au BL) : modal de signature (non signe) ou de
+   // visualisation du document signe. Repli : ouverture de la fiche.
    $base     = PLUGIN_GESTION_WEBDIR;
    $fallback = $base . '/front/survey.form.php?id=' . $survey_id;
    $params   = [
@@ -143,6 +156,11 @@ function plugin_gestion_giveItem($itemtype, $orig_id, $data, $num) {
    $onclick = "if (typeof gestion_loadCriForm === 'function') {"
       . " gestion_loadCriForm('showCriForm', '" . $survey_id . "', " . json_encode($params) . ");"
       . " } else { window.location.href = " . json_encode($fallback) . "; } return false;";
+
+   if ($signed === 1) {
+      return '<button type="button" class="btn btn-sm btn-outline-secondary" style="color:var(--tblr-body-color, var(--bs-body-color, #000));" onclick="' . htmlspecialchars($onclick, ENT_QUOTES) . '" title="' . __s('Voir le BL signé', 'gestion') . '">'
+         . '<i class="ti ti-eye me-1"></i>' . __s('Voir', 'gestion') . '</button>';
+   }
 
    return '<button type="button" class="btn btn-sm btn-primary" onclick="' . htmlspecialchars($onclick, ENT_QUOTES) . '">'
       . '<i class="ti ti-signature me-1"></i>' . __s('Signer', 'gestion') . '</button>';
