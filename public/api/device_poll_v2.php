@@ -61,6 +61,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function dp_jexit(int $code, array $payload): never
 {
+    if (class_exists('PluginGestionLogger')) {
+        PluginGestionLogger::apiResponse($code, $payload);
+    }
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;

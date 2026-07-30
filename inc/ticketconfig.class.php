@@ -156,7 +156,7 @@ class PluginGestionTicketConfig extends CommonDBTM
                         </div>
                         <?php if ($connexion) { ?>
                           <!-- tokens/infos à lire côté JS -->
-                          <input type="hidden" id="gestion_csrf" value="<?= Html::cleanInputText(Session::getNewCSRFToken()) ?>">
+                          <input type="hidden" id="gestion_csrf" value="<?= Html::cleanInputText(Session::getNewCSRFToken(true)) ?>">
                           <input type="hidden" id="gestion_ticket_id" value="<?= (int)$ticketId ?>">
 
                           <!-- aide au-dessus du select -->

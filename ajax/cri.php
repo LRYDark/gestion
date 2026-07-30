@@ -191,7 +191,8 @@ switch ($action) {
          $incomingToken = $_POST['_glpi_csrf_token'] ?? ($_SERVER['HTTP_X_GLPI_CSRF_TOKEN'] ?? '');
          $sessionToken  = $_SESSION['glpicsrftoken'] ?? '';
          if (!$sessionToken || !$incomingToken || !hash_equals((string)$sessionToken, (string)$incomingToken)) {
-            error_log("[gestion] sendMail CSRF mismatch: session=".(string)$sessionToken." post=".(string)$incomingToken." user=".Session::getLoginUserID());
+            // Ne pas journaliser les tokens eux-memes (secrets).
+            PluginGestionLogger::warning('resend-mail', 'CSRF mismatch (non bloquant), user #' . (int)Session::getLoginUserID());
          }
 
          $survey_id = isset($_POST['survey_id']) ? (int)$_POST['survey_id'] : 0;
@@ -245,6 +246,7 @@ switch ($action) {
          if (!empty($filePath) && file_exists($filePath)) {
             @unlink($filePath);
          }
+         PluginGestionLogger::error('resend-mail', 'Echec renvoi document signe (survey #' . (int)($_POST['survey_id'] ?? 0) . ') : ' . $e->getMessage());
          http_response_code(400);
          echo json_encode(['ok' => false, 'message' => $e->getMessage()]);
       }

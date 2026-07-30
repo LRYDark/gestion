@@ -1092,8 +1092,14 @@ class PluginGestionCri extends CommonDBTM {
 
       // Bouton flottant "Aller en bas"
       echo '<button type="button" class="fab-go-bottom" title="Aller en bas" aria-label="Aller en bas">↓</button>';
-      
-      Html::closeForm();
+
+      // Token CSRF standalone : Html::closeForm() emettrait le token PARTAGE de la
+      // requete ($CURRENTCSRFTOKEN, reutilise par tous les formulaires rendus dans le
+      // meme rendu AJAX). Des qu'un autre POST le consomme, le kernel GLPI 11
+      // (CheckCsrfListener) rejette la soumission suivante ("CSRF check failed").
+      // Un token standalone est unique a CE formulaire : personne d'autre ne peut le consommer.
+      echo Html::hidden('_glpi_csrf_token', ['value' => Session::getNewCSRFToken(true)]);
+      echo '</form>';
       ?>
       <script>
          setTimeout(function() {   
@@ -1485,6 +1491,14 @@ class PluginGestionCri extends CommonDBTM {
 
       $rpHtml = preg_replace('/<form\b([^>]*)>/', '<form$1>' . $hidden, $rpHtml, 1);
 
+      // Token CSRF standalone (meme raison que showForm : le token partage du rendu
+      // AJAX peut etre consomme par un autre POST avant la soumission).
+      $rpHtml = preg_replace(
+         '/(<input type="hidden" name="_glpi_csrf_token" value=")[^"]*(")/',
+         '${1}' . Session::getNewCSRFToken(true) . '${2}',
+         $rpHtml
+      );
+
       // Insérer la section BL après l'ouverture du container principal
       $rpHtml = preg_replace('/<div class="form-container">/', '<div class="form-container">' . $blSectionHtml, $rpHtml, 1);
 
@@ -1675,6 +1689,14 @@ class PluginGestionCri extends CommonDBTM {
       // Injecter combined_mode + section BL
       $hidden = Html::hidden('combined_mode', ['value' => 1]);
       $rpHtml = preg_replace('/<form\b([^>]*)>/', '<form$1>' . $hidden, $rpHtml, 1);
+
+      // Token CSRF standalone (meme raison que showForm : le token partage du rendu
+      // AJAX peut etre consomme par un autre POST avant la soumission).
+      $rpHtml = preg_replace(
+         '/(<input type="hidden" name="_glpi_csrf_token" value=")[^"]*(")/',
+         '${1}' . Session::getNewCSRFToken(true) . '${2}',
+         $rpHtml
+      );
       $rpHtml = preg_replace('/<div class="form-container">/', '<div class="form-container">' . $blSectionHtml, $rpHtml, 1);
 
       // Libelle bouton

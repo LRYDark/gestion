@@ -63,14 +63,14 @@ function update_150_remote() {
       if ($current !== 'ON') {
          if (!$DB->doQuery("SET GLOBAL event_scheduler = ON")) {
             if (class_exists('Toolbox')) {
-               Toolbox::logInFile('plugin_gestion',
+               Toolbox::logInFile('plugin-gestion',
                   'WARN: impossible d’activer event_scheduler (droits manquants ?): '.$DB->error().PHP_EOL);
             }
          }
       }
    } catch (\Throwable $e) {
       if (class_exists('Toolbox')) {
-         Toolbox::logInFile('plugin_gestion', 'WARN: check/enable event_scheduler a échoué: '.$e->getMessage().PHP_EOL);
+         Toolbox::logInFile('plugin-gestion', 'WARN: check/enable event_scheduler a échoué: '.$e->getMessage().PHP_EOL);
       }
    }
 
@@ -97,7 +97,7 @@ function update_150_remote() {
    if (!$DB->doQuery($eventSql)) {
       if (class_exists('Toolbox')) {
          Toolbox::logInFile(
-            'plugin_gestion',
+            'plugin-gestion',
             'WARN: création event ev_cleanup_remote_sign_requests échouée (droit EVENT ?): '.$DB->error().PHP_EOL
          );
       }

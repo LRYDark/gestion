@@ -98,6 +98,16 @@ try {
 ///////////////// NEW TEST ////////////////////
 
 function gestion_message($msg, $msgtype){
+    if (class_exists('PluginGestionLogger')) {
+        $detail = $msg . (!empty($_POST['DOC']) ? ' (BL: ' . $_POST['DOC'] . ')' : '');
+        if ($msgtype === ERROR) {
+            PluginGestionLogger::error('signature', $detail);
+        } elseif ($msgtype === WARNING) {
+            PluginGestionLogger::warning('signature', $detail);
+        } else {
+            PluginGestionLogger::info('signature', $detail);
+        }
+    }
     Session::addMessageAfterRedirect(
         __($msg, 'gestion'),
         true,
@@ -169,6 +179,17 @@ $MAILTOCLIENT = $_POST["mailtoclient"];
 $nombreAleatoire = rand(1, 100000);
 
 $DOC = $DB->doQuery("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = $id_document")->fetch_object();
+
+if (class_exists('PluginGestionLogger')) {
+    PluginGestionLogger::info('signature', sprintf(
+        'Debut signature BL "%s" (survey #%d, tech #%d%s%s)',
+        $DOC_NAME,
+        $id_document,
+        $tech_id,
+        $is_quick ? ', quick-sign' : '',
+        $combined_mode ? ', mode combine' : ''
+    ));
+}
 
 ob_start(); // Démarre la mise en tampon de sortie
 

@@ -31,6 +31,9 @@ $rootdoc = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');
 
 function api_prepare_end(int $status, array $payload): void
 {
+   if (class_exists('PluginGestionLogger')) {
+      PluginGestionLogger::apiResponse($status, $payload);
+   }
    if (!headers_sent()) {
       header('Content-Type: application/json; charset=UTF-8');
    }

@@ -13,6 +13,15 @@ global $DB;
 Session::checkLoginUser();
 
 function gestion_combined_message($msg, $type = INFO) {
+   if (class_exists('PluginGestionLogger')) {
+      if ($type === ERROR) {
+         PluginGestionLogger::error('signature-combinee', $msg);
+      } elseif ($type === WARNING) {
+         PluginGestionLogger::warning('signature-combinee', $msg);
+      } else {
+         PluginGestionLogger::info('signature-combinee', $msg);
+      }
+   }
    Session::addMessageAfterRedirect(__($msg, 'gestion'), true, $type);
 }
 

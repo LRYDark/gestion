@@ -68,7 +68,7 @@ if ($config->SageSearch() == 1 && $config->SageOn() == 1){
             // Si le document n'existe pas, on n'ajoute rien aux résultats
         } catch (Exception $e) {
             // Erreur lors de la vérification, on log mais on continue
-            error_log("Erreur vérification Sage pour $searchTerm: " . $e->getMessage());
+            PluginGestionLogger::warning('scanner', "Erreur verification Sage pour $searchTerm : " . $e->getMessage());
         }
     }
     // Si le format ne correspond pas à un document complet, on ne fait rien

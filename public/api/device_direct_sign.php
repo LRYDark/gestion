@@ -42,6 +42,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 
 function ds_json(int $status, array $payload): void
 {
+    if (class_exists('PluginGestionLogger')) {
+        PluginGestionLogger::apiResponse($status, $payload);
+    }
     if (!headers_sent()) {
         header('Content-Type: application/json; charset=UTF-8');
     }

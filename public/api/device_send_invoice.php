@@ -63,6 +63,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function dsi_jexit(int $code, array $payload): never
 {
+    if (class_exists('PluginGestionLogger')) {
+        PluginGestionLogger::apiResponse($code, $payload);
+    }
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
@@ -277,7 +280,7 @@ try {
 } catch (Throwable $e) {
     // Détail journalisé côté serveur uniquement (pas de fuite d'info au client).
     $cleanup();
-    Toolbox::logInFile('gestion', 'device_send_invoice mail exception: ' . $e->getMessage() . "\n");
+    PluginGestionLogger::error('api:device_send_invoice.php', 'Exception envoi mail : ' . $e->getMessage());
     dsi_jexit(500, ['ok' => false, 'error' => 'mail_failed']);
 }
 

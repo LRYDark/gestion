@@ -161,7 +161,7 @@ function update_170_alpha1(): bool
     // =========================================================================
     if (!empty($errors) && class_exists('Toolbox')) {
         foreach ($errors as $err) {
-            Toolbox::logInFile('plugin_gestion', '[update_170_alpha1] ERREUR: ' . $err . PHP_EOL);
+            Toolbox::logInFile('plugin-gestion', '[update_170_alpha1] ERREUR: ' . $err . PHP_EOL);
         }
     }
 

@@ -1123,6 +1123,10 @@ class PluginGestionSharepoint extends CommonDBTM {
     // On nettoie et valide la liste
     $EMAILS = parse_emails($EMAIL /* <- ta colonne BDD telle quelle */);
     if (!$EMAILS) {
+        if (class_exists('PluginGestionLogger')) {
+            $raw = is_array($EMAIL) ? implode(',', $EMAIL) : (string)$EMAIL;
+            PluginGestionLogger::warning('mail', 'Aucune adresse email valide dans "' . $raw . '"');
+        }
         throw new InvalidArgumentException("Aucune adresse email valide trouvée.");
     }
 
@@ -1268,6 +1272,20 @@ class PluginGestionSharepoint extends CommonDBTM {
 
         // Envoi + messages
         $ok = $mmail->send();
+        if (class_exists('PluginGestionLogger')) {
+            $dest = $to . (!empty($cc) ? ' (cc: ' . implode(', ', $cc) . ')' : '');
+            if ($ok) {
+                $pj = '';
+                if ($pdfTooLarge) {
+                    $pj = ' SANS PJ (PDF ' . $pdfSizeMB . ' Mo > 15 Mo)';
+                } elseif (!empty($outputPath) && is_string($outputPath) && file_exists($outputPath)) {
+                    $pj = ' avec PJ ' . basename($outputPath);
+                }
+                PluginGestionLogger::info('mail', 'Mail envoye a ' . $dest . $pj);
+            } else {
+                PluginGestionLogger::error('mail', 'Echec envoi mail a ' . $dest . ' : ' . $mmail->ErrorInfo);
+            }
+        }
         if (!$ok) {
             Session::addMessageAfterRedirect(__("Erreur lors de l'envoi du mail : ", 'gestion') . $mmail->ErrorInfo, true, ERROR);
         } else {

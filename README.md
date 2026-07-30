@@ -276,6 +276,26 @@ Rôle du cron (selon options activées):
 - opérations périodiques du plugin
 - mise à jour de certains états exploités par l'interface
 
+## Journalisation
+
+Le plugin écrit ses logs dans le fichier `plugin-gestion.log` du répertoire de logs
+GLPI (`GLPI_LOG_DIR`, par défaut `files/_log/`, configurable dans GLPI). Le fichier est
+consultable directement dans GLPI : **Administration → Journaux → Fichier de log**
+(lecture, filtre, téléchargement, purge).
+
+Format d'une entrée : `[NIVEAU] [contexte] message` avec niveau `INFO` / `WARN` / `ERROR`.
+
+Contextes utilisés :
+- `signature`, `signature-combinee`, `signature-groupee` : flux de signature BL / Rapport+BL (début, succès, erreurs).
+- `mail` : envois de mails (destinataires, pièce jointe, échecs transport).
+- `resend-mail` : renvoi d'un document signé depuis l'onglet BL.
+- `scanner` : recherche/vérification BL (Sage).
+- `api:<endpoint>.php` : toute réponse en erreur (HTTP >= 400) des endpoints `public/api/`.
+
+Point d'entrée du code : `inc/logger.class.php` (`PluginGestionLogger::info/warning/error`),
+qui s'appuie sur `Toolbox::logInFile()` — le réglage GLPI « Journaux dans les fichiers »
+(`use_log_in_files`) est donc respecté. Ne jamais journaliser de secrets (tokens, mots de passe).
+
 ## Note importante (versions > 1.7.0)
 
 Pour les versions **supérieures à 1.7.0**, il y a **abandon de la page web `device_sign.php`**. Elle est remplacée par les **APIs** : il n'y a donc plus de page avec token, uniquement des connexions API. Une **application de remplacement pour iOS** utilisant les APIs est disponible. Si vous avez besoin d'une page web, il faut la développer via les APIs fournies. Même principe pour une **application Android** : l'usage des APIs laisse plus de possibilités de création derrière.

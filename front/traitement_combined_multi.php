@@ -23,6 +23,15 @@ global $DB, $CFG_GLPI;
 Session::checkLoginUser();
 
 function gestion_multi_message($msg, $type = INFO) {
+   if (class_exists('PluginGestionLogger')) {
+      if ($type === ERROR) {
+         PluginGestionLogger::error('signature-groupee', $msg);
+      } elseif ($type === WARNING) {
+         PluginGestionLogger::warning('signature-groupee', $msg);
+      } else {
+         PluginGestionLogger::info('signature-groupee', $msg);
+      }
+   }
    Session::addMessageAfterRedirect(__($msg, 'gestion'), true, $type);
 }
 

@@ -96,7 +96,7 @@ function update_175_next() {
    $hasIdx = $idxRes && $DB->numrows($idxRes) > 0;
    if (!$hasIdx) {
       if (!$DB->doQuery("ALTER TABLE `$stable` ADD UNIQUE KEY `bl_number` (`bl_number`)")) {
-         error_log("[gestion] Index unique bl_number non cree (doublon residuel ?) : " . $DB->error());
+         Toolbox::logInFile('plugin-gestion', "[update_175] Index unique bl_number non cree (doublon residuel ?) : " . $DB->error() . "\n");
       }
    }
 }
