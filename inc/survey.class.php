@@ -35,12 +35,23 @@ if (!defined('GLPI_ROOT')) {
 /**
  * Class PluginGestionSurvey
  */
-class PluginGestionSurvey extends CommonDBTM {
+class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSearchRequestInterface {
 
    static $rightname = "plugin_gestion_survey";
 
    static function getTypeName($nb = 0) {
       return _n('Gestion', 'Gestion', $nb, 'gestion');
+   }
+
+   /**
+    * Tri par defaut de la liste (front/survey.php) : derniers BL crees en premier.
+    * Option 6 = date_creation (cf. rawSearchOptions).
+    */
+   public static function getDefaultSearchRequest(): array {
+      return [
+         'sort'  => 6,
+         'order' => 'DESC',
+      ];
    }
 
    function defineTabs($options = []) {
@@ -114,7 +125,7 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => $this->getTable(),
          'field'              => 'date_creation',
          'name'               => __('Date de création'),
-         'datatype'           => 'datetime',
+         'datatype'           => 'date',
          'massiveaction'      => true
       ];
 
@@ -123,7 +134,7 @@ class PluginGestionSurvey extends CommonDBTM {
          'table'              => $this->getTable(),
          'field'              => 'doc_date',
          'name'               => __('Date de signature'),
-         'datatype'           => 'datetime',
+         'datatype'           => 'date',
          'massiveaction'      => true
       ];
 
@@ -179,6 +190,19 @@ class PluginGestionSurvey extends CommonDBTM {
          'name'               => __('Commentaire'),
          'datatype'           => 'text',
          'massiveaction'      => true
+      ];
+
+      // Colonne « Signature » : bouton « Signer » (BL non signe) / coche (signe).
+      // Rendu HTML par plugin_gestion_giveItem() dans hook.php (hook auto giveItem).
+      $tab[] = [
+         'id'                 => '14',
+         'table'              => $this->getTable(),
+         'field'              => 'signed',
+         'name'               => __('Signature', 'gestion'),
+         'datatype'           => 'specific',
+         'nosearch'           => true,
+         'nosort'             => true,
+         'massiveaction'      => false
       ];
 
       return $tab;

@@ -105,6 +105,49 @@ function plugin_gestion_install() { // fonction installation du plugin
    return true;
 }
 
+/**
+ * Hook auto GLPI (Hooks::AUTO_GIVE_ITEM) : rendu des cellules du moteur de recherche
+ * pour les itemtypes du plugin. Retourner '' laisse le rendu standard s'appliquer.
+ * Utilise ici pour la colonne « Signature » (search option 14 de PluginGestionSurvey).
+ */
+function plugin_gestion_giveItem($itemtype, $orig_id, $data, $num) {
+   if ($itemtype !== 'PluginGestionSurvey' || (int)$orig_id !== 14) {
+      return '';
+   }
+
+   $survey_id = (int)($data['id'] ?? 0);
+   $signed    = (int)($data[$num][0]['name'] ?? 0);
+   if ($survey_id <= 0) {
+      return ' ';
+   }
+
+   // Exports (CSV, PDF...) : texte simple, pas de HTML.
+   if (Search::$output_type != Search::HTML_OUTPUT) {
+      return $signed === 1 ? __('Signé', 'gestion') : __('Non signé', 'gestion');
+   }
+
+   if ($signed === 1) {
+      return '<i class="ti ti-circle-check text-success" style="font-size:1.2rem;" title="' . __s('Signé', 'gestion') . '"></i>';
+   }
+
+   // Bouton « Signer » : meme flux que survey.form.php (gestion_loadCriForm -> ajax/cri.php,
+   // qui retrouve lui-meme le ticket associe au BL). Repli : ouverture de la fiche.
+   $base     = PLUGIN_GESTION_WEBDIR;
+   $fallback = $base . '/front/survey.form.php?id=' . $survey_id;
+   $params   = [
+      'job'          => $survey_id,
+      'root_doc'     => $base,
+      'root_modal'   => 'survey-form',
+      'fallback_url' => $fallback,
+   ];
+   $onclick = "if (typeof gestion_loadCriForm === 'function') {"
+      . " gestion_loadCriForm('showCriForm', '" . $survey_id . "', " . json_encode($params) . ");"
+      . " } else { window.location.href = " . json_encode($fallback) . "; } return false;";
+
+   return '<button type="button" class="btn btn-sm btn-primary" onclick="' . htmlspecialchars($onclick, ENT_QUOTES) . '">'
+      . '<i class="ti ti-signature me-1"></i>' . __s('Signer', 'gestion') . '</button>';
+}
+
 function plugin_gestion_uninstall() { // fonction desintallation du plugin
 
    // Suppression du dossier de documents : NON bloquante.
