@@ -291,6 +291,9 @@ Contextes utilisés :
 - `resend-mail` : renvoi d'un document signé depuis l'onglet BL.
 - `scanner` : recherche/vérification BL (Sage).
 - `api:<endpoint>.php` : toute réponse en erreur (HTTP >= 400) des endpoints `public/api/`.
+- `csrf-diag` : anomalies de token CSRF sur `front/traitement*.php` uniquement (token
+  absent/vide/inconnu, avec content-length et liste des champs reçus — typiquement un
+  POST dépassant `post_max_size`, vidé par PHP). Aucune ligne en fonctionnement normal.
 
 Point d'entrée du code : `inc/logger.class.php` (`PluginGestionLogger::info/warning/error`),
 qui s'appuie sur `Toolbox::logInFile()` — le réglage GLPI « Journaux dans les fichiers »
