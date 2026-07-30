@@ -309,7 +309,7 @@ class PluginGestionTicketConfig extends CommonDBTM
                                 var idx = vals.indexOf(data.id);
                                 if (idx > -1) { vals.splice(idx,1); $sel.val(vals).trigger('change'); }
                                 $sel.find('option[value="'+data.id+'"]').remove();
-                                showModalMessage('Document "'+data.id+'" non trouvé dans l\'API Sage. Il a été retiré de la sélection.', 'warning');
+                                showModalMessage('Document "'+data.id+'" non trouvé dans l\'API Sage (BL déjà en facture ou introuvable dans SAGE). Il a été retiré de la sélection.', 'warning');
                               } else {
                                 $sel.find('option[value="'+data.id+'"]').removeAttr('data-select2-tag');
                                 showModalMessage('Document "'+data.id+'" vérifié et ajouté.', 'success');

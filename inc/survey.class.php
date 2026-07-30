@@ -609,6 +609,11 @@ class PluginGestionSurvey extends CommonDBTM {
                $("#search_pdf").select2({
                   placeholder: "Recherche de fichier PDF...",
                   minimumInputLength: 2,
+                  language: {
+                     noResults: function () {
+                        return "Aucun résultat : BL déjà en facture ou introuvable dans SAGE";
+                     }
+                  },
                   ajax: {
                      delay: 300,
                      url: "../ajax/ajax_search_pdf.php",

@@ -240,7 +240,7 @@ if ($gestion->canView()) {
                if (!resultsEl) return;
                resultsEl.innerHTML = '';
                if (!items || items.length === 0) {
-                  resultsEl.innerHTML = '<div class="list-group-item text-muted">Aucun resultat</div>';
+                  resultsEl.innerHTML = '<div class="list-group-item text-muted">Aucun résultat : BL déjà en facture ou introuvable dans SAGE</div>';
                   pendingAutoClick = false;
                   return;
                }

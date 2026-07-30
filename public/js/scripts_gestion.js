@@ -1684,7 +1684,7 @@ function initializeSignatureGestion(uniqId) {
         return;
       }
       if (code === 'not_found') {
-        alert('Aucun document trouve pour ' + bl + '.');
+        alert('Aucun document trouve pour ' + bl + ' : BL deja en facture ou introuvable dans SAGE.');
         return;
       }
       if (code.indexOf('already') !== -1 || code.indexOf('deja') !== -1) {
