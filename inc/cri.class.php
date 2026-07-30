@@ -387,6 +387,35 @@ class PluginGestionCri extends CommonDBTM {
                setTimeout(function() { li.remove(); }, 15000);
             }
 
+            // Compression navigateur : max 1600px, JPEG qualite 0.75 (identique au
+            // traitement serveur). Reduit ~10x le poids du POST (limite post_max_size).
+            // En cas de probleme, on garde le fichier original (comportement inchange).
+            function gestionCompressImageDataUrl(dataUrl, cb) {
+               try {
+                  var img = new Image();
+                  img.onload = function() {
+                     try {
+                        var maxDim = 1600;
+                        var w = img.naturalWidth || img.width;
+                        var h = img.naturalHeight || img.height;
+                        if (!w || !h) { cb(dataUrl); return; }
+                        var ratio = Math.min(1, maxDim / Math.max(w, h));
+                        var canvas = document.createElement("canvas");
+                        canvas.width = Math.round(w * ratio);
+                        canvas.height = Math.round(h * ratio);
+                        var ctx = canvas.getContext("2d");
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        var out = canvas.toDataURL("image/jpeg", 0.75);
+                        cb(out && out.length > 20 && out.length < dataUrl.length ? out : dataUrl);
+                     } catch (err) { cb(dataUrl); }
+                  };
+                  img.onerror = function() { cb(dataUrl); };
+                  img.src = dataUrl;
+               } catch (err) { cb(dataUrl); }
+            }
+
             function processFile(file, slot) {
                if (file.type === "application/pdf") {
                   var reader = new FileReader();
@@ -403,11 +432,13 @@ class PluginGestionCri extends CommonDBTM {
                }
                var reader2 = new FileReader();
                reader2.onload = function(e) {
-                  var ta = document.getElementById("photo-base64-" + slot);
-                  if (ta) ta.value = e.target.result;
-                  photoNames[slot - 1] = file.name;
-                  rebuildList();
-                  updateCounters();
+                  gestionCompressImageDataUrl(e.target.result, function(finalDataUrl) {
+                     var ta = document.getElementById("photo-base64-" + slot);
+                     if (ta) ta.value = finalDataUrl;
+                     photoNames[slot - 1] = file.name;
+                     rebuildList();
+                     updateCounters();
+                  });
                };
                reader2.readAsDataURL(file);
             }
@@ -1155,12 +1186,11 @@ class PluginGestionCri extends CommonDBTM {
       // (CheckCsrfListener) rejette la soumission suivante ("CSRF check failed").
       // Un token standalone est unique a CE formulaire : personne d'autre ne peut le consommer.
       $csrf_standalone = Session::getNewCSRFToken(true);
-      if (class_exists('PluginGestionLogger')) {
-         PluginGestionLogger::info('csrf-diag', sprintf(
-            'Rendu formulaire BL "%s" : token %s emis, %d tokens en session, user #%s',
+      if ($csrf_standalone === '' && class_exists('PluginGestionLogger')) {
+         // Cas anormal uniquement (jamais atteint en fonctionnement normal).
+         PluginGestionLogger::error('csrf-diag', sprintf(
+            'Rendu formulaire BL "%s" : token VIDE, user #%s',
             (string)$Doc_Name,
-            substr(sha1($csrf_standalone), 0, 8),
-            is_array($_SESSION['glpicsrftokens'] ?? null) ? count($_SESSION['glpicsrftokens']) : 0,
             (string)(Session::getLoginUserID() ?: 'anonyme')
          ));
       }
@@ -1436,6 +1466,34 @@ class PluginGestionCri extends CommonDBTM {
             setTimeout(function() { li.remove(); }, 15000);
          }
 
+         // Compression navigateur : max 1600px, JPEG qualite 0.75 (identique au
+         // traitement serveur). Reduit ~10x le poids du POST (limite post_max_size).
+         function gestionCompressImageDataUrl(dataUrl, cb) {
+            try {
+               var img = new Image();
+               img.onload = function() {
+                  try {
+                     var maxDim = 1600;
+                     var w = img.naturalWidth || img.width;
+                     var h = img.naturalHeight || img.height;
+                     if (!w || !h) { cb(dataUrl); return; }
+                     var ratio = Math.min(1, maxDim / Math.max(w, h));
+                     var canvas = document.createElement("canvas");
+                     canvas.width = Math.round(w * ratio);
+                     canvas.height = Math.round(h * ratio);
+                     var ctx = canvas.getContext("2d");
+                     ctx.fillStyle = "#ffffff";
+                     ctx.fillRect(0, 0, canvas.width, canvas.height);
+                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                     var out = canvas.toDataURL("image/jpeg", 0.75);
+                     cb(out && out.length > 20 && out.length < dataUrl.length ? out : dataUrl);
+                  } catch (err) { cb(dataUrl); }
+               };
+               img.onerror = function() { cb(dataUrl); };
+               img.src = dataUrl;
+            } catch (err) { cb(dataUrl); }
+         }
+
          function processFile(file, slot) {
             if (file.type === "application/pdf") {
                var reader = new FileReader();
@@ -1452,11 +1510,13 @@ class PluginGestionCri extends CommonDBTM {
             }
             var reader2 = new FileReader();
             reader2.onload = function(e) {
-               var ta = document.getElementById("photo-base64-" + slot);
-               if (ta) ta.value = e.target.result;
-               photoNames[slot - 1] = file.name;
-               rebuildList();
-               updateCounters();
+               gestionCompressImageDataUrl(e.target.result, function(finalDataUrl) {
+                  var ta = document.getElementById("photo-base64-" + slot);
+                  if (ta) ta.value = finalDataUrl;
+                  photoNames[slot - 1] = file.name;
+                  rebuildList();
+                  updateCounters();
+               });
             };
             reader2.readAsDataURL(file);
          }
@@ -1718,9 +1778,11 @@ class PluginGestionCri extends CommonDBTM {
             (function(t,i){ btn.addEventListener("click",function(){removeItem(t,i);}); })(type,idx);
             li.appendChild(left); li.appendChild(btn); list.appendChild(li);
          }
+         // Compression navigateur : max 1600px, JPEG 0.75 (comme le serveur) — limite post_max_size.
+         function gestionCompressImageDataUrl(dataUrl,cb){ try{ var img=new Image(); img.onload=function(){ try{ var m=1600,w=img.naturalWidth||img.width,h=img.naturalHeight||img.height; if(!w||!h){cb(dataUrl);return;} var r=Math.min(1,m/Math.max(w,h)); var c=document.createElement("canvas"); c.width=Math.round(w*r); c.height=Math.round(h*r); var x=c.getContext("2d"); x.fillStyle="#ffffff"; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0,c.width,c.height); var o=c.toDataURL("image/jpeg",0.75); cb(o&&o.length>20&&o.length<dataUrl.length?o:dataUrl); }catch(e){cb(dataUrl);} }; img.onerror=function(){cb(dataUrl);}; img.src=dataUrl; }catch(e){cb(dataUrl);} }
          function processFile(file,slot){
             if(file.type==="application/pdf"){ var r=new FileReader(); r.onload=function(e){ var ta=document.getElementById("pdf-base64"); if(ta)ta.value=e.target.result; hasPdf=true; pdfName=file.name; rebuildList(); updateCounters(); }; r.readAsDataURL(file); return; }
-            var r2=new FileReader(); r2.onload=function(e){ var ta=document.getElementById("photo-base64-"+slot); if(ta)ta.value=e.target.result; photoNames[slot-1]=file.name; rebuildList(); updateCounters(); }; r2.readAsDataURL(file);
+            var r2=new FileReader(); r2.onload=function(e){ gestionCompressImageDataUrl(e.target.result,function(fin){ var ta=document.getElementById("photo-base64-"+slot); if(ta)ta.value=fin; photoNames[slot-1]=file.name; rebuildList(); updateCounters(); }); }; r2.readAsDataURL(file);
          }
          input.addEventListener("change",function(event){
             var files=event.target.files; if(!files||files.length===0)return;

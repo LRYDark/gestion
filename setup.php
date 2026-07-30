@@ -46,25 +46,28 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
           && class_exists('PluginGestionLogger')) {
          $diag_tok   = array_key_exists('_glpi_csrf_token', $_POST) ? (string)$_POST['_glpi_csrf_token'] : null;
          $diag_known = ($diag_tok !== null && $diag_tok !== '' && isset($_SESSION['glpicsrftokens'][$diag_tok]));
-         if ($diag_tok === null) {
-            $diag_tok_txt = 'ABSENT';
-         } elseif ($diag_tok === '') {
-            $diag_tok_txt = 'VIDE';
-         } else {
-            $diag_tok_txt = substr(sha1($diag_tok), 0, 8);
+         // On ne journalise QUE les anomalies (token absent/vide/inconnu) : un POST
+         // sain n'apporte aucune information et polluerait le log.
+         if (!$diag_known) {
+            if ($diag_tok === null) {
+               $diag_tok_txt = 'ABSENT';
+            } elseif ($diag_tok === '') {
+               $diag_tok_txt = 'VIDE';
+            } else {
+               $diag_tok_txt = substr(sha1($diag_tok), 0, 8) . ' (inconnu en session)';
+            }
+            PluginGestionLogger::warning('csrf-diag', sprintf(
+               'POST %s : token %s, %d tokens en session, user #%s, ajax=%s, content-length=%s octets, %d champs POST [%s]',
+               basename((string)parse_url((string)$_SERVER['REQUEST_URI'], PHP_URL_PATH)),
+               $diag_tok_txt,
+               is_array($_SESSION['glpicsrftokens'] ?? null) ? count($_SESSION['glpicsrftokens']) : 0,
+               (string)(Session::getLoginUserID() ?: 'anonyme'),
+               !empty($_SERVER['HTTP_X_REQUESTED_WITH']) ? 'oui' : 'non',
+               (string)($_SERVER['CONTENT_LENGTH'] ?? '?'),
+               count($_POST),
+               implode(',', array_keys($_POST))
+            ));
          }
-         PluginGestionLogger::info('csrf-diag', sprintf(
-            'POST %s : token %s (connu en session : %s), %d tokens en session, user #%s, ajax=%s, content-length=%s octets, %d champs POST [%s]',
-            basename((string)parse_url((string)$_SERVER['REQUEST_URI'], PHP_URL_PATH)),
-            $diag_tok_txt,
-            $diag_known ? 'OUI' : 'NON',
-            is_array($_SESSION['glpicsrftokens'] ?? null) ? count($_SESSION['glpicsrftokens']) : 0,
-            (string)(Session::getLoginUserID() ?: 'anonyme'),
-            !empty($_SERVER['HTTP_X_REQUESTED_WITH']) ? 'oui' : 'non',
-            (string)($_SERVER['CONTENT_LENGTH'] ?? '?'),
-            count($_POST),
-            implode(',', array_keys($_POST))
-         ));
       }
       // ── FIN DIAGNOSTIC CSRF ────────────────────────────────────────────────
 
