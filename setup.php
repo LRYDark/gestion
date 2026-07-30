@@ -36,6 +36,28 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
 
    $plugin = new Plugin();
    if ($plugin->isInstalled('gestion') && $plugin->isActivated('gestion')){  // verification si le plugin gestion est installé et activé
+
+      // ── DIAGNOSTIC CSRF (temporaire) ────────────────────────────────────────
+      // plugin_init s'execute AVANT le CheckCsrfListener du kernel : on trace ici
+      // l'etat du token des POST vers traitement*.php pour comprendre les rejets.
+      // On ne journalise jamais le token lui-meme (seulement un hash tronque).
+      if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+          && strpos((string)($_SERVER['REQUEST_URI'] ?? ''), '/plugins/gestion/front/traitement') !== false
+          && class_exists('PluginGestionLogger')) {
+         $diag_tok   = (string)($_POST['_glpi_csrf_token'] ?? '');
+         $diag_known = ($diag_tok !== '' && isset($_SESSION['glpicsrftokens'][$diag_tok]));
+         PluginGestionLogger::info('csrf-diag', sprintf(
+            'POST %s : token %s (connu en session : %s), %d tokens en session, user #%s, ajax=%s',
+            basename((string)parse_url((string)$_SERVER['REQUEST_URI'], PHP_URL_PATH)),
+            $diag_tok === '' ? 'ABSENT' : substr(sha1($diag_tok), 0, 8),
+            $diag_known ? 'OUI' : 'NON',
+            is_array($_SESSION['glpicsrftokens'] ?? null) ? count($_SESSION['glpicsrftokens']) : 0,
+            (string)(Session::getLoginUserID() ?: 'anonyme'),
+            !empty($_SERVER['HTTP_X_REQUESTED_WITH']) ? 'oui' : 'non'
+         ));
+      }
+      // ── FIN DIAGNOSTIC CSRF ────────────────────────────────────────────────
+
       // ── Endpoints BL (app technicien APPAPPLE) ─────────────────────────────
       $api_pattern_prepare      = '#^/api/bl_prepare\.php(?:/.*)?$#';
       $api_pattern_sign         = '#^/api/bl_sign\.php(?:/.*)?$#';

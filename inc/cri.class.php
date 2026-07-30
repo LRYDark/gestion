@@ -1098,7 +1098,17 @@ class PluginGestionCri extends CommonDBTM {
       // meme rendu AJAX). Des qu'un autre POST le consomme, le kernel GLPI 11
       // (CheckCsrfListener) rejette la soumission suivante ("CSRF check failed").
       // Un token standalone est unique a CE formulaire : personne d'autre ne peut le consommer.
-      echo Html::hidden('_glpi_csrf_token', ['value' => Session::getNewCSRFToken(true)]);
+      $csrf_standalone = Session::getNewCSRFToken(true);
+      if (class_exists('PluginGestionLogger')) {
+         PluginGestionLogger::info('csrf-diag', sprintf(
+            'Rendu formulaire BL "%s" : token %s emis, %d tokens en session, user #%s',
+            (string)$Doc_Name,
+            substr(sha1($csrf_standalone), 0, 8),
+            is_array($_SESSION['glpicsrftokens'] ?? null) ? count($_SESSION['glpicsrftokens']) : 0,
+            (string)(Session::getLoginUserID() ?: 'anonyme')
+         ));
+      }
+      echo Html::hidden('_glpi_csrf_token', ['value' => $csrf_standalone]);
       echo '</form>';
       ?>
       <script>
