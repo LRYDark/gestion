@@ -108,7 +108,9 @@ if ($mode === 0){
 
 if ($mode === 2){
     $relativePath = '_plugins/gestion/Documents';
-    $dir = GLPI_ROOT . '/files/' . $relativePath;
+    // GLPI_DOC_DIR (et non GLPI_ROOT/files) : le dossier documents est configurable
+    // (ex: /var/lib/servicedesk en prod).
+    $dir = GLPI_DOC_DIR . '/' . $relativePath;
     $groups = [];
 
     if (is_dir($dir)) {

@@ -299,6 +299,10 @@ try {
          'is_recursive'=> 1,
       ];
       $merged_doc_id  = (int)$doc->add($input);
+      if ($merged_doc_id) {
+         // GLPI 11 blackliste filepath/sha1sum dans Document::add => reecriture directe.
+         pluginGestionFixDocumentFile($merged_doc_id, $merged_url_bl . $mergedName);
+      }
       $merged_doc_url = $merged_doc_id ? ("document.send.php?docid=" . $merged_doc_id) : '';
    }
 } catch (Throwable $e) {

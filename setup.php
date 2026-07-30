@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.7.6'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.7.7'); // version du plugin
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 /**
@@ -15,6 +15,40 @@ if (!function_exists('pluginGestionBlNumber')) {
          return strtoupper($m[1]) . $m[2];
       }
       return '';
+   }
+}
+
+/**
+ * GLPI 11 : Document::add()/update() supprime silencieusement `filepath` et `sha1sum`
+ * de l'input (blacklist dans Document::filterFields, src/Document.php) => les Documents
+ * crees par le plugin pointaient sur un chemin vide (erreur Safe\fread au telechargement).
+ * Ce helper reecrit les deux champs directement en base APRES Document::add(), avec le
+ * chemin relatif a GLPI_DOC_DIR (convention core : Document.php:402 sert
+ * GLPI_DOC_DIR . '/' . filepath). A appeler apres CHAQUE $doc->add() du plugin.
+ *
+ * @param int    $doc_id        id du Document cree
+ * @param string $relative_path chemin relatif a GLPI_DOC_DIR (ex: '_plugins/gestion/.../BLxxx.pdf')
+ * @return bool  true si le filepath a ete ecrit (fichier physique present)
+ */
+if (!function_exists('pluginGestionFixDocumentFile')) {
+   function pluginGestionFixDocumentFile(int $doc_id, string $relative_path): bool {
+      global $DB;
+      if ($doc_id <= 0) {
+         return false;
+      }
+      $relative_path = ltrim(str_replace('\\', '/', $relative_path), '/');
+      $fullpath = GLPI_DOC_DIR . '/' . $relative_path;
+      if ($relative_path === '' || !is_file($fullpath)) {
+         if (class_exists('PluginGestionLogger')) {
+            PluginGestionLogger::warning('document', "Document #$doc_id : fichier introuvable pour filepath '$relative_path' — champ non corrige");
+         }
+         return false;
+      }
+      $sha1 = @sha1_file($fullpath);
+      return (bool)$DB->update('glpi_documents', [
+         'filepath' => $relative_path,
+         'sha1sum'  => ($sha1 !== false ? $sha1 : null),
+      ], ['id' => $doc_id]);
    }
 }
 

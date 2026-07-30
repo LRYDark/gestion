@@ -124,6 +124,8 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                             'is_recursive'=> 1];
 
                     if($NewDoc = $doc->add($input)){
+                        // GLPI 11 blackliste filepath/sha1sum dans Document::add => reecriture directe.
+                        pluginGestionFixDocumentFile((int)$NewDoc, $itemUrl.'/'.$item);
                         $fileUrl = 'document.send.php?docid='.$NewDoc;
                         $relatedSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'".$DB->escape($relatedInvoiceToBL)."'" : "NULL";
                         if (!$DB->doQuery("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, bl_number, doc_id, doc_url, relatedInvoiceToBL, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', $blNumberSql, '$NewDoc', '$fileUrl', $relatedSql, '$tracker', '$save', NOW(), NULL)")) {

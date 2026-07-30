@@ -2382,6 +2382,10 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
          include(PLUGIN_GESTION_DIR . "/install/update_175_next.php");
          update_175_next();
       }
+      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.7.6'){ // NEW 1.7.7
+         include(PLUGIN_GESTION_DIR . "/install/update_177_next.php");
+         update_177_next();
+      }
 
       self::migrateEncryptedFieldsToSodium($migration);
    }

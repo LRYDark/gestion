@@ -740,6 +740,8 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
                     'is_recursive'=> 1];
 
             if($NewDoc = $doc->add($input)){
+                // GLPI 11 blackliste filepath/sha1sum dans Document::add => reecriture directe.
+                pluginGestionFixDocumentFile((int)$NewDoc, $folderPath . $DOC_NAME);
                 $fileUrl = "document.send.php?docid=".$NewDoc;
             }else{
                 $fileUrl = null;

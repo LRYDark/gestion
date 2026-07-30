@@ -96,6 +96,8 @@ try {
       if (!$NewDoc) {
          json_end(500, ['ok' => false, 'error' => 'document_add_failed']);
       }
+      // GLPI 11 blackliste filepath/sha1sum dans Document::add => reecriture directe.
+      pluginGestionFixDocumentFile((int)$NewDoc, $pdf_folder . $pdf_filename);
       $doc_url = 'document.send.php?docid=' . $NewDoc;
    } else {
       json_end(400, ['ok' => false, 'error' => 'unknown_source']);
