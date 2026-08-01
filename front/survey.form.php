@@ -107,6 +107,10 @@ if (isset($_POST["add"])) {
                   'is_recursive'=> 1];
 
          $NewDoc = $doc->add($input);
+         if ($NewDoc) {
+            // GLPI 11 blackliste filepath/sha1sum dans Document::add => reecriture directe.
+            pluginGestionFixDocumentFile((int)$NewDoc, $pdf_folder.$pdf_filename);
+         }
          $doc_url = 'document.send.php?docid='.$NewDoc;
       }
       if ($pdf_save == 'SharePoint'){
