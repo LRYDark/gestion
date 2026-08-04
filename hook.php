@@ -127,6 +127,42 @@ function plugin_gestion_giveItem($itemtype, $orig_id, $data, $num) {
          : '<i class="ti ti-x text-danger" title="' . __s('Non') . '"></i>';
    }
 
+   // Colonne « Tickets » (option 2) : id cliquable vers le ticket + infobulle au
+   // survol affichant la description, comme sur l'accueil (Ticket::showCentralList :
+   // lien avec id + Html::showToolTip applyto). Le script qtip inline s'execute aussi
+   // apres tri/filtre : Search/Table.js reinsere les resultats via $.html().
+   if ((int)$orig_id === 2) {
+      if (Search::$output_type != Search::HTML_OUTPUT) {
+         return '';
+      }
+      $count = (int)($data[$num]['count'] ?? (isset($data[$num][0]) ? 1 : 0));
+      $out   = [];
+      for ($k = 0; $k < $count; $k++) {
+         $tickets_id = (int)($data[$num][$k]['name'] ?? 0);
+         if ($tickets_id <= 0) {
+            continue;
+         }
+         $ticket = new Ticket();
+         if (!$ticket->getFromDB($tickets_id) || !$ticket->canViewItem()) {
+            $out[] = (string)$tickets_id;
+            continue;
+         }
+         $linkid = 'gestionsurveyticket' . $tickets_id . mt_rand();
+         $link   = '<a id="' . $linkid . '" href="'
+            . htmlspecialchars($ticket->getLinkURL(), ENT_QUOTES) . '">'
+            . $tickets_id . '</a>';
+         $link  .= Html::showToolTip(
+            \Glpi\RichText\RichText::getEnhancedHtml($ticket->fields['content'] ?? ''),
+            ['applyto' => $linkid, 'display' => false]
+         );
+         $out[] = $link;
+      }
+      if (count($out) === 0) {
+         return ' ';
+      }
+      return implode('<br>', $out);
+   }
+
    if ((int)$orig_id !== 14) {
       return '';
    }

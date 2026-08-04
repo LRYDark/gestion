@@ -73,7 +73,7 @@ if ($gestion->canView()) {
    // ---- Barre de stats BL : chaque carte est cliquable et filtre la liste dessous ----
    $survey_table = 'glpi_plugin_gestion_surveys';
    $entity_crit  = getEntitiesRestrictCriteria($survey_table);
-   $late_limit   = date('Y-m-d H:i:s', time() - (7 * DAY_TIMESTAMP));
+   $late_limit   = date('Y-m-d H:i:s', time() - (14 * DAY_TIMESTAMP));
    $nb_signed    = countElementsInTable($survey_table, ['signed' => 1] + $entity_crit);
    $nb_unsigned  = countElementsInTable($survey_table, ['signed' => 0] + $entity_crit);
    $nb_late      = countElementsInTable($survey_table, ['signed' => 0, 'date_creation' => ['<', $late_limit]] + $entity_crit);
@@ -82,7 +82,7 @@ if ($gestion->canView()) {
    $self_url     = PLUGIN_GESTION_WEBDIR . '/front/survey.php';
    $url_signed   = $self_url . '?reset=reset&criteria[0][link]=AND&criteria[0][field]=5&criteria[0][searchtype]=equals&criteria[0][value]=1';
    $url_unsigned = $self_url . '?reset=reset&criteria[0][link]=AND&criteria[0][field]=5&criteria[0][searchtype]=equals&criteria[0][value]=0';
-   $url_late     = $url_unsigned . '&criteria[1][link]=AND&criteria[1][field]=6&criteria[1][searchtype]=lessthan&criteria[1][value]=' . urlencode(date('Y-m-d', time() - (7 * DAY_TIMESTAMP)));
+   $url_late     = $url_unsigned . '&criteria[1][link]=AND&criteria[1][field]=6&criteria[1][searchtype]=lessthan&criteria[1][value]=' . urlencode(date('Y-m-d', time() - (14 * DAY_TIMESTAMP)));
 
    $url_all = $self_url . '?reset=reset';
 
@@ -90,7 +90,7 @@ if ($gestion->canView()) {
       ['url' => $url_all,      'label' => 'Tous les BL',                    'count' => $nb_signed + $nb_unsigned, 'color' => 'primary', 'icon' => 'ti ti-list'],
       ['url' => $url_signed,   'label' => 'BL signés',                      'count' => $nb_signed,   'color' => 'success', 'icon' => 'ti ti-circle-check'],
       ['url' => $url_unsigned, 'label' => 'BL non signés',                  'count' => $nb_unsigned, 'color' => 'warning', 'icon' => 'ti ti-signature'],
-      ['url' => $url_late,     'label' => 'Non signés depuis + de 7 jours', 'count' => $nb_late,     'color' => 'danger',  'icon' => 'ti ti-alert-triangle'],
+      ['url' => $url_late,     'label' => 'Non signés depuis + de 14 jours', 'count' => $nb_late,     'color' => 'danger',  'icon' => 'ti ti-alert-triangle'],
    ];
    echo '<div class="card mb-2" id="gestionBlStatsBar">';
    echo '<div class="card-body py-2 px-3 d-flex flex-wrap align-items-center">';
