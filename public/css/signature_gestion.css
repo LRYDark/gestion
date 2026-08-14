@@ -20,8 +20,9 @@
 .sig-base{
   border: 1px solid #ccc;
   display:block;
-  width:100%;          
+  width:100%;
   height:auto;
+  touch-action: none;
 }
 
 /* Bouton zoom - GÉNÉRAL */
@@ -89,12 +90,13 @@
     min-width: 0;
 }
 
+/* Taille pilotée par le JS (style width/height inline) : ne pas contraindre
+   avec max-width/max-height sous peine de désynchroniser les coordonnées */
 .modal-canvas {
     border: 2px solid #333;
     background: #fff;
     touch-action: none;
-    max-width: 100%;
-    max-height: 100%;
+    display: block;
     cursor: crosshair;
 }
 

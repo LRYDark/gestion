@@ -433,6 +433,10 @@ function initializeSignatureGestion(uniqId) {
   }
 
   // ---------- Signature ----------
+  // Moteur réécrit : l'historique vectoriel normalisé (0..1) est la source de
+  // vérité unique ; base et modale n'en sont que des rendus. Les coordonnées
+  // sont converties avec une échelle séparée par axe, mesurée au moment du
+  // tracé : aucun décalage possible même si le CSS réduit le canvas.
   (function () {
     const root = document.getElementById(uniqId);
     if (!root) return;
@@ -450,266 +454,198 @@ function initializeSignatureGestion(uniqId) {
     const rotateCloseBtn = root.querySelector(".rotate-close-btn");
     if (!originalCanvas || !modalCanvas) return;
 
-    // Contexts
     const originalCtx = originalCanvas.getContext("2d");
     const modalCtx    = modalCanvas.getContext("2d");
 
-    // Canvas d'export (offscreen)
-    const modalExportCanvas = document.createElement("canvas");
-    const modalExportCtx    = modalExportCanvas.getContext("2d");
-
-    // États
-    let modalIsOpen = false;
-    let needModalResync = false; // resynchro forcée après pivot
-
     // Épaisseurs (px CSS)
-    const TARGET_BASE_LINE   = 2.00;  // ta nouvelle épaisseur “en live” sur le canvas de base
-    const VISUAL_MODAL_LINE  = 1.80;  // affichage modale (comme avant)
-    const REF_BASE_EXPORT_LINE = 2.40; // ⬅️ épaisseur “cible” quand on revient de la modale vers la base
-    let   exportLineCSS = TARGET_BASE_LINE;
-    const MOBILE_TWEAK = 0.90;
+    const BASE_LINE        = 2.00; // tracé live sur le canvas de base
+    const MODAL_LINE       = 1.80; // tracé dans la modale
+    const BASE_EXPORT_LINE = 2.40; // re-rendu sur la base à la validation de la modale
 
-    // ---- utilitaires ----
-    function setup(ctx, lw) {
-      ctx.strokeStyle = "#000";
-      ctx.lineCap     = "round";
-      ctx.lineJoin    = "round";
-      ctx.lineWidth   = lw; // (sera recalculée en px bitmap quand on trace)
-    }
-
-    // Fixe taille CSS + bitmap + transform (DPR) — on ne s’appuie plus dessus pour l’épaisseur.
-    function fixDPR(canvas, ctx, cssW, cssH) {
-      const dpr = window.devicePixelRatio || 1;
-      canvas.style.width  = cssW + "px";
-      canvas.style.height = cssH + "px";
-      canvas.width  = Math.round(cssW * dpr);
-      canvas.height = Math.round(cssH * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.beginPath();
-    }
-
-    function clearCanvas(ctx, canvas) {
-      const m = ctx.getTransform();
-      ctx.setTransform(1,0,0,1,0,0);
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      ctx.setTransform(m);
-      ctx.beginPath();
-    }
-
-    // ====== NOUVEAU : pipeline de dessin indépendante du DPR ======
-    // facteur CSS→bitmap (pas besoin du DPR)
-    function scaleCSS2BM(canvas) {
-      const rectW = canvas.getBoundingClientRect().width || parseFloat(canvas.style.width) || 1;
-      return canvas.width / rectW; // ex. dpr=3 ⇒ width bitmap = 3× rectW
-    }
-
-    // trace un segment (fromCSS -> toCSS) en pixels *bitmap* (épaisseur stable)
-    function drawSegment(ctx, canvas, fromCSS, toCSS, cssLineWidth) {
-      const s = scaleCSS2BM(canvas);
-      const m = ctx.getTransform();
-      ctx.setTransform(1,0,0,1,0,0);               // unité = pixel bitmap
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      const isModal = (canvas === modalCanvas || canvas === modalExportCanvas);
-      ctx.lineWidth = Math.max(1, cssLineWidth * s * (isModal ? MOBILE_TWEAK : 1));
-      ctx.beginPath();
-      ctx.moveTo(fromCSS.x * s, fromCSS.y * s);
-      ctx.lineTo(toCSS.x   * s, toCSS.y   * s);
-      ctx.stroke();
-      ctx.setTransform(m);
-    }
-    // =================================================================
+    let modalIsOpen = false;
 
     // ---------- Historique vectoriel ----------
-    let paths = [];      // chaque path = [{x,y} …] coordonnées normalisées 0..1
+    let paths = [];        // chaque trait = [{x,y} ...] en coordonnées normalisées 0..1
     let currentPath = null;
 
-    // coordonnées robustes : offsetX/offsetY si dispo (PointerEvent), sinon rect
-    function getPos(e, canvas) {
-      const p = e.touches?.[0] || e.changedTouches?.[0] || e;
-      if (e.offsetX != null && e.offsetY != null && e.target === canvas) {
-        return { x: e.offsetX, y: e.offsetY };
-      }
-      const rect = canvas.getBoundingClientRect();
-      return { x: p.clientX - rect.left, y: p.clientY - rect.top };
-    }
-    function getPosNorm(e, canvas) {
+    // Événement -> coordonnées normalisées, échelle séparée par axe (anti-décalage)
+    function getNorm(e, canvas) {
       const rect = canvas.getBoundingClientRect();
       const p = e.touches?.[0] || e.changedTouches?.[0] || e;
-      return { x: (p.clientX - rect.left) / (rect.width || 1),
-               y: (p.clientY - rect.top)  / (rect.height || 1) };
+      return {
+        x: (p.clientX - rect.left) / (rect.width  || 1),
+        y: (p.clientY - rect.top)  / (rect.height || 1)
+      };
     }
 
-    // rendu vectoriel : même logique que drawSegment (épaisseur stable)
-    function renderHistoryOn(canvas, ctx, cssLineWidth) {
-      const m = ctx.getTransform();
-      const s = scaleCSS2BM(canvas);
-      ctx.setTransform(1,0,0,1,0,0);
-      ctx.clearRect(0,0,canvas.width,canvas.height);
+    // Épaisseur en px bitmap équivalente à cssLine px CSS affichés
+    function lineWidthFor(canvas, cssLine) {
+      const rect = canvas.getBoundingClientRect();
+      const s = rect.width > 0 ? canvas.width / rect.width : (window.devicePixelRatio || 1);
+      return Math.max(1, cssLine * s);
+    }
+
+    function setupStroke(ctx, lw) {
+      ctx.strokeStyle = "#000";
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = lw;
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
-      ctx.strokeStyle = "#000";
-      ctx.lineCap="round"; ctx.lineJoin="round";
-      const isModal = (canvas === modalCanvas || canvas === modalExportCanvas);
-      ctx.lineWidth = Math.max(1, cssLineWidth * s * (isModal ? MOBILE_TWEAK : 1));
+    }
 
+    function drawSegmentNorm(ctx, canvas, from, to, cssLine) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      setupStroke(ctx, lineWidthFor(canvas, cssLine));
+      ctx.beginPath();
+      ctx.moveTo(from.x * canvas.width, from.y * canvas.height);
+      ctx.lineTo(to.x   * canvas.width, to.y   * canvas.height);
+      ctx.stroke();
+    }
+
+    function renderHistoryOn(canvas, ctx, cssLine) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      setupStroke(ctx, lineWidthFor(canvas, cssLine));
       const W = canvas.width, H = canvas.height;
       for (const path of paths) {
         if (path.length < 2) continue;
         ctx.beginPath();
-        ctx.moveTo(path[0].x*W, path[0].y*H);
-        for (let i=1;i<path.length;i++) ctx.lineTo(path[i].x*W, path[i].y*H);
+        ctx.moveTo(path[0].x * W, path[0].y * H);
+        for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x * W, path[i].y * H);
         ctx.stroke();
       }
-      ctx.setTransform(m);
     }
 
-    function applyModalStyle() {
-      setup(modalCtx, VISUAL_MODAL_LINE);
-      const ratioRaw = (modalExportCanvas.width || 1) / (originalCanvas.width || 1);
-
-      // ⬇️ garde-fou : évite d’amplifier/réduire trop l’épaisseur quand la modale est bien plus grande/petite
-      const ratio = Math.min(1.15, Math.max(0.85, ratioRaw));
-
-      exportLineCSS = Math.max(1, REF_BASE_EXPORT_LINE * ratio);
-      setup(modalExportCtx, exportLineCSS);
+    function setCanvasSize(canvas, cssW, cssH) {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.style.width  = cssW + "px";
+      canvas.style.height = cssH + "px";
+      canvas.width  = Math.max(1, Math.round(cssW * dpr));
+      canvas.height = Math.max(1, Math.round(cssH * dpr));
     }
 
-    // ---------- Base : init + ratio fixe ----------
+    // ---------- Canvas de base ----------
     const initRect = originalCanvas.getBoundingClientRect();
-    const INITIAL_BASE_CSS_W = Math.max(200, Math.round(initRect.width  || originalCanvas.clientWidth  || 320));
-    const INITIAL_BASE_CSS_H = Math.max( 60, Math.round(initRect.height || originalCanvas.clientHeight ||  80));
-    const BASE_ASPECT = INITIAL_BASE_CSS_W / INITIAL_BASE_CSS_H || 4;
-
-    (function initBase() {
-      fixDPR(originalCanvas, originalCtx, INITIAL_BASE_CSS_W, INITIAL_BASE_CSS_H);
-      setup(originalCtx, TARGET_BASE_LINE);
-    })();
+    const INITIAL_BASE_W = Math.max(200, Math.round(initRect.width  || originalCanvas.clientWidth  || 320));
+    const INITIAL_BASE_H = Math.max( 60, Math.round(initRect.height || originalCanvas.clientHeight ||  80));
+    const BASE_ASPECT = INITIAL_BASE_W / INITIAL_BASE_H || 4;
 
     function adaptCanvasSize() {
       const container = originalCanvas.closest(".signature-container") || originalCanvas.parentElement;
       if (!container) return;
-      const cs   = getComputedStyle(container);
-      const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-      const availW = Math.max(200, Math.floor(container.clientWidth - padX));
-      const cssW = availW;
+      const cs = getComputedStyle(container);
+      const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      const cssW = Math.max(200, Math.floor(container.clientWidth - padX));
       const cssH = Math.max(60, Math.round(cssW / BASE_ASPECT));
-
-      // sauvegarde bitmap
+      if (parseInt(originalCanvas.style.width, 10) === cssW
+          && parseInt(originalCanvas.style.height, 10) === cssH) {
+        return;
+      }
+      // Le bitmap est préservé : une signature déportée peut avoir été chargée en image
       const backup = document.createElement("canvas");
       backup.width  = originalCanvas.width;
       backup.height = originalCanvas.height;
-      const hasSourceBitmap = originalCanvas.width > 0 && originalCanvas.height > 0;
-      if (hasSourceBitmap) {
-        backup.getContext("2d").drawImage(originalCanvas, 0, 0);
+      const hasBitmap = backup.width > 0 && backup.height > 0;
+      if (hasBitmap) backup.getContext("2d").drawImage(originalCanvas, 0, 0);
+      setCanvasSize(originalCanvas, cssW, cssH);
+      if (hasBitmap) {
+        originalCtx.setTransform(1, 0, 0, 1, 0, 0);
+        originalCtx.imageSmoothingEnabled = true;
+        originalCtx.imageSmoothingQuality = "high";
+        originalCtx.drawImage(backup, 0, 0, backup.width, backup.height,
+                                      0, 0, originalCanvas.width, originalCanvas.height);
       }
-
-      // resize + DPR
-      fixDPR(originalCanvas, originalCtx, cssW, cssH);
-
-      // restaure
-      const m = originalCtx.getTransform();
-      originalCtx.setTransform(1,0,0,1,0,0);
-      if (backup.width > 0 && backup.height > 0) {
-        originalCtx.drawImage(backup, 0,0, backup.width, backup.height,
-                                      0,0, originalCanvas.width, originalCanvas.height);
-      }
-      originalCtx.setTransform(m);
-      setup(originalCtx, TARGET_BASE_LINE);
     }
 
-    // Appels init (aucun resize au clic)
+    setCanvasSize(originalCanvas, INITIAL_BASE_W, INITIAL_BASE_H);
     adaptCanvasSize();
-    const baseContainer = originalCanvas.closest('.signature-container') || originalCanvas.parentElement;
-    if (baseContainer && 'ResizeObserver' in window) {
-      const ro = new ResizeObserver(() => adaptCanvasSize());
-      ro.observe(baseContainer);
+    const baseContainer = originalCanvas.closest(".signature-container") || originalCanvas.parentElement;
+    if (baseContainer && "ResizeObserver" in window) {
+      new ResizeObserver(() => adaptCanvasSize()).observe(baseContainer);
     }
-    window.addEventListener('load', adaptCanvasSize);
+    window.addEventListener("load", adaptCanvasSize);
 
-    // ---------- Dessin (pipeline stable) ----------
-    let currentCanvas = originalCanvas;
-    let drawing = false;
-    let lastPosCSS = {x:0,y:0};
+    // ---------- Modale : taille d'après le rect réel du wrapper ----------
+    const isMobilePhone = () => Math.min(window.innerWidth, window.innerHeight) <= 768;
+    const isLandscape   = () => window.innerWidth > window.innerHeight;
 
-    async function forceModalSyncSize() {
-      // laisse iOS finir le reflow/DPR (2 frames)
-      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-
-      const aspect  = BASE_ASPECT;
+    function sizeModalCanvas() {
       const wrapper = root.querySelector(".cri-canvas-wrapper");
-      const r = wrapper.getBoundingClientRect();
-      const pad = 20;
-      let w = Math.max(320, Math.floor(r.width  - pad*2));
-      let h = Math.max(120, Math.floor(r.height - pad*2));
-      if (w / h > aspect) w = Math.floor(h * aspect); else h = Math.floor(w / aspect);
-
-      fixDPR(modalCanvas,       modalCtx,       w, h);
-      fixDPR(modalExportCanvas, modalExportCtx, w, h);
-      applyModalStyle();
-
-      renderHistoryOn(modalCanvas,       modalCtx,       VISUAL_MODAL_LINE);
-      renderHistoryOn(modalExportCanvas, modalExportCtx, exportLineCSS);
-
-      needModalResync = false;
+      if (!wrapper) return;
+      const r  = wrapper.getBoundingClientRect();
+      const cs = getComputedStyle(wrapper);
+      const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight)  || 0);
+      const padY = (parseFloat(cs.paddingTop)  || 0) + (parseFloat(cs.paddingBottom) || 0);
+      let w = Math.max(200, Math.floor(r.width  - padX));
+      let h = Math.max(100, Math.floor(r.height - padY));
+      // même ratio que la base pour que l'historique normalisé ne soit pas déformé
+      if (w / h > BASE_ASPECT) w = Math.floor(h * BASE_ASPECT); else h = Math.floor(w / BASE_ASPECT);
+      setCanvasSize(modalCanvas, w, h);
+      renderHistoryOn(modalCanvas, modalCtx, MODAL_LINE);
     }
 
-    function start(e, canvas){
+    let refreshQueued = false;
+    function refreshModalLayout() {
+      if (!modalIsOpen || refreshQueued) return;
+      refreshQueued = true;
+      // deux frames pour laisser le reflow (pivot mobile) se stabiliser
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        refreshQueued = false;
+        if (!modalIsOpen) return;
+        if (isMobilePhone() && !isLandscape()) {
+          rotateGate?.classList.add("show");
+        } else {
+          rotateGate?.classList.remove("show");
+          sizeModalCanvas();
+        }
+      }));
+    }
+
+    // ---------- Dessin ----------
+    let drawing = false;
+    let activeCanvas = null;
+    let lastNorm = null;
+
+    function start(e, canvas) {
       e.preventDefault();
-
-      const go = () => {
-        currentCanvas = canvas;
-        drawing = true;
-        lastPosCSS = getPos(e, canvas);
-        // historisation vectorielle
-        currentPath = [ getPosNorm(e, canvas) ];
-        if (e.pointerId != null) canvas.setPointerCapture(e.pointerId);
-      };
-
-      if (canvas === modalCanvas) {
-        const p = needModalResync ? forceModalSyncSize() : Promise.resolve();
-        p.then(()=>requestAnimationFrame(go));
-        return;
-      }
-
-      // base : déjà redimensionné au chargement/observer
-      requestAnimationFrame(go);
+      if (canvas === modalCanvas && rotateGate && rotateGate.classList.contains("show")) return;
+      drawing = true;
+      activeCanvas = canvas;
+      lastNorm = getNorm(e, canvas);
+      currentPath = [lastNorm];
+      if (e.pointerId != null) { try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
     }
 
-    function move(e){
-      if (!drawing) return;
-      const pCSS = getPos(e, currentCanvas);
-
-      if (currentCanvas === modalCanvas) {
-        // VISUEL modale
-        drawSegment(modalCtx, modalCanvas, lastPosCSS, pCSS, VISUAL_MODAL_LINE);
-        // EXPORT modale (pour renvoyer vers base)
-        drawSegment(modalExportCtx, modalExportCanvas, lastPosCSS, pCSS, exportLineCSS);
+    function move(e) {
+      if (!drawing || !activeCanvas) return;
+      const p = getNorm(e, activeCanvas);
+      if (activeCanvas === modalCanvas) {
+        drawSegmentNorm(modalCtx, modalCanvas, lastNorm, p, MODAL_LINE);
       } else {
-        // BASE
-        drawSegment(originalCtx, originalCanvas, lastPosCSS, pCSS, TARGET_BASE_LINE);
+        drawSegmentNorm(originalCtx, originalCanvas, lastNorm, p, BASE_LINE);
       }
-
-      lastPosCSS = pCSS;
-      // historisation vectorielle
-      if (currentPath) currentPath.push(getPosNorm(e, currentCanvas));
+      lastNorm = p;
+      if (currentPath) currentPath.push(p);
     }
 
-    function end(e){
+    function end(e) {
       if (!drawing) return;
       drawing = false;
       if (currentPath && currentPath.length > 1) paths.push(currentPath);
       currentPath = null;
-      if (e && e.pointerId != null) { try { currentCanvas.releasePointerCapture(e.pointerId); } catch {} }
+      if (e && e.pointerId != null && activeCanvas) {
+        try { activeCanvas.releasePointerCapture(e.pointerId); } catch (err) {}
+      }
     }
 
-    function bindCanvas(canvas){
-      canvas.addEventListener("pointerdown", (e)=>start(e, canvas));
+    function bindCanvas(canvas) {
+      canvas.addEventListener("pointerdown", (e) => start(e, canvas));
       canvas.addEventListener("pointermove", move);
       canvas.addEventListener("pointerup",   end);
       canvas.addEventListener("pointercancel", end);
-      canvas.addEventListener("touchstart", e=>e.preventDefault(), {passive:false});
-      canvas.addEventListener("touchmove",  e=>e.preventDefault(), {passive:false});
+      canvas.addEventListener("touchstart", e => e.preventDefault(), { passive: false });
+      canvas.addEventListener("touchmove",  e => e.preventDefault(), { passive: false });
     }
     bindCanvas(originalCanvas);
     bindCanvas(modalCanvas);
@@ -717,142 +653,86 @@ function initializeSignatureGestion(uniqId) {
     // ---------- Effacer ----------
     function wipeAll() {
       paths = [];
-      clearCanvas(originalCtx, originalCanvas);
-      clearCanvas(modalCtx, modalCanvas);
-      clearCanvas(modalExportCtx, modalExportCanvas);
-      applyModalStyle();
+      currentPath = null;
+      originalCtx.setTransform(1, 0, 0, 1, 0, 0);
+      originalCtx.clearRect(0, 0, originalCanvas.width, originalCanvas.height);
+      modalCtx.setTransform(1, 0, 0, 1, 0, 0);
+      modalCtx.clearRect(0, 0, modalCanvas.width, modalCanvas.height);
     }
 
     if (btnClearBase) {
-      btnClearBase.addEventListener("click", ()=>{
+      btnClearBase.addEventListener("click", () => {
         wipeAll();
-        const hidden = document.getElementById("sig-dataUrl"); if (hidden) hidden.value = "";
+        const hidden = document.getElementById("sig-dataUrl");
+        if (hidden) hidden.value = "";
       });
     }
     if (btnClearModal) {
-      btnClearModal.addEventListener("click", ()=>{ wipeAll(); });
-    }
-
-    // ---------- Orientation / tailles modale ----------
-    const isMobilePhone = () => window.innerWidth <= 768;
-    const isLandscape   = () => window.innerWidth > window.innerHeight;
-
-    function sizeModalCanvasDesktop(){
-      const wrapper = root.querySelector(".cri-canvas-wrapper");
-      const r = wrapper.getBoundingClientRect();
-      const pad = 20, aspect = BASE_ASPECT;
-      let w = Math.max(360, Math.floor(r.width  - pad*2));
-      let h = Math.max(120, Math.floor(r.height - pad*2));
-      if (w/h > aspect) w = Math.floor(h*aspect); else h = Math.floor(w/aspect);
-      fixDPR(modalCanvas,       modalCtx,       w, h);
-      fixDPR(modalExportCanvas, modalExportCtx, w, h);
-      applyModalStyle();
-    }
-    function sizeModalCanvasMobile(){
-      const panelW = Math.max(100, root.querySelector(".cri-controls-panel")?.getBoundingClientRect().width || 120);
-      const pad = 20, aspect = BASE_ASPECT;
-      let availW = Math.max(320, window.innerWidth  - panelW - pad*2);
-      let availH = Math.max(160, window.innerHeight - pad*2);
-      let w = availW, h = availH;
-      if (w/h > aspect) w = Math.floor(h*aspect); else h = Math.floor(w/aspect);
-      fixDPR(modalCanvas,       modalCtx,       w, h);
-      fixDPR(modalExportCanvas, modalExportCtx, w, h);
-      applyModalStyle();
-    }
-
-    function copyToModal(){
-      renderHistoryOn(modalCanvas,       modalCtx,       VISUAL_MODAL_LINE);
-      renderHistoryOn(modalExportCanvas, modalExportCtx, exportLineCSS);
-    }
-
-    function handleOrientationAndResize(){
-      if (!modalIsOpen) return;
-      if (isMobilePhone() && isLandscape()) {
-        rotateGate?.classList.remove("show"); sizeModalCanvasMobile(); copyToModal();
-      } else if (isMobilePhone()) {
-        rotateGate?.classList.add("show");
-      } else {
-        rotateGate?.classList.remove("show"); sizeModalCanvasDesktop(); copyToModal();
-      }
-      needModalResync = true; // on exigera une resynchro avant le prochain trait
-    }
-
-    if (rotateCloseBtn) {
-      rotateCloseBtn.addEventListener("click", ()=>{
-        rotateGate?.classList.remove("show");
-        if (isMobilePhone()) { sizeModalCanvasMobile(); copyToModal(); }
-        needModalResync = true;
-      });
+      btnClearModal.addEventListener("click", () => { wipeAll(); });
     }
 
     // ---------- Ouverture / fermeture modale ----------
     if (btnZoom) {
-      btnZoom.addEventListener("click", ()=>{
+      btnZoom.addEventListener("click", () => {
         modalIsOpen = true;
         document.documentElement.classList.add("no-scroll");
         modalOverlay.classList.add("active");
-        // A11y: rendre la modale interactive et visible pour les AT
-        modalOverlay.removeAttribute('aria-hidden');
-        modalOverlay.removeAttribute('inert');
-        // Focus initial raisonnable à l'ouverture
-        setTimeout(()=>{
+        modalOverlay.removeAttribute("aria-hidden");
+        modalOverlay.removeAttribute("inert");
+        setTimeout(() => {
           const focusTarget = rotateCloseBtn || btnCancel || btnValidate || modalOverlay;
-          if (focusTarget && typeof focusTarget.focus === 'function') { try { focusTarget.focus(); } catch(e){} }
+          if (focusTarget && typeof focusTarget.focus === "function") { try { focusTarget.focus(); } catch (e) {} }
         }, 0);
-        needModalResync = true;
-        handleOrientationAndResize();
+        refreshModalLayout();
       });
     }
+
     function closeModal() {
       modalIsOpen = false;
-      // A11y: si le focus est à l'intérieur, le déplacer hors de la modale
       try {
         const ae = document.activeElement;
         if (ae && modalOverlay && modalOverlay.contains(ae)) {
-          if (btnZoom && typeof btnZoom.focus === 'function') { btnZoom.focus(); }
-          else if (document.body && typeof document.body.focus === 'function') { document.body.focus(); }
+          if (btnZoom && typeof btnZoom.focus === "function") { btnZoom.focus(); }
         }
-      } catch(e){}
+      } catch (e) {}
       modalOverlay.classList.remove("active");
       rotateGate?.classList.remove("show");
       document.documentElement.classList.remove("no-scroll");
-      // A11y: marquer comme caché/inactif
-      modalOverlay?.setAttribute('aria-hidden', 'true');
-      modalOverlay?.setAttribute('inert', '');
+      modalOverlay?.setAttribute("aria-hidden", "true");
+      modalOverlay?.setAttribute("inert", "");
     }
     if (btnCancel) btnCancel.addEventListener("click", closeModal);
 
-    // ---------- Valider : modale → base ----------
+    // Fermer le message pivot sans tourner : signature possible en portrait (échappatoire)
+    if (rotateCloseBtn) {
+      rotateCloseBtn.addEventListener("click", () => {
+        rotateGate?.classList.remove("show");
+        sizeModalCanvas();
+      });
+    }
+
+    // ---------- Valider : re-rendu vectoriel sur la base ----------
     if (btnValidate) {
-      btnValidate.addEventListener("click", ()=>{
-        const m = originalCtx.getTransform();
-        originalCtx.setTransform(1,0,0,1,0,0);
-        originalCtx.clearRect(0,0, originalCanvas.width, originalCanvas.height);
-        originalCtx.imageSmoothingEnabled = true;
-        originalCtx.imageSmoothingQuality = "high";
-        originalCtx.drawImage(
-          modalExportCanvas,
-          0,0, modalExportCanvas.width, modalExportCanvas.height,
-          0,0, originalCanvas.width, originalCanvas.height
-        );
-        originalCtx.setTransform(m);
-        originalCtx.beginPath();
+      btnValidate.addEventListener("click", () => {
+        renderHistoryOn(originalCanvas, originalCtx, BASE_EXPORT_LINE);
         closeModal();
       });
     }
 
     // ---------- Écoutes globales ----------
-    window.addEventListener("orientationchange", ()=>{
+    window.addEventListener("orientationchange", () => {
       adaptCanvasSize();
-      handleOrientationAndResize();
-      needModalResync = true;
-      setTimeout(()=>{ adaptCanvasSize(); handleOrientationAndResize(); needModalResync = true; }, 150);
+      refreshModalLayout();
+      // certains navigateurs mobiles ne stabilisent le viewport qu'après coup
+      setTimeout(() => { adaptCanvasSize(); refreshModalLayout(); }, 250);
     });
-    window.addEventListener("resize", ()=>{
+    window.addEventListener("resize", () => {
       adaptCanvasSize();
-      handleOrientationAndResize();
-      needModalResync = true;
+      refreshModalLayout();
     });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", refreshModalLayout);
+    }
 
     // Champ hidden
     const submitBtn  = document.getElementById("sig-submitBtn");
@@ -864,8 +744,14 @@ function initializeSignatureGestion(uniqId) {
       });
     }
 
-    // Anti double-tap zoom iOS
-    document.addEventListener("touchend", (function(){ let last=0; return function(e){ const now=Date.now(); if (now-last<300) e.preventDefault(); last=now; }; })(), {passive:false});
+    // Anti double-tap zoom iOS (une seule fois par page)
+    if (!document.documentElement.dataset.sigNoDoubleTap) {
+      document.documentElement.dataset.sigNoDoubleTap = "1";
+      document.addEventListener("touchend", (function () {
+        let last = 0;
+        return function (e) { const now = Date.now(); if (now - last < 300) e.preventDefault(); last = now; };
+      })(), { passive: false });
+    }
   })();
 }
 
