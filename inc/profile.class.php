@@ -75,6 +75,13 @@ class PluginGestionProfile extends Profile {
             'field'    => 'plugin_gestion_survey',
             'rights'   => [READ    => __('Read'), UPDATE  => __('Update'), CREATE  => __('Create'), PURGE  => __('Purge')] // 1.5.5
          ],
+         // Boutons flottants (relais du plugin RP quand celui-ci est inactif)
+         ['itemtype' => 'PluginGestionConfig',
+            'label'    => __('Boutons flottants', 'gestion'),
+            'field'    => 'plugin_gestion_boutons',
+            'rights'   => [READ   => __("Bouton d'accueil (scan)", 'gestion'),
+                           UPDATE => __('Bouton sur les tickets', 'gestion')]
+         ],
       ];
 
       return $rights;
@@ -171,7 +178,8 @@ class PluginGestionProfile extends Profile {
                                    ['plugin_gestion_add'          => ALLSTANDARDRIGHT,
                                     'plugin_gestion_sign'         => ALLSTANDARDRIGHT,
                                     'plugin_gestion'              => ALLSTANDARDRIGHT,
-                                    'plugin_gestion_survey'       => ALLSTANDARDRIGHT], true);
+                                    'plugin_gestion_survey'       => ALLSTANDARDRIGHT,
+                                    'plugin_gestion_boutons'      => READ | UPDATE], true);
    }
 
    static function removeRightsFromSession() {

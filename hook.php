@@ -101,6 +101,18 @@ function plugin_gestion_install() { // fonction installation du plugin
    PluginGestionProfile::initProfile();
    PluginGestionProfile::createFirstAccess($_SESSION['glpiactiveprofile']['id']);
 
+   // update_177_180 : mise à jour unique 1.8.0 — boutons flottants
+   // (préférences utilisateur + droit de profil).
+   // Appelé APRÈS initProfile() : la migration alimente les lignes de droits
+   // que celui-ci vient de créer.
+   $update180 = dirname(__FILE__) . '/install/update_177_180.php';
+   if (file_exists($update180)) {
+      require_once $update180;
+      if (function_exists('update_177_180')) {
+         update_177_180();
+      }
+   }
+
    CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
    return true;
 }

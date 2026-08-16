@@ -1,5 +1,17 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.7.7'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.8.0'); // version du plugin
+
+/**
+ * Révision des fichiers JS/CSS.
+ *
+ * GLPI suffixe les assets d'un plugin avec sa version : sans changement de
+ * version, les navigateurs continuent de servir l'ancien fichier. Cette
+ * révision force le rechargement d'un JS ou d'un CSS SANS toucher à la version
+ * du plugin (donc sans repasser par « Mettre à jour »).
+ *
+ * À incrémenter à chaque modification d'un fichier de public/js ou public/css.
+ */
+define('PLUGIN_GESTION_ASSETS_REV', '2');
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 /**
@@ -160,8 +172,42 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
       if (Session::getLoginUserID()) {
          Plugin::registerClass('PluginGestionProfile', ['addtabon' => 'Profile']);
 
-         $PLUGIN_HOOKS['add_css']['gestion'] = ["public/css/signature_gestion.css"];
-         $PLUGIN_HOOKS['add_javascript']['gestion'] = ['public/js/scripts_gestion.js'];
+         // `?r=` : révision des assets, pour forcer le rechargement des JS/CSS
+         // sans changer la version du plugin (GLPI ajoute ensuite son `&v=`).
+         $gestion_rev = '?r=' . PLUGIN_GESTION_ASSETS_REV;
+
+         $PLUGIN_HOOKS['add_css']['gestion'] = ["public/css/signature_gestion.css" . $gestion_rev];
+         $PLUGIN_HOOKS['add_javascript']['gestion'] = ['public/js/scripts_gestion.js' . $gestion_rev];
+
+         /*
+          * Boutons flottants : relais du plugin RP.
+          * Quand RP est actif, c'est lui qui les fournit (avec les rapports en
+          * plus) ; on ne charge donc rien ici pour éviter les doublons. Quand RP
+          * est inactif, Gestion prend le relais sur son propre périmètre (BL).
+          */
+         if (!Plugin::isPluginActive('rp')) {
+            Plugin::registerClass('PluginGestionUserpref', ['addtabon' => 'Preference']);
+
+            $gestion_mode_home   = PluginGestionUserpref::getEffectiveMode('fab_home');
+            $gestion_mode_ticket = PluginGestionUserpref::getEffectiveMode('fab_ticket');
+
+            if ($gestion_mode_home !== PluginGestionUserpref::MODE_NEVER
+                || $gestion_mode_ticket !== PluginGestionUserpref::MODE_NEVER) {
+               $PLUGIN_HOOKS['add_javascript']['gestion'][] = 'public/js/fab_gestion.js' . $gestion_rev;
+               $PLUGIN_HOOKS['add_header_tag']['gestion'] = [
+                  [
+                     'tag'        => 'meta',
+                     'properties' => [
+                        'name'    => 'gestion:fab',
+                        'content' => json_encode([
+                           'fab_home'   => $gestion_mode_home,
+                           'fab_ticket' => $gestion_mode_ticket,
+                        ]),
+                     ],
+                  ],
+               ];
+            }
+         }
       }
 
       if (Session::haveRight('plugin_gestion_survey', READ)) {

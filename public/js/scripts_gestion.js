@@ -1,3 +1,33 @@
+/**
+ * Titre du modal selon ce qui est réellement affiché, pour que le technicien
+ * identifie tout de suite ce qu'il s'apprête à signer.
+ *
+ * Le même modal sert à trois parcours : signature du BL seul, signature du
+ * rapport seul, ou signature groupée Rapport + BL. On se base sur le mode
+ * coché dans le sélecteur rendu par le serveur (gestion_render_combined_radio),
+ * et à défaut sur les paramètres d'appel.
+ */
+function gestion_getCriFormTitle(response, params) {
+   var html = String(response || '');
+   var p    = params || {};
+
+   if (html.indexOf('gestion-combined-mode') !== -1) {
+      if (/id="gcm_rp"[^>]*checked/.test(html)) {
+         return __('Signature du rapport', 'gestion');
+      }
+      return __('Signature Rapport + BL', 'gestion');
+   }
+
+   if (p.force_rp) {
+      return __('Signature du rapport', 'gestion');
+   }
+   if (p.force_combined) {
+      return __('Signature Rapport + BL', 'gestion');
+   }
+
+   return __('Signature du bon de livraison', 'gestion');
+}
+
 function gestion_loadCriForm(action, modal, params) {
    var formInput;
 
@@ -61,7 +91,7 @@ function gestion_loadCriForm(action, modal, params) {
                       return;
                    }
                    glpi_html_dialog({
-                      title: __('Gestion BL', 'gestion'),
+                      title: gestion_getCriFormTitle(response, params),
                       body: response,
                       id: action,
                      afterOpen: function() {
@@ -897,7 +927,9 @@ function initializeSignatureGestion(uniqId) {
     `;
 
     glpi_html_dialog({
-      title: 'Gestion BL',
+      title: defaultMode === 'both'
+         ? 'Signature Rapport + BL'
+         : (defaultMode === 'rp' ? 'Signature du rapport' : 'Signature du bon de livraison'),
       body: body,
       id: modalId,
       show: function(){
@@ -1448,7 +1480,7 @@ function initializeSignatureGestion(uniqId) {
     }
     if (typeof glpi_html_dialog === 'function') {
       glpi_html_dialog({
-        title: 'Gestion BL',
+        title: 'Traitement du bon de livraison',
         body: body,
         id: PROGRESS_MODAL_ID
       });

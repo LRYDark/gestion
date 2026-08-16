@@ -41,12 +41,17 @@ $config = new PluginGestionConfig();
 $survey = new PluginGestionSurvey();
 $doc = new Document();
 
+// Garde-fou : message() est aussi definie par l'autre plugin (RP / Gestion).
+// Sans ce test, charger les deux dans la meme requete provoquerait une
+// erreur fatale de redeclaration.
+if (!function_exists('message')) {
 function message($msg, $msgtype){
     Session::addMessageAfterRedirect(
         __($msg, 'gestion'),
         true,
         $msgtype
     );
+}
 }
 
 function pluginGestionSurveyCheckCSRF(array $data): void {

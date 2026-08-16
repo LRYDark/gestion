@@ -1,9 +1,12 @@
 /* === SIGNATURE.CSS - CSS UNIFIÉ MOBILE/DESKTOP === */
 
-/* Styles généraux pour modal */
-.modal-dialog { 
-    max-width: 1050px; 
-    margin: 1.75rem auto; 
+/* Styles généraux pour modal.
+   `:not(.modal-fullscreen)` est indispensable : sans lui, cette règle a la même
+   spécificité que `.modal-fullscreen` de Bootstrap et, chargée après, elle
+   l'emporte — une fenêtre plein écran ne le serait alors jamais. */
+.modal-dialog:not(.modal-fullscreen) {
+    max-width: 1050px;
+    margin: 1.75rem auto;
 }
 
 .table td, .table td { 
@@ -338,12 +341,20 @@
 }
 
 /* Liens PDF */
+/* Boutons d'en-tête de carte : compacts, pour ne pas écraser le titre.
+   (sans taille explicite ils héritent du 16px gras de .form-label) */
 .pdf-link {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     color: #007bff;
     text-decoration: none;
+    font-size: 13px;
     font-weight: 500;
-    padding: 8px 16px;
+    line-height: 1.3;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    padding: 5px 10px;
     border: 1px solid #007bff;
     border-radius: 4px;
     transition: all 0.3s ease;
@@ -357,11 +368,17 @@
 
 /* Bouton ajout fichiers (vert) */
 .file-add-btn {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     color: #28a745;
     text-decoration: none;
+    font-size: 13px;
     font-weight: 500;
-    padding: 8px 16px;
+    line-height: 1.3;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    padding: 5px 10px;
     border: 1px solid #28a745;
     border-radius: 4px;
     background: transparent;
@@ -677,3 +694,101 @@
 }
 .fab-go-bottom:hover { background: #0056b3; }
 @media print { .fab-go-bottom { display: none; } }
+/* ============================================================
+   Boutons flottants (relais du plugin RP quand celui-ci est inactif)
+   L'habillage utilise les composants natifs GLPI/Tabler : on ne définit
+   ici que la position flottante, le cadre de visée et le panneau bas.
+   ============================================================ */
+.gestion-fab {
+   position: fixed;
+   right: 20px;
+   bottom: 20px;
+   width: 56px;
+   height: 56px;
+   z-index: 1030;
+   box-shadow: 0 4px 14px rgba(0, 0, 0, .28);
+   touch-action: none; /* le bouton est déplaçable au doigt */
+}
+.gestion-fab .ti { font-size: 24px; }
+.gestion-fab + .gestion-fab { bottom: 86px; }
+
+.gestion-scan-video-wrap {
+   position: relative;
+   overflow: hidden;
+   background: #000;
+   border-radius: var(--tblr-border-radius, .25rem);
+}
+.gestion-scan-video-wrap video {
+   width: 100%;
+   max-height: 320px;
+   display: block;
+   object-fit: cover;
+}
+.gestion-scan-frame {
+   position: absolute;
+   top: 50%;
+   left: 50%;
+   transform: translate(-50%, -50%);
+   width: 78%;
+   height: 46%;
+   border: 2px dashed rgba(255, 255, 255, .5);
+   border-radius: var(--tblr-border-radius, .25rem);
+   pointer-events: none;
+}
+.gestion-scan-frame span {
+   position: absolute;
+   width: 22px;
+   height: 22px;
+   border-color: var(--tblr-primary, #206bc4);
+   border-style: solid;
+   border-width: 0;
+}
+.gestion-scan-frame .tl { top: -2px; left: -2px; border-top-width: 3px; border-left-width: 3px; }
+.gestion-scan-frame .tr { top: -2px; right: -2px; border-top-width: 3px; border-right-width: 3px; }
+.gestion-scan-frame .bl { bottom: -2px; left: -2px; border-bottom-width: 3px; border-left-width: 3px; }
+.gestion-scan-frame .br { bottom: -2px; right: -2px; border-bottom-width: 3px; border-right-width: 3px; }
+
+/* Téléphone : panneaux ancrés en bas de l'écran (accessibles à une main).
+   Ordinateur : position GLPI par défaut, en haut de la page. */
+@media (max-width: 768px) {
+   .modal.gestion-sheet .modal-dialog {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      display: flex;
+      align-items: flex-end;
+      height: auto !important;
+      max-height: 85svh;
+   }
+
+   .modal.gestion-sheet .modal-content {
+      width: 100%;
+      max-height: 85svh;
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+      border-bottom: 0;
+   }
+
+   .modal.gestion-sheet .modal-body {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+   }
+
+   .modal.gestion-sheet.fade .modal-dialog {
+      transform: translateY(100%);
+      transition: transform .25s ease-out;
+   }
+   .modal.gestion-sheet.show .modal-dialog {
+      transform: none;
+   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+   .modal.gestion-sheet.fade .modal-dialog { transition: none; }
+}
+
+@media print { .gestion-fab { display: none !important; } }

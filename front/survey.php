@@ -50,7 +50,7 @@ if ($gestion->canView()) {
    if (defined('GESTION_AUTO_SCAN') && GESTION_AUTO_SCAN) {
       echo '<script>window.GESTION_AUTO_SCAN = true;</script>';
    }
-   echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . (defined('PLUGIN_GESTION_VERSION') ? PLUGIN_GESTION_VERSION : '1') . '" defer></script>';
+   echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?r=' . (defined('PLUGIN_GESTION_ASSETS_REV') ? PLUGIN_GESTION_ASSETS_REV : '1') . '" defer></script>';
    echo '<style>
       a.btn[href*="signature_bl=1"] {
          background-color: transparent !important;

@@ -67,12 +67,12 @@ class PluginGestionCri extends CommonDBTM {
       $uniq = 'cri'.mt_rand(10000,99999);
 
       // Inclure les fichiers CSS et JS externes
-      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css">';
+      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css?r=' . (defined('PLUGIN_GESTION_ASSETS_REV') ? PLUGIN_GESTION_ASSETS_REV : '1') . '">';
       // Remote signature additions
       echo '<script>
          window.GLPI_PLUG_GESTION = "' . PLUGIN_GESTION_WEBDIR . '";
       </script>';
-      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?v=' . (defined('PLUGIN_GESTION_VERSION') ? PLUGIN_GESTION_VERSION : '1') . '" defer></script>';
+      echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?r=' . (defined('PLUGIN_GESTION_ASSETS_REV') ? PLUGIN_GESTION_ASSETS_REV : '1') . '" defer></script>';
 
       // Style CSS inline pour hauteur responsive
          $responsiveIframeStyle = "
@@ -239,7 +239,7 @@ class PluginGestionCri extends CommonDBTM {
 
                   echo '<div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">';
                      echo '<span>Visualisation du document</span>';
-                     echo '<a href="' . $DocUrlSharePoint . '" target="_blank" class="pdf-link">Voir le PDF en plein écran</a>';
+                     echo '<a href="' . $DocUrlSharePoint . '" target="_blank" class="pdf-link" title="Voir le PDF en plein écran"><i class="ti ti-arrows-maximize"></i> Plein écran</a>';
                   echo '</div>';
                   echo '<div class="form-content">';
                   echo '<object data="' . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . '#view=FitH" '
@@ -262,7 +262,7 @@ class PluginGestionCri extends CommonDBTM {
             echo '<div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">';
                echo '<span>Ajouter un fichier / image</span>';
                echo '<input type="file" id="capture-file-input" accept="image/png,image/jpeg,application/pdf" multiple style="display:none;">';
-               echo '<button type="button" onclick="document.getElementById(\'capture-file-input\').click();" id="capture-file-btn" class="file-add-btn">Prendre Photos / Joindre PDF</button>';
+               echo '<button type="button" onclick="document.getElementById(\'capture-file-input\').click();" id="capture-file-btn" class="file-add-btn" title="Prendre des photos ou joindre un PDF"><i class="ti ti-camera"></i> Photo / PDF</button>';
             echo '</div>';
             echo '<div class="form-content">';
                echo '<div style="margin-top:8px;font-size:0.85em;color:#666;">';
@@ -1151,7 +1151,7 @@ class PluginGestionCri extends CommonDBTM {
 
                   echo '<div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">';
                      echo '<span>Document signé</span>';
-                     echo '<a href="' . $DocUrlSharePoint . '" target="_blank" class="pdf-link">Voir le PDF en plein écran</a>';
+                     echo '<a href="' . $DocUrlSharePoint . '" target="_blank" class="pdf-link" title="Voir le PDF en plein écran"><i class="ti ti-arrows-maximize"></i> Plein écran</a>';
                   echo '</div>';
                   echo '<div class="form-content">';
                   echo '<object data="' . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . '#view=FitH" '
@@ -1258,7 +1258,7 @@ class PluginGestionCri extends CommonDBTM {
       global $DB, $CFG_GLPI;
 
       // CSS gestion pour les cartes BL
-      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css">';
+      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css?r=' . (defined('PLUGIN_GESTION_ASSETS_REV') ? PLUGIN_GESTION_ASSETS_REV : '1') . '">';
 
       $config     = PluginGestionConfig::getInstance();
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
@@ -1323,7 +1323,7 @@ class PluginGestionCri extends CommonDBTM {
          <div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
             <span>Visualisation du document</span>
             <?php if (!empty($DocUrlSharePoint)) { ?>
-               <a href="<?php echo $DocUrlSharePoint; ?>" target="_blank" class="pdf-link">Voir le PDF en plein écran</a>
+               <a href="<?php echo $DocUrlSharePoint; ?>" target="_blank" class="pdf-link" title="Voir le PDF en plein écran"><i class="ti ti-arrows-maximize"></i> Plein écran</a>
             <?php } ?>
          </div>
          <div class="form-content">
@@ -1341,7 +1341,7 @@ class PluginGestionCri extends CommonDBTM {
          <div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
             <span>Ajouter un fichier / image</span>
             <input type="file" id="capture-file-input" accept="image/png,image/jpeg,application/pdf" multiple style="display:none;">
-            <button type="button" onclick="document.getElementById('capture-file-input').click();" id="capture-file-btn" class="file-add-btn">Prendre Photos / Joindre PDF</button>
+            <button type="button" onclick="document.getElementById('capture-file-input').click();" id="capture-file-btn" class="file-add-btn" title="Prendre des photos ou joindre un PDF"><i class="ti ti-camera"></i> Photo / PDF</button>
          </div>
          <div class="form-content">
             <div style="margin-top:8px;font-size:0.85em;color:#666;">
@@ -1668,7 +1668,7 @@ class PluginGestionCri extends CommonDBTM {
    function showCombinedMultiForm($ticket_id, $options = []) {
       global $DB, $CFG_GLPI;
 
-      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css">';
+      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css?r=' . (defined('PLUGIN_GESTION_ASSETS_REV') ? PLUGIN_GESTION_ASSETS_REV : '1') . '">';
 
       $config = PluginGestionConfig::getInstance();
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
@@ -1730,7 +1730,7 @@ class PluginGestionCri extends CommonDBTM {
          echo '<div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">';
             echo '<span>Ajouter un fichier / image</span>';
             echo '<input type="file" id="capture-file-input" accept="image/png,image/jpeg,application/pdf" multiple style="display:none;">';
-            echo '<button type="button" onclick="document.getElementById(\'capture-file-input\').click();" id="capture-file-btn" class="file-add-btn">Prendre Photos / Joindre PDF</button>';
+            echo '<button type="button" onclick="document.getElementById(\'capture-file-input\').click();" id="capture-file-btn" class="file-add-btn" title="Prendre des photos ou joindre un PDF"><i class="ti ti-camera"></i> Photo / PDF</button>';
          echo '</div>';
          echo '<div class="form-content">';
             echo '<div style="margin-top:8px;font-size:0.85em;color:#666;">';
