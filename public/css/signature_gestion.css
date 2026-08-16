@@ -791,4 +791,53 @@
    .modal.gestion-sheet.fade .modal-dialog { transition: none; }
 }
 
+/* ============================================================
+   Modal de choix « Compléter l'intervention / Signer Rapport + BL »
+   Il est produit par glpi_html_dialog, sans classe propre : on le
+   reconnaît à son contenu (`.gestion-choice`). Sur téléphone il
+   s'ouvre en feuille du bas, comme les autres modals des plugins,
+   pour que les boutons restent atteignables au pouce.
+   `.modal .modal-dialog:has(…)` : spécificité volontairement
+   supérieure à `.modal-dialog:not(.modal-fullscreen)`, que les deux
+   plugins déclarent et qui impose sinon `margin: 1.75rem auto`.
+   ============================================================ */
+@media (max-width: 767.98px) {
+   .modal .modal-dialog:has(.gestion-choice) {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      display: flex;
+      align-items: flex-end;
+      height: auto !important;
+      max-height: 85svh;
+   }
+
+   .modal .modal-dialog:has(.gestion-choice) > .modal-content {
+      width: 100%;
+      max-height: 85svh;
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+      border-bottom: 0;
+   }
+
+   /* Le récapitulatif peut allonger le contenu : il défile, les boutons non. */
+   .modal .modal-dialog:has(.gestion-choice) .modal-body {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+   }
+
+   /* Boutons empilés en pleine largeur : cible large, atteignable au pouce. */
+   .gestion-choice .gestion-choice-actions {
+      flex-direction: column;
+   }
+
+   .gestion-choice .gestion-choice-actions > .btn {
+      width: 100%;
+   }
+}
+
 @media print { .gestion-fab { display: none !important; } }
