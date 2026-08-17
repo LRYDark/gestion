@@ -75,12 +75,45 @@ function gestion_scan_bl_result(array $row, string $webdir, string $rootdoc): ar
    $signed     = (int)($row['signed'] ?? 0);
    $tickets_id = (int)($row['tickets_id'] ?? 0);
 
-   $actions = [[
-      'label'   => $signed === 1 ? __('Voir le BL signé', 'gestion') : __('Signer le BL', 'gestion'),
-      'url'     => $webdir . '/front/survey.form.php?id=' . $survey_id,
-      'icon'    => $signed === 1 ? 'ti ti-eye' : 'ti ti-signature',
-      'primary' => $signed !== 1,
-   ]];
+   if ($signed === 1) {
+      $actions = [[
+         'label'   => __('Voir le BL signé', 'gestion'),
+         'url'     => $webdir . '/front/survey.form.php?id=' . $survey_id,
+         'icon'    => 'ti ti-eye',
+         'primary' => false,
+      ]];
+   } else {
+      /*
+       * Le formulaire de signature s'ouvre DIRECTEMENT : le ticket associé est
+       * déjà connu ici, il n'y a aucune question à reposer.
+       *   - ticket associé => formulaire combiné « Rapport + BL »
+       *   - aucun ticket   => formulaire du BL seul, parcours normal
+       * `force_combined` reste contrôlé côté serveur : sans tâche sur le ticket,
+       * ajax/cri.php retombe sur son message et ses choix habituels.
+       */
+      $combined    = $tickets_id > 0 && Plugin::isPluginActive('rp');
+      $sign_params = [
+         'job'        => $tickets_id,
+         'root_doc'   => $webdir,
+         'root_modal' => 'gestion-scan-sign',
+      ];
+      if ($combined) {
+         $sign_params['force_combined'] = 1;
+      }
+
+      $actions = [[
+         'label'   => $combined ? __('Signer BL + rapport', 'gestion') : __('Signer le BL', 'gestion'),
+         // Repli si le script de signature n'est pas chargé.
+         'url'     => $webdir . '/front/survey.form.php?id=' . $survey_id,
+         'icon'    => 'ti ti-signature',
+         'primary' => true,
+         'open'    => [
+            'handler' => 'gestion',
+            'modal'   => (string)$survey_id,
+            'params'  => $sign_params,
+         ],
+      ]];
+   }
 
    $subtitle = __('Aucun ticket associé', 'gestion');
    if ($tickets_id > 0) {
@@ -138,12 +171,27 @@ function gestion_scan_ticket_result(Ticket $ticket, string $webdir, string $root
          $subtitle .= ' — ' . (string)$bl['bl'];
          $badge     = $signed === 1 ? ['label' => __('BL signé', 'gestion'), 'style' => 'ok']
                                     : ['label' => __('BL à signer', 'gestion'), 'style' => 'warn'];
-         $actions[] = [
-            'label'   => $signed === 1 ? __('Voir le BL signé', 'gestion') : __('Signer le BL', 'gestion'),
+         // Même raccourci : le ticket étant connu, on ouvre directement le
+         // formulaire combiné.
+         $bl_action = [
+            'label'   => $signed === 1 ? __('Voir le BL signé', 'gestion') : __('Signer BL + rapport', 'gestion'),
             'url'     => $webdir . '/front/survey.form.php?id=' . (int)$bl['id'],
             'icon'    => $signed === 1 ? 'ti ti-eye' : 'ti ti-signature',
             'primary' => false,
          ];
+         if ($signed !== 1) {
+            $bl_action['open'] = [
+               'handler' => 'gestion',
+               'modal'   => (string)$bl['id'],
+               'params'  => [
+                  'job'            => $ticket_id,
+                  'root_doc'       => $webdir,
+                  'root_modal'     => 'gestion-scan-sign',
+                  'force_combined' => 1,
+               ],
+            ];
+         }
+         $actions[] = $bl_action;
       }
    }
 

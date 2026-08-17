@@ -116,7 +116,7 @@ if (!function_exists('gestion_render_ticket_summary')) {
             __('Bon de livraison', 'gestion'),
             $bl_signed === 0
                ? '<span class="badge bg-warning text-dark">' . __('À faire signer', 'gestion') . '</span>'
-               : '<span class="badge bg-success">' . __('Signé', 'gestion') . '</span>',
+               : '<span class="badge bg-success text-white">' . __('Signé', 'gestion') . '</span>',
             false,
             $note
          );

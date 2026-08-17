@@ -840,4 +840,42 @@
    }
 }
 
+/* ============================================================
+   Résultats du scanner : actions confortables au doigt
+   Sur téléphone, les actions passent en pleine largeur, empilées,
+   avec une hauteur d'au moins 38px : la pleine largeur rend déjà la
+   cible large, au-delà les boutons mangeaient l'écran pour rien.
+   Côte à côte en `btn-sm`, elles étaient trop petites au pouce.
+   ============================================================ */
+/* Toutes tailles d'écran : un peu plus généreux que `btn-sm`, pour que le
+   rendu sur ordinateur corresponde à celui du téléphone. */
+.gestion-scan-actions {
+   gap: .4rem;
+   margin-top: .4rem;
+}
+
+.gestion-scan-actions > .btn {
+   min-height: 30px;
+   font-size: .875rem;
+   padding-left: .65rem;
+   padding-right: .65rem;
+   margin: 0 !important;
+}
+
+/* Téléphone : pleine largeur et empilés, pour viser au pouce sans erreur. */
+@media (max-width: 767.98px) {
+   .gestion-scan-actions {
+      flex-direction: column;
+      gap: .5rem;
+      margin-top: .5rem;
+   }
+
+   .gestion-scan-actions > .btn {
+      width: 100%;
+      min-height: 38px;
+      font-size: .9375rem;
+      justify-content: center;
+   }
+}
+
 @media print { .gestion-fab { display: none !important; } }

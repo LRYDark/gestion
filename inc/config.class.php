@@ -239,7 +239,7 @@ class PluginGestionConfig extends CommonDBTM
                <label class="form-label mb-1 d-block"><?php echo __('API application tierce', 'gestion'); ?></label>
                <div class="d-flex flex-wrap align-items-center gap-2">
                   <?php if ($api_hl_enabled): ?>
-                  <span class="badge bg-success"><?php echo __('API v2 active', 'gestion'); ?></span>
+                  <span class="badge bg-success text-white"><?php echo __('API v2 active', 'gestion'); ?></span>
                   <?php endif; ?>
                   <?php if ($api_legacy_enabled): ?>
                   <span class="badge bg-warning text-dark"><?php echo __('API legacy active', 'gestion'); ?></span>

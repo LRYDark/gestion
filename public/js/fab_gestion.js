@@ -57,6 +57,18 @@
    }
 
    /**
+    * Le script capable d'ouvrir ce formulaire est-il chargé ?
+    * Sans ce test, on afficherait un bouton inerte quand le plugin concerné
+    * est absent ou désactivé.
+    */
+   function signHandlerAvailable(handler) {
+      if (handler === 'rp') {
+         return typeof rp_loadCriForm === 'function';
+      }
+      return typeof gestion_loadCriForm === 'function';
+   }
+
+   /**
     * Bouton flottant déplaçable, position mémorisée par navigateur.
     */
    function createFab(options) {
@@ -261,6 +273,44 @@
          modal = new bootstrap.Modal(modalEl, {});
       }
 
+      /*
+       * Clic sur « Signer » : on FERME d'abord la feuille de scan, puis on ouvre
+       * le formulaire de signature. Imbriquer deux modals Bootstrap laisse un
+       * voile résiduel qui masque toute la page une fois le second refermé.
+       */
+      els.results.addEventListener('click', function (event) {
+         var button = event.target.closest('.gestion-scan-sign');
+         if (!button) {
+            return;
+         }
+         event.preventDefault();
+
+         var action;
+         try {
+            action = JSON.parse(button.dataset.open || '{}');
+         } catch (e) {
+            return;
+         }
+         if (!action.modal || !signHandlerAvailable(action.handler)) {
+            return;
+         }
+
+         var open = function () {
+            if (action.handler === 'rp') {
+               rp_loadCriForm('showCriForm', String(action.modal), action.params || {});
+            } else {
+               gestion_loadCriForm('showCriForm', String(action.modal), action.params || {});
+            }
+         };
+
+         if (modal && els.modalEl) {
+            els.modalEl.addEventListener('hidden.bs.modal', open, { once: true });
+            modal.hide();
+         } else {
+            open();
+         }
+      });
+
       createFab({
          id: 'home',
          icon: 'ti ti-scan',
@@ -367,12 +417,25 @@
 
          var body = new URLSearchParams();
          body.append('q', q);
+         // Conservé pour compatibilité, mais c'est l'en-tête ci-dessous que
+         // GLPI 11 utilise réellement.
          body.append('_glpi_csrf_token', csrf());
 
          fetch(scanUrl, {
             method: 'POST',
             credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            /*
+             * GLPI 11 contrôle le jeton CSRF dans un écouteur du noyau, AVANT
+             * d'atteindre le script. Signalée AJAX, la requête voit son jeton
+             * lu dans l'en-tête `X-Glpi-Csrf-Token` et CONSERVÉ, donc
+             * réutilisable ; sinon il est lu dans le corps et CONSOMMÉ, et
+             * toute recherche suivante échoue.
+             */
+            headers: {
+               'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+               'X-Requested-With': 'XMLHttpRequest',
+               'X-Glpi-Csrf-Token': csrf()
+            },
             body: body.toString()
          })
          .then(function (r) { return r.json(); })
@@ -414,11 +477,23 @@
 
             var actions = '';
             (item.actions || []).forEach(function (action) {
-               actions += '<a class="btn btn-sm '
+               var classes = 'btn btn-sm '
                   + (action.primary ? 'btn-primary' : 'btn-outline-secondary')
-                  + ' me-2 mt-2" href="' + esc(action.url) + '">'
-                  + '<i class="' + esc(action.icon || 'ti ti-arrow-right') + ' me-1"></i>'
-                  + esc(action.label) + '</a>';
+                  + ' me-2 mt-2';
+               var inner = '<i class="' + esc(action.icon || 'ti ti-arrow-right') + ' me-1"></i>'
+                  + esc(action.label);
+
+               // Action ouvrant un formulaire sur place, sans passer par la page
+               // du BL. Le lien reste en repli si le script concerné n'est pas
+               // chargé (cf. le clic plus bas).
+               if (action.open && signHandlerAvailable(action.open.handler)) {
+                  actions += '<button type="button" class="' + classes + ' gestion-scan-sign" '
+                     + 'data-open="' + esc(JSON.stringify(action.open)) + '">'
+                     + inner + '</button>';
+                  return;
+               }
+               actions += '<a class="' + classes + '" href="' + esc(action.url) + '">'
+                  + inner + '</a>';
             });
 
             row.innerHTML =
@@ -426,7 +501,7 @@
                + '<span class="fw-bold">' + esc(item.title || '') + '</span>' + badge
                + '</div>'
                + (item.subtitle ? '<div class="text-muted small">' + esc(item.subtitle) + '</div>' : '')
-               + '<div class="d-flex flex-wrap">' + actions + '</div>';
+               + '<div class="d-flex flex-wrap gestion-scan-actions">' + actions + '</div>';
 
             els.results.appendChild(row);
          });
