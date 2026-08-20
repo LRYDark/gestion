@@ -11,7 +11,7 @@ define('PLUGIN_GESTION_VERSION', '1.8.0'); // version du plugin
  *
  * À incrémenter à chaque modification d'un fichier de public/js ou public/css.
  */
-define('PLUGIN_GESTION_ASSETS_REV', '9');
+define('PLUGIN_GESTION_ASSETS_REV', '14');
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 /**

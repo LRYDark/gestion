@@ -11,25 +11,14 @@ global $DB, $CFG_GLPI;
 /**
  * Radio « Signature Rapport » / « Signature Rapport + BL » en haut du modal combine.
  * onchange => gestion_switchCombinedMode (recharge le formulaire dans le modal).
+ *
+ * Le rendu vit desormais dans PluginGestionCri, pour que le plugin RP puisse
+ * proposer le meme choix depuis ses propres formulaires. Cette fonction reste
+ * comme raccourci local : elle est appelee a plusieurs endroits du fichier.
  */
 if (!function_exists('gestion_render_combined_radio')) {
    function gestion_render_combined_radio(string $mode, int $bl_id, array $params): string {
-      $base = $params;
-      unset($base['force_rp'], $base['force_combined'], $base['force_bl']);
-      $data = htmlspecialchars(json_encode($base), ENT_QUOTES);
-      $rp   = ($mode === 'rp')   ? 'checked' : '';
-      $both = ($mode === 'both') ? 'checked' : '';
-      $h  = '<div class="mb-3 text-center gestion-combined-mode" data-bl="' . $bl_id . '" data-params="' . $data . '">';
-      $h .= '<div class="form-check form-check-inline">';
-      $h .= '<input class="form-check-input" type="radio" name="gestion_combined_mode" id="gcm_rp" value="rp" ' . $rp . ' onchange="gestion_switchCombinedMode(this);">';
-      $h .= '<label class="form-check-label" for="gcm_rp">' . __('Signature Rapport', 'gestion') . '</label>';
-      $h .= '</div>';
-      $h .= '<div class="form-check form-check-inline">';
-      $h .= '<input class="form-check-input" type="radio" name="gestion_combined_mode" id="gcm_both" value="both" ' . $both . ' onchange="gestion_switchCombinedMode(this);">';
-      $h .= '<label class="form-check-label" for="gcm_both">' . __('Signature Rapport + BL', 'gestion') . '</label>';
-      $h .= '</div>';
-      $h .= '</div>';
-      return $h;
+      return PluginGestionCri::renderCombinedModeRadio($mode, $bl_id, $params);
    }
 }
 
@@ -133,6 +122,11 @@ switch ($action) {
    case 'showCriForm' :
       $PluginGestionCri = new PluginGestionCri();
       $params           = $_POST["params"] ?? [];
+      if (!is_array($params)) {
+         // Meme garde que rp/ajax/cri.php : un `params` scalaire force ferait
+         // lire des offsets de chaine sur chaque drapeau, et PHP 8 leve.
+         $params = [];
+      }
       $bl_id            = (int)($_POST["modal"] ?? 0);
       $force_bl         = !empty($params['force_bl']);       // « Signer le BL seul quand meme »
       $force_combined   = !empty($params['force_combined']); // « Signer Rapport + BL »
@@ -155,6 +149,31 @@ switch ($action) {
       $rp_active = Plugin::isPluginActive('rp')
                    && class_exists('PluginRpCri')
                    && class_exists('PluginRpConfig');
+
+      /*
+       * Droit de VOIR le formulaire de rapport, et pas seulement d'etre connecte.
+       *
+       * Ce point d'entree rend le formulaire du plugin RP, qui expose les taches,
+       * les suivis et les adresses du ticket. Le point d'entree de RP, lui, exige
+       * la regle d'acces du plugin ET la visibilite du ticket (rp/ajax/cri.php).
+       * Passer par ici ne doit pas etre une porte plus permissive que celle-la,
+       * d'autant que le rapport d'intervention y renvoie desormais lui-meme.
+       *
+       * `canUse` et non `checkUseAjax` : un refus n'est pas une erreur. Ne pas
+       * avoir le droit de produire un rapport n'empeche pas de signer un bon —
+       * on retombe alors sur la signature du BL seul, exactement comme lorsque
+       * le plugin RP est absent.
+       *
+       * Sans niveau explicite : celui declare pour la fonctionnalite
+       * (rp/inc/access.class.php) reste la reference unique.
+       */
+      $rp_allowed = false;
+      if ($rp_active && $ticket_id > 0 && class_exists('PluginRpAccess')) {
+         $rp_ticket  = new Ticket();
+         $rp_allowed = $rp_ticket->getFromDB($ticket_id)
+                       && $rp_ticket->canViewItem()
+                       && PluginRpAccess::canUse('rapport_tech');
+      }
 
       /*
        * Comptage des taches (le formulaire RP exige >=1 tache). Identique au
@@ -181,12 +200,50 @@ switch ($action) {
 
       // Radio « Rapport seul » / « Rapport + BL » : rendu du formulaire choisi DANS le modal.
       // (force_combined = « Signer Rapport + BL » ; force_rp = bascule vers « Rapport seul ».)
-      if (($force_combined || $force_rp) && $rp_active && $ticket_id > 0 && !$is_signed && $task_count > 0) {
+      if (($force_combined || $force_rp) && $rp_allowed && $ticket_id > 0 && !$is_signed && $task_count > 0) {
+         /*
+          * Le technicien vient du rapport d'atelier du plugin RP, ou il y a
+          * repondu « le client repart avec ». Sa reponse reste affichee ici,
+          * au-dessus de tout : sans elle il perdrait la main sur le sort du
+          * materiel en venant signer le BL, et devrait rouvrir le modal.
+          *
+          * Rendue HORS du formulaire, donc jamais postee : elle ne sert qu'a
+          * rebasculer, c'est le formulaire d'atelier qui commande la livraison.
+          */
+         /*
+          * `form-container` : la MEME gouttiere que celle du formulaire qui
+          * suit. Ces cartes sont rendues avant lui, donc en dehors ; sans ce
+          * conteneur elles s'affichaient 30 px plus larges que toutes les
+          * autres, decalees vers la gauche.
+          *
+          * Conteneur distinct de celui du formulaire, jamais imbrique : deux
+          * gouttieres l'une dans l'autre doubleraient la marge.
+          */
+         echo '<div class="form-container">';
+         // `method_exists` : methode NEUVE du plugin RP. Sur une version
+         // anterieure, la classe existe mais pas la methode, et l'appel
+         // remplacerait le formulaire par une page blanche.
+         if (!empty($params['from_atelier'])
+             && class_exists('PluginRpPreparation')
+             && method_exists('PluginRpPreparation', 'showDestinationCard')) {
+            PluginRpPreparation::showDestinationCard($ticket_id, 'form_rapport');
+         }
          echo gestion_render_combined_radio($force_rp ? 'rp' : 'both', $bl_id, $params);
+         echo '</div>';
          if ($force_rp) {
             $_POST['modal'] = 'form_rapport';
             $rp = new PluginRpCri();
-            $rp->showForm($ticket_id, ['modal' => 'form_rapport']);
+            /*
+             * PAS de mode integre ici, contrairement au formulaire combine :
+             * l'action reste celle du plugin RP, et sa reponse EST le PDF. Sans
+             * le `target="_blank"` que RP pose lui-meme, la page du ticket etait
+             * remplacee par le document, le contexte JS mourait avec elle et le
+             * modal ne se refermait jamais.
+             *
+             * `bl_choice` : le choix « Rapport / Rapport + BL » est deja rendu
+             * juste au-dessus par ce fichier — RP ne doit pas en poser un second.
+             */
+            $rp->showForm($ticket_id, ['modal' => 'form_rapport', 'bl_choice' => false]);
          } else {
             $unsigned_count = countElementsInTable('glpi_plugin_gestion_surveys', ['tickets_id' => $ticket_id, 'signed' => 0]);
             if ($unsigned_count > 1) {
@@ -206,6 +263,17 @@ switch ($action) {
        * repondu. Ceux qui arrivent jusqu'ici sont donc sans tache, et doivent
        * recevoir le message et les choix prevus pour ce cas plutot que de
        * basculer silencieusement sur la signature du BL seul.
+       */
+      /*
+       * `$rp_active` et NON `$rp_allowed` : ce bloc ne rend pas que du HTML RP.
+       *
+       * Il porte aussi la redirection du scanner et la regle « exiger au moins
+       * une tache » (NoTaskSignMode), qui sont des regles de l'ENTREPRISE, pas
+       * des droits de l'utilisateur. Les faire dependre du droit rapport les
+       * aurait rendues contournables : il suffisait de ne pas avoir ce droit
+       * pour se voir offrir la signature du BL seul, precisement ce que le
+       * reglage interdit. Le controle de droit est applique plus bas, au seul
+       * endroit qui produit le formulaire de rapport.
        */
       if (!$force_bl && $rp_active && $ticket_id > 0 && !$is_signed) {
          $context   = (string)($params['root_modal'] ?? '');
@@ -229,9 +297,25 @@ switch ($action) {
 
          // ---- Au moins une tache : rapport generable ----
          if ($task_count > 0) {
+            /*
+             * Rapport generable, mais pas par celui-ci : on signe le bon seul,
+             * exactement comme lorsque le plugin RP est absent. Un refus sec
+             * priverait de la signature du BL, a laquelle il a bien droit.
+             */
+            if (!$rp_allowed) {
+               $PluginGestionCri->showForm($job, [
+                  'modal'      => $bl_id,
+                  'root_modal' => $params["root_modal"] ?? '',
+               ]);
+               break;
+            }
             if ($on_ticket) {
                // Sur le ticket : radio (Rapport / Rapport + BL) + modal combinee (1 BL) ou groupee (>=2 BL).
-               echo gestion_render_combined_radio('both', $bl_id, $params);
+               // Meme gouttiere que le formulaire qui suit : rendue avant lui,
+               // la carte serait sinon plus large que toutes les autres.
+               echo '<div class="form-container">'
+                  . gestion_render_combined_radio('both', $bl_id, $params)
+                  . '</div>';
                $unsigned_count = countElementsInTable('glpi_plugin_gestion_surveys', ['tickets_id' => $ticket_id, 'signed' => 0]);
                if ($unsigned_count > 1) {
                   $PluginGestionCri->showCombinedMultiForm($ticket_id, []);

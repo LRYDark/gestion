@@ -90,7 +90,8 @@ if ($gestion->canView()) {
       ['url' => $url_all,      'label' => 'Tous les BL',                    'count' => $nb_signed + $nb_unsigned, 'color' => 'primary', 'icon' => 'ti ti-list'],
       ['url' => $url_signed,   'label' => 'BL signés',                      'count' => $nb_signed,   'color' => 'success', 'icon' => 'ti ti-circle-check'],
       ['url' => $url_unsigned, 'label' => 'BL non signés',                  'count' => $nb_unsigned, 'color' => 'warning', 'icon' => 'ti ti-signature'],
-      ['url' => $url_late,     'label' => 'Non signés depuis + de 14 jours', 'count' => $nb_late,     'color' => 'danger',  'icon' => 'ti ti-alert-triangle'],
+      ['url' => $url_late,     'label' => 'Non signés depuis + de 14 jours', 'count' => $nb_late,     'color' => 'danger',  'icon' => 'ti ti-alert-triangle',
+       'tooltip' => "Bons de livraison non signés depuis plus de 14 jours"],
    ];
    echo '<div class="card mb-2" id="gestionBlStatsBar">';
    echo '<div class="card-body py-2 px-3 d-flex flex-wrap align-items-center">';
@@ -100,7 +101,14 @@ if ($gestion->canView()) {
          echo '<div class="vr mx-3 my-1"></div>';
       }
       $first = false;
-      echo '<a href="' . htmlspecialchars($c['url'], ENT_QUOTES) . '" class="d-flex align-items-center gap-2 text-decoration-none text-reset py-1" title="' . htmlspecialchars(__('Cliquer pour filtrer la liste', 'gestion'), ENT_QUOTES) . '">';
+      /*
+       * L'infobulle doit se suffire à elle-même : un libellé abrégé pour tenir
+       * dans la barre perd son sens lu isolément. D'où `tooltip`, qui donne la
+       * phrase complète, et le libellé en repli quand il est déjà explicite.
+       * Que la vignette soit cliquable se voit au curseur.
+       */
+      $c_title = trim((string)($c['tooltip'] ?? '')) !== '' ? $c['tooltip'] : $c['label'];
+      echo '<a href="' . htmlspecialchars($c['url'], ENT_QUOTES) . '" class="d-flex align-items-center gap-2 text-decoration-none text-reset py-1" title="' . htmlspecialchars($c_title, ENT_QUOTES) . '">';
       echo '<span class="avatar avatar-sm bg-' . $c['color'] . '-lt"><i class="' . $c['icon'] . '"></i></span>';
       echo '<span class="d-flex flex-column lh-sm">';
       echo '<span class="h2 fw-bold mb-0">' . (int)$c['count'] . '</span>';

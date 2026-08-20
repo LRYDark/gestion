@@ -74,12 +74,33 @@ $SeeFilePath = '';
 try {
    $rp_dir = Plugin::getPhpDir('rp');
    ob_start();
+   /*
+    * Marqueur lu par le generateur : il produit alors le document sans decider
+    * de l'afficher ni de rediriger, ces deux choix appartenant au parcours qui
+    * l'appelle. Sans lui, le reglage « Affichage du PDF apres signature » du
+    * plugin RP sur Non le ferait rediriger ici meme, coupant la signature du BL
+    * avant qu'elle n'ait lieu.
+    */
+   $GLOBALS['PLUGIN_RP_PDF_EMBEDDED'] = true;
    include $rp_dir . '/front/cripdf.form.php';
+   unset($GLOBALS['PLUGIN_RP_PDF_EMBEDDED']);
    ob_end_clean();
    $rp_pdf = $SeeFilePath ?? '';
 } catch (Throwable $e) {
+   unset($GLOBALS['PLUGIN_RP_PDF_EMBEDDED']);
    $rp_pdf = '';
 }
+
+/*
+ * Le rapport est INCLUS, pas appele : il s'execute dans cette portee et y
+ * reaffecte `$config` avec la configuration du plugin RP. Les envois de mail
+ * plus bas lisaient donc MailTo, gabarit et ZenDocMail sur le mauvais objet —
+ * champs absents, donc conditions toujours fausses : le client ne recevait
+ * jamais ses documents signes, sans la moindre erreur.
+ *
+ * `getInstance()` est idempotent : on reprend simplement la bonne.
+ */
+$config = PluginGestionConfig::getInstance();
 
 if (empty($rp_pdf) || !file_exists($rp_pdf)) {
    gestion_combined_message("Generation du rapport impossible.", ERROR);
@@ -160,6 +181,43 @@ if (!empty($config->fields['ZenDocMail'])) {
    );
 }
 
+gestion_combined_message("BL + Rapport signés et fusionnés.", INFO);
+
+/*
+ * Affichage du document produit, comme le fait la signature d'un BL seul et
+ * celle d'un rapport seul.
+ *
+ * C'est le PDF FUSIONNÉ que l'on montre : celui du BL et celui du rapport ont
+ * été produits dans des tampons refermés, et ne représentent chacun qu'une
+ * moitié de ce qui vient d'être signé.
+ *
+ * Le formulaire porte `target="_blank"` dans ce cas : le document s'ouvre à
+ * côté, la page du ticket reste vivante, et le message ci-dessus s'y affiche au
+ * rechargement.
+ */
+if ((int)($config->fields['DisplayPdfEnd'] ?? 0) === 1
+    && file_exists($mergedPath)
+    && !headers_sent()) {
+
+   $download_name = trim((string)($_POST['DOC'] ?? 'BL_Rapport'));
+   if (!str_ends_with(strtolower($download_name), '.pdf')) {
+      $download_name .= '.pdf';
+   }
+
+   header('Content-Type: application/pdf');
+   header('Content-Disposition: inline; filename="' . str_replace('"', '', $download_name) . '"');
+   header('Content-Length: ' . filesize($mergedPath));
+   readfile($mergedPath);
+
+   // Nettoyage identique au parcours sans affichage : le fichier a été envoyé,
+   // il n'a plus de raison d'occuper le disque.
+   @unlink($mergedPath);
+   if (file_exists($bl_signed_pdf)) {
+      @unlink($bl_signed_pdf);
+   }
+   exit;
+}
+
 // Nettoyage des temporaires
 if (file_exists($mergedPath)) {
    @unlink($mergedPath);
@@ -168,5 +226,4 @@ if (file_exists($bl_signed_pdf)) {
    @unlink($bl_signed_pdf);
 }
 
-gestion_combined_message("BL + Rapport signés et fusionnés.", INFO);
 Html::back();

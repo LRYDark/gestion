@@ -62,6 +62,65 @@ class PluginGestionCri extends CommonDBTM {
             }';
    }
 
+   /**
+    * Bascule « Signature Rapport » / « Signature Rapport + BL ».
+    *
+    * Rendu unique de ce choix, déplacé ici depuis ajax/cri.php pour que le
+    * plugin RP puisse le proposer lui aussi : le technicien qui passe par le
+    * rapport d'atelier arrive sur le rapport d'intervention sans jamais croiser
+    * le parcours Gestion, et n'avait donc aucun moyen de signer le bon de
+    * livraison au passage. Une seconde copie du groupe aurait divergé au
+    * premier ajustement.
+    *
+    * @param string $mode   'rp' (rapport seul) ou 'both' (rapport + BL)
+    * @param int    $bl_id  bon de livraison concerné
+    * @param array  $params paramètres du modal, réémis à chaque bascule.
+    *                       Les drapeaux force_* sont retirés : c'est le choix
+    *                       de l'utilisateur qui les repose, sinon un ancien
+    *                       forçage écraserait le nouveau.
+    */
+   static function renderCombinedModeRadio(string $mode, int $bl_id, array $params): string {
+      $base = $params;
+      unset($base['force_rp'], $base['force_combined'], $base['force_bl']);
+      $data = htmlspecialchars(json_encode($base), ENT_QUOTES);
+      $rp   = ($mode === 'rp')   ? 'checked' : '';
+      $both = ($mode === 'both') ? 'checked' : '';
+
+      /*
+       * Taille imposee sur le bouton lui-meme.
+       *
+       * Ce groupe est depose dans les cartes de plusieurs ecrans, dont les
+       * feuilles etirent tout `input` sur la largeur du bloc pour habiller les
+       * champs de saisie. Cette regle, plus specifique que celle de Tabler,
+       * transformait le bouton natif en ellipse. Un style en ligne est le seul
+       * moyen d'etre certain du rendu quel que soit l'ecran d'accueil.
+       */
+      $size = 'width:1.25rem;height:1.25rem;max-width:none;padding:0;flex-shrink:0;';
+
+      /*
+       * Habille en carte, comme le reste des formulaires de signature : la
+       * question porte un intitule et se lit d'un coup d'oeil, au lieu de deux
+       * boutons flottants dont on devine le role.
+       */
+      $h  = '<div class="form-card">';
+      $h .= '<div class="form-label">' . __('Que signe le client ?', 'gestion') . '</div>';
+      $h .= '<div class="form-content">';
+      $h .= '<div class="text-center gestion-combined-mode" data-bl="' . $bl_id . '" data-params="' . $data . '">';
+      $h .= '<div class="form-check form-check-inline">';
+      $h .= '<input class="form-check-input" style="' . $size . '" type="radio" name="gestion_combined_mode" id="gcm_rp" value="rp" ' . $rp . ' onchange="gestion_switchCombinedMode(this);">';
+      $h .= '<label class="form-check-label" for="gcm_rp">' . __('Signature Rapport', 'gestion') . '</label>';
+      $h .= '</div>';
+      $h .= '<div class="form-check form-check-inline">';
+      $h .= '<input class="form-check-input" style="' . $size . '" type="radio" name="gestion_combined_mode" id="gcm_both" value="both" ' . $both . ' onchange="gestion_switchCombinedMode(this);">';
+      $h .= '<label class="form-check-label" for="gcm_both">' . __('Signature Rapport + BL', 'gestion') . '</label>';
+      $h .= '</div>';
+      $h .= '</div>';
+      $h .= '</div>';
+      $h .= '</div>';
+
+      return $h;
+   }
+
    function showForm($ID, $options = []) {
       global $DB, $CFG_GLPI;
       $uniq = 'cri'.mt_rand(10000,99999);
@@ -1600,7 +1659,7 @@ class PluginGestionCri extends CommonDBTM {
       $_POST['modal'] = 'form_rapport';
       ob_start();
       $rp = new PluginRpCri();
-      $rp->showForm($ID, ['modal' => 'form_rapport']);
+      $rp->showForm($ID, ['modal' => 'form_rapport', 'embedded' => true]);
       $rpHtml = ob_get_clean();
 
       // Remplacer l'action du formulaire
@@ -1615,7 +1674,17 @@ class PluginGestionCri extends CommonDBTM {
               . Html::hidden('id_document', ['value' => $bl_id])
               . Html::hidden('combined_mode', ['value' => 1]);
 
-      $rpHtml = preg_replace('/<form\b([^>]*)>/', '<form$1>' . $hidden, $rpHtml, 1);
+      /*
+       * `target="_blank"` quand le reglage « Affichage du PDF apres signature »
+       * le demande : le traitement combine renvoie alors le PDF fusionne, qui
+       * s'ouvre a cote pendant que la page du ticket reste vivante — meme
+       * comportement que la signature d'un rapport seul.
+       *
+       * Le formulaire de RP arrive sans `target` (mode integre) : on l'ajoute
+       * ici, dans la reecriture qui insere deja les champs du BL.
+       */
+      $target = ((int)($config->fields['DisplayPdfEnd'] ?? 0) === 1) ? ' target="_blank"' : '';
+      $rpHtml = preg_replace('/<form\b([^>]*)>/', '<form$1' . $target . '>' . $hidden, $rpHtml, 1);
 
       // Token CSRF standalone (meme raison que showForm : le token partage du rendu
       // AJAX peut etre consomme par un autre POST avant la soumission).
@@ -1629,8 +1698,21 @@ class PluginGestionCri extends CommonDBTM {
       $rpHtml = preg_replace('/<div class="form-container">/', '<div class="form-container">' . $blSectionHtml, $rpHtml, 1);
 
       // Ajuster le libellé du bouton
-      $rpHtml = str_replace('value="Génération du PDF"', 'value="Signer BL + Rapport"', $rpHtml);
-      $rpHtml = str_replace('value="GÃ©nÃ©ration du PDF"', 'value="Signer BL + Rapport"', $rpHtml);
+      /*
+       * Le bouton est vise par son IDENTIFIANT, plus par son texte.
+       *
+       * Le libelle du plugin RP varie desormais selon que le client signe ou
+       * non ; le chercher mot pour mot laissait le bouton du formulaire combine
+       * annoncer autre chose que ce qu'il fait. C'est aussi ce qui imposait une
+       * seconde recherche sur la version mal encodee du meme libelle : viser
+       * l'identifiant rend l'encodage sans objet.
+       */
+      $rpHtml = preg_replace(
+         '/(<input[^>]*id="sig-submitBtn"[^>]*\bvalue=")[^"]*(")/',
+         '${1}Signer BL + Rapport${2}',
+         $rpHtml,
+         1
+      );
 
       echo $rpHtml;
 
@@ -1805,7 +1887,7 @@ class PluginGestionCri extends CommonDBTM {
       $_POST['modal'] = 'form_rapport';
       ob_start();
       $rp = new PluginRpCri();
-      $rp->showForm($ticket_id, ['modal' => 'form_rapport']);
+      $rp->showForm($ticket_id, ['modal' => 'form_rapport', 'embedded' => true]);
       $rpHtml = ob_get_clean();
 
       // Action => handler MULTI
@@ -1816,8 +1898,11 @@ class PluginGestionCri extends CommonDBTM {
       );
 
       // Injecter combined_mode + section BL
+      // `target="_blank"` : meme raison que pour la signature d'un seul BL —
+      // le PDF fusionne s'ouvre a cote, la page du ticket reste vivante.
       $hidden = Html::hidden('combined_mode', ['value' => 1]);
-      $rpHtml = preg_replace('/<form\b([^>]*)>/', '<form$1>' . $hidden, $rpHtml, 1);
+      $target = ((int)($config->fields['DisplayPdfEnd'] ?? 0) === 1) ? ' target="_blank"' : '';
+      $rpHtml = preg_replace('/<form\b([^>]*)>/', '<form$1' . $target . '>' . $hidden, $rpHtml, 1);
 
       // Token CSRF standalone (meme raison que showForm : le token partage du rendu
       // AJAX peut etre consomme par un autre POST avant la soumission).
@@ -1829,8 +1914,14 @@ class PluginGestionCri extends CommonDBTM {
       $rpHtml = preg_replace('/<div class="form-container">/', '<div class="form-container">' . $blSectionHtml, $rpHtml, 1);
 
       // Libelle bouton
-      $rpHtml = str_replace('value="Génération du PDF"', 'value="Signer tous les BL + Rapport"', $rpHtml);
-      $rpHtml = str_replace('value="GÃ©nÃ©ration du PDF"', 'value="Signer tous les BL + Rapport"', $rpHtml);
+      // Bouton vise par son identifiant, meme raison que le formulaire combine
+      // simple : le libelle du plugin RP varie, l'identifiant non.
+      $rpHtml = preg_replace(
+         '/(<input[^>]*id="sig-submitBtn"[^>]*\bvalue=")[^"]*(")/',
+         '${1}Signer tous les BL + Rapport${2}',
+         $rpHtml,
+         1
+      );
 
       echo $rpHtml;
 

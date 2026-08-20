@@ -172,13 +172,34 @@ $_POST['mailtoclient'] = 0; // jamais de mail depuis le rapport
 try {
    $rp_dir = Plugin::getPhpDir('rp');
    ob_start();
+   /*
+    * Marqueur lu par le generateur : il produit alors le document sans decider
+    * de l'afficher ni de rediriger, ces deux choix appartenant au parcours qui
+    * l'appelle. Sans lui, le reglage « Affichage du PDF apres signature » du
+    * plugin RP sur Non le ferait rediriger ici meme, coupant la signature des
+    * bons avant qu'elle n'ait lieu.
+    */
+   $GLOBALS['PLUGIN_RP_PDF_EMBEDDED'] = true;
    include $rp_dir . '/front/cripdf.form.php';
+   unset($GLOBALS['PLUGIN_RP_PDF_EMBEDDED']);
    ob_end_clean();
    $rp_pdf = $SeeFilePath ?? '';
 } catch (Throwable $e) {
+   unset($GLOBALS['PLUGIN_RP_PDF_EMBEDDED']);
    $rp_pdf = '';
 }
 $_POST['mailtoclient'] = $saved_mailto;
+
+/*
+ * Le rapport est INCLUS, pas appele : il s'execute dans cette portee et y
+ * reaffecte `$config` avec la configuration du plugin RP. Plus bas,
+ * `$config->SharePointOn()` n'existe pas sur cet objet — erreur fatale — et les
+ * envois de mail lisaient MailTo et ZenDocMail sur des champs absents : le
+ * client ne recevait jamais ses documents signes.
+ *
+ * `getInstance()` est idempotent : on reprend simplement la bonne.
+ */
+$config = PluginGestionConfig::getInstance();
 
 if (empty($rp_pdf) || !file_exists($rp_pdf)) {
    @unlink($signaturePath);
@@ -348,7 +369,31 @@ if (!empty($config->fields['ZenDocMail'])) {
 foreach ($signed_bl_pdfs as $p) { if (file_exists($p)) { @unlink($p); } }
 if (file_exists($rp_pdf)) { @unlink($rp_pdf); }
 if ($attachedPdfPath && file_exists($attachedPdfPath)) { @unlink($attachedPdfPath); }
-if (file_exists($mergedPath)) { @unlink($mergedPath); }
 
 gestion_multi_message(count($valid_bls) . " BL + Rapport signes et fusionnes.", INFO);
+
+/*
+ * Affichage du document produit, comme les autres signatures.
+ *
+ * C'est le PDF FUSIONNE que l'on montre : il porte tous les bons signes et le
+ * rapport, la seule vue complete de ce qui vient d'etre signe. Le formulaire
+ * porte `target="_blank"` dans ce cas, la page du ticket reste donc vivante.
+ *
+ * Le fichier n'est supprime qu'ici, apres envoi : le nettoyage ci-dessus l'a
+ * volontairement laisse de cote.
+ */
+if ((int)($config->fields['DisplayPdfEnd'] ?? 0) === 1
+    && file_exists($mergedPath)
+    && !headers_sent()) {
+
+   header('Content-Type: application/pdf');
+   header('Content-Disposition: inline; filename="BL_Rapport.pdf"');
+   header('Content-Length: ' . filesize($mergedPath));
+   readfile($mergedPath);
+   @unlink($mergedPath);
+   exit;
+}
+
+if (file_exists($mergedPath)) { @unlink($mergedPath); }
+
 Html::back();

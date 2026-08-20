@@ -48,6 +48,35 @@ if ($mode === 'rp' || $mode === 'both') {
       echo "<div class='alert alert-danger'>Le plugin RP n'est pas disponible.</div>";
       exit;
    }
+
+   /*
+    * Droits du plugin RP, en plus de la liste d'utilisateurs autorisee ci-dessus.
+    *
+    * Ce point d'entree rend le formulaire de rapport, qui expose les taches, les
+    * suivis et les adresses du ticket. Figurer dans la liste « signature apres
+    * tache » dit qu'on utilise cette fonction, pas qu'on a le droit de produire
+    * un rapport ni meme de voir ce ticket : ces deux controles-la sont ceux du
+    * plugin RP, et ils s'appliquent ici comme a sa propre entree AJAX.
+    *
+    * Le mode « Rapport + BL » retombe sur la signature du bon seul, a laquelle
+    * l'utilisateur a bien droit. Le mode « Rapport » seul, lui, n'a pas de repli.
+    */
+   $rp_ticket  = new Ticket();
+   $rp_allowed = class_exists('PluginRpAccess')
+                 && $rp_ticket->getFromDB($ticket_id)
+                 && $rp_ticket->canViewItem()
+                 && PluginRpAccess::canUse('rapport_tech');
+
+   if (!$rp_allowed) {
+      if ($mode === 'both' && $bl_id > 0) {
+         $mode = 'bl';
+      } else {
+         echo "<div class='alert alert-danger'>"
+            . __("Vous n'avez pas le droit de générer un rapport.", 'gestion')
+            . "</div>";
+         exit;
+      }
+   }
 }
 
 switch ($mode) {

@@ -234,8 +234,19 @@
     width: 100%;
 }
 
-/* Inputs généraux */
-.form-content input,
+/*
+ * Inputs généraux
+ *
+ * `.form-check-input` est exclu : c'est la case à cocher et le bouton radio
+ * natifs de GLPI (Tabler), qui se dimensionnent eux-mêmes et n'ont ni bordure
+ * ni rembourrage à recevoir. Étirés sur 400 px de large par la règle ci-dessous,
+ * ils s'affichaient en ellipses.
+ *
+ * Exclusion à garder identique dans le plugin RP : les deux feuilles sont
+ * chargées sur la même page, et celle qui n'exclurait pas réétirerait le
+ * bouton de l'autre.
+ */
+.form-content input:not(.form-check-input),
 .form-content textarea,
 .form-content select {
     width: 100%;
@@ -247,7 +258,7 @@
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.form-content input:focus,
+.form-content input:not(.form-check-input):focus,
 .form-content textarea:focus,
 .form-content select:focus {
     border-color: #007bff;
