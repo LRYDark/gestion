@@ -14,6 +14,53 @@ if (file_exists($vendor)) {
 use Smalot\PdfParser\Parser;
 
 /**
+ * Message lisible pour une réponse Sage en erreur.
+ *
+ * « Erreur API (404): Not Found » décrivait le transport, pas la situation. Or
+ * un 404 de Sage n'est pas une panne : c'est un fait métier — le document n'est
+ * pas, ou n'est plus, dans Sage. Le technicien qui le lit doit savoir s'il doit
+ * vérifier un numéro, prévenir un administrateur, ou simplement réessayer.
+ *
+ * Le corps de la réponse n'est repris que pour les codes non reconnus : sur un
+ * 404 il ne dit rien de plus que « Not Found ».
+ *
+ * @param int    $status code HTTP renvoyé par Sage
+ * @param string $docId  référence demandée (numéro de BL)
+ * @param string $body   corps de la réponse, éventuellement vide
+ */
+function sageErrorMessage(int $status, string $docId, string $body = ''): string
+{
+    $ref = trim($docId) !== '' ? $docId : '?';
+
+    if ($status === 404) {
+        return sprintf(
+            __("Le document %s n'existe pas (ou plus) dans Sage. Vérifiez le numéro, ou il a été supprimé.", 'gestion'),
+            $ref
+        );
+    }
+    if ($status === 401 || $status === 403) {
+        return sprintf(
+            __("Sage refuse l'accès au document %s : clé API invalide ou expirée.", 'gestion'),
+            $ref
+        );
+    }
+    if ($status >= 500) {
+        return sprintf(
+            __('Sage est momentanément indisponible (erreur %1$d). Document %2$s : réessayez dans un instant.', 'gestion'),
+            $status,
+            $ref
+        );
+    }
+
+    $body = trim($body);
+    return sprintf(
+        __('Sage a répondu une erreur %1$d pour le document %2$s.', 'gestion'),
+        $status,
+        $ref
+    ) . ($body !== '' ? ' ' . $body : '');
+}
+
+/**
  * Nettoie un nom de fichier BL pour supprimer les caractères interdits.
  *  - ' → -
  *  - Supprime < > : " / \ | ? *
@@ -61,10 +108,12 @@ function parseDocument(string $docId): array
     curl_close($ch);
 
     if ($pdfBytes === false) {
-        throw new \RuntimeException("Erreur cURL: $err");
+        throw new \RuntimeException(
+            sprintf(__('Sage est injoignable : %s', 'gestion'), $err !== '' ? $err : __('pas de réponse', 'gestion'))
+        );
     }
     if ($status >= 400) {
-        throw new \RuntimeException("Erreur API ($status): $pdfBytes");
+        throw new \RuntimeException(sageErrorMessage($status, $docId, (string)$pdfBytes));
     }
 
     // --- Parse PDF
@@ -144,51 +193,121 @@ function parseDocument(string $docId): array
 
 /**
  * 2) Télécharge et sauvegarde le PDF localement, renvoie le chemin du fichier.
+ *
+ * ---- Une seconde tentative avant de conclure ----
+ *
+ * Un téléchargement qui échoue ne prouve pas que le document est absent : une
+ * coupure réseau, un délai dépassé ou un Sage momentanément saturé produisent
+ * le même résultat qu'une suppression. Le plugin en concluait « PDF source
+ * introuvable » et refusait la signature, alors qu'un simple nouvel essai
+ * aurait suffi.
+ *
+ * On réessaie donc, brièvement, AVANT de déclarer l'échec — sauf sur un **404**,
+ * qui est une réponse claire de Sage : le document n'est pas là, insister ne
+ * ferait que doubler la charge et l'attente.
+ *
+ * Le message et le journal ne sont émis qu'après la DERNIÈRE tentative : une
+ * reprise réussie ne doit pas laisser derrière elle une erreur qui n'en est pas
+ * une.
+ *
+ * @param string $docId           référence Sage du document
+ * @param string $destinationFile fichier de destination
+ * @param int    $attempts        nombre total de tentatives (1 = pas de reprise)
+ * @return string le chemin de destination ; l'appelant vérifie qu'il existe
  */
-function downloadDocument(string $docId, string $destinationFile): string
+function downloadDocument(string $docId, string $destinationFile, int $attempts = 2): string
 {
-    $config     = new PluginGestionConfig();
-    $apiKey     = $config->SageToken();
-    $apiUrl     = $config->SageUrlApi();
-    $url        = $apiUrl.$docId;
+    $config = new PluginGestionConfig();
+    $apiKey = $config->SageToken();
+    $apiUrl = $config->SageUrlApi();
+    $url    = $apiUrl . $docId;
 
-    $fp = fopen($destinationFile, 'wb');
-    if ($fp === false) {
-        //throw new RuntimeException("Impossible d'ouvrir le fichier en écriture : $destinationFile");
-        Session::addMessageAfterRedirect(__("Impossible d'ouvrir le fichier en écriture : $destinationFile"), true, ERROR);
+    $attempts = max(1, $attempts);
+    $status   = 0;
+    $err      = '';
+    $body     = '';
+
+    for ($try = 1; $try <= $attempts; $try++) {
+        $fp = fopen($destinationFile, 'wb');
+        if ($fp === false) {
+            $msg = sprintf(
+                __("Impossible d'ouvrir le fichier en écriture : %s", 'gestion'),
+                $destinationFile
+            );
+            Session::addMessageAfterRedirect($msg, true, ERROR);
+            if (class_exists('PluginGestionLogger')) {
+                PluginGestionLogger::error('sage', $msg);
+            }
+            return $destinationFile;
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_FILE           => $fp,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_HTTPHEADER     => [
+                'x-api-key: ' . $apiKey,
+                'Accept: application/pdf'
+            ],
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_FAILONERROR    => false, // on gère nous-même les statuts HTTP
+        ]);
+
+        $ok     = curl_exec($ch);
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err    = curl_error($ch);
+
+        curl_close($ch);
+        fclose($fp);
+
+        // Succès : le fichier est en place, on s'arrête là.
+        if ($ok !== false && $status < 400) {
+            return $destinationFile;
+        }
+
+        // Le corps est lu AVANT d'effacer : il sert au message des codes non
+        // reconnus, et le fichier partiel n'a plus de valeur.
+        $body = (string)@file_get_contents($destinationFile);
+        @unlink($destinationFile);
+
+        // Réponse nette de Sage : le document n'existe pas. Inutile d'insister.
+        if ($status === 404) {
+            break;
+        }
+
+        // Incident probablement passager : on laisse respirer avant de reprendre.
+        if ($try < $attempts) {
+            usleep(700000);
+        }
     }
 
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_FILE           => $fp,
-        CURLOPT_TIMEOUT        => 60,
-        CURLOPT_CONNECTTIMEOUT => 5,
-        CURLOPT_HTTPHEADER     => [
-            'x-api-key: ' . $apiKey,
-            'Accept: application/pdf'
-        ],
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_FAILONERROR    => false, // on gère nous-même les statuts HTTP
-    ]);
-
-    $ok     = curl_exec($ch);
-    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $err    = curl_error($ch);
-
-    curl_close($ch);
-    fclose($fp);
-
-    if ($ok === false) {
-        @unlink($destinationFile);
-        //throw new RuntimeException("Erreur cURL: $err");
-        Session::addMessageAfterRedirect(__("Erreur cURL: $err"), true, ERROR);
+    /*
+     * Échec définitif. `WARNING` sur un 404 : le document absent de Sage n'est
+     * pas une défaillance du plugin, c'est un état du référentiel. Le distinguer
+     * évite qu'un journal d'erreurs se remplisse de BL supprimés, et que ces
+     * lignes noient les vraies pannes (401, 500, réseau).
+     */
+    if ($status === 0 || $status >= 500 || $err !== '') {
+        $msg = sprintf(
+            __('Sage est injoignable après %1$d tentative(s) pour le document %2$s : %3$s', 'gestion'),
+            $attempts,
+            $docId,
+            $err !== '' ? $err : sprintf(__('erreur %d', 'gestion'), $status)
+        );
+        $level = ERROR;
+    } else {
+        $msg   = sageErrorMessage($status, $docId, $body);
+        $level = ($status === 404) ? WARNING : ERROR;
     }
 
-    if ($status >= 400) {
-        $body = file_get_contents($destinationFile);
-        @unlink($destinationFile);
-        //throw new RuntimeException("Erreur API ($status): $body");
-        Session::addMessageAfterRedirect(__("Erreur API ($status): $body"), true, ERROR);  
+    Session::addMessageAfterRedirect($msg, true, $level);
+    if (class_exists('PluginGestionLogger')) {
+        if ($level === WARNING) {
+            PluginGestionLogger::warning('sage', $msg);
+        } else {
+            PluginGestionLogger::error('sage', $msg);
+        }
     }
 
     return $destinationFile;
@@ -277,8 +396,11 @@ function documentExiste(string $docId, ?int &$httpStatus = null): bool
     curl_close($ch);
 
     if ($res === false) {
-        //throw new RuntimeException("Erreur cURL: $err");
-        Session::addMessageAfterRedirect(__("Erreur cURL: $err"), true, ERROR);
+        Session::addMessageAfterRedirect(
+            sprintf(__('Sage est injoignable : %s', 'gestion'), $err !== '' ? $err : __('pas de réponse', 'gestion')),
+            true,
+            ERROR
+        );
     }
 
     return $httpStatus === 200;

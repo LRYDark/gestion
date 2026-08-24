@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.8.0'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.8.1'); // version du plugin
 
 /**
  * Révision des fichiers JS/CSS.
@@ -11,7 +11,7 @@ define('PLUGIN_GESTION_VERSION', '1.8.0'); // version du plugin
  *
  * À incrémenter à chaque modification d'un fichier de public/js ou public/css.
  */
-define('PLUGIN_GESTION_ASSETS_REV', '14');
+define('PLUGIN_GESTION_ASSETS_REV', '18');
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 /**
@@ -27,6 +27,69 @@ if (!function_exists('pluginGestionBlNumber')) {
          return strtoupper($m[1]) . $m[2];
       }
       return '';
+   }
+}
+
+/**
+ * PDF source d'un bon, s'il est DEJA sur le serveur — et si c'est bien le sien.
+ *
+ * Un Document GLPI est souvent rattache au bon : c'est celui que l'apercu du
+ * modal affiche. S'en servir evite de retourner interroger Sage ou SharePoint
+ * pour un fichier qu'on a sous la main, et permet de signer un bon dont le
+ * document a disparu de sa source depuis son rattachement.
+ *
+ * ---- Mais `doc_id` ne designe pas toujours la source ----
+ *
+ * Apres une signature GROUPEE, chaque ligne recoit `doc_id` = le PDF FUSIONNE,
+ * qui porte tous les bons du lot et le rapport (traitement_combined_multi.php,
+ * etape 6). Prendre ce document pour source d'un bon produisait un document
+ * absurde : chaque « bon signe » contenait le lot entier, et leur fusion
+ * repetait l'ensemble autant de fois qu'il y avait de bons.
+ *
+ * Le nom du fichier tranche : le document propre a un bon porte son numero
+ * (`BL208207_EUROCOM.pdf`), un fusionne s'appelle `BL_Rapport_T55375_...`.
+ * Sans cette correspondance, on considere qu'il n'y a pas de source locale et
+ * on va la chercher a la source declaree.
+ *
+ * @param object $DOC ligne de `glpi_plugin_gestion_surveys`
+ * @return string chemin absolu du PDF, ou '' s'il n'y a pas de source locale sure
+ */
+if (!function_exists('pluginGestionLocalSourcePdf')) {
+   function pluginGestionLocalSourcePdf(object $DOC): string {
+      global $DB;
+
+      $doc_id = (int)($DOC->doc_id ?? 0);
+      if ($doc_id <= 0) {
+         return '';
+      }
+
+      $row = $DB->request([
+         'SELECT' => ['filename', 'filepath'],
+         'FROM'   => 'glpi_documents',
+         'WHERE'  => ['id' => $doc_id],
+         'LIMIT'  => 1,
+      ])->current();
+      if (!$row) {
+         return '';
+      }
+
+      // Le document appartient-il a CE bon ? Son numero doit figurer dans le nom.
+      $ref = pluginGestionBlNumber((string)($DOC->bl ?? ''));
+      if ($ref === '') {
+         $ref = trim((string)($DOC->bl ?? ''));
+      }
+      $filename = (string)($row['filename'] ?? '');
+      if ($ref === '' || stripos($filename, $ref) === false) {
+         return '';
+      }
+
+      $filepath = ltrim(str_replace('\\', '/', (string)($row['filepath'] ?? '')), '/');
+      if ($filepath === '') {
+         return '';
+      }
+
+      $full = GLPI_DOC_DIR . '/' . $filepath;
+      return is_file($full) ? $full : '';
    }
 }
 

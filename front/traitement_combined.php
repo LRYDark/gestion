@@ -69,7 +69,8 @@ if ($combined_mail_mode === 0) {
 }
 
 // Generer le rapport RP (memes champs que le formulaire RP)
-$rp_pdf = '';
+$rp_pdf    = '';
+$rp_doc_id = 0;   // Document GLPI cree par le generateur RP
 $SeeFilePath = '';
 try {
    $rp_dir = Plugin::getPhpDir('rp');
@@ -86,6 +87,13 @@ try {
    unset($GLOBALS['PLUGIN_RP_PDF_EMBEDDED']);
    ob_end_clean();
    $rp_pdf = $SeeFilePath ?? '';
+   /*
+    * Le generateur est INCLUS dans cette portee : `$NewDoc` y designe le
+    * Document GLPI qu'il vient de creer pour le rapport. On le retient tout de
+    * suite — la signature du bon, incluse plus bas, reutilise ce meme nom pour
+    * le sien.
+    */
+   $rp_doc_id = (int)($NewDoc ?? 0);
 } catch (Throwable $e) {
    unset($GLOBALS['PLUGIN_RP_PDF_EMBEDDED']);
    $rp_pdf = '';
@@ -149,6 +157,82 @@ try {
    gestion_combined_message("Fusion des PDF impossible : " . $e->getMessage(), ERROR);
    Html::back();
    exit;
+}
+
+/*
+ * ---- Un seul document pour le bon ET le rapport ----
+ *
+ * Ce qui vient d'être signé est UN document : le bon de livraison suivi du
+ * rapport d'intervention. Les deux plugins doivent donc montrer celui-là.
+ *
+ * Jusqu'ici chacun archivait sa moitié — Gestion le bon seul, RP le rapport
+ * seul — et le PDF fusionné, celui que le client reçoit par mail, finissait à
+ * la corbeille. « Voir » et « Visualiser » ouvraient deux documents différents,
+ * dont aucun ne montrait ce qui avait réellement été signé.
+ *
+ * On écrit donc le fusionné À LA PLACE du fichier du bon : son Document, son
+ * lien et son numéro ne bougent pas, seul son contenu devient complet. La ligne
+ * du rapport bascule sur ce même Document, et celui du rapport seul est purgé —
+ * son fichier part avec lui, il ne sert plus à rien.
+ *
+ * Rien de tout cela si l'archivage n'a pas produit de Document local
+ * (destination SharePoint) ou si la copie échoue : chaque plugin garde alors le
+ * sien, exactement comme avant. Les mails, eux, ne changent pas : ils partent
+ * du fusionné temporaire, selon le réglage « Mode d'envoi mail au client ».
+ */
+if ($rp_doc_id > 0 && file_exists($mergedPath) && filesize($mergedPath) > 0) {
+
+   // La ligne a ete mise a jour par la signature du bon : on relit son Document.
+   $signed_row = $DB->request([
+      'SELECT' => ['doc_id'],
+      'FROM'   => 'glpi_plugin_gestion_surveys',
+      'WHERE'  => ['id' => $bl_id],
+      'LIMIT'  => 1,
+   ])->current();
+   $bl_doc_id = (int)($signed_row['doc_id'] ?? 0);
+
+   $rel_path = '';
+   $doc_name = '';
+   if ($bl_doc_id > 0) {
+      $doc_row  = $DB->request([
+         'SELECT' => ['name', 'filepath'],
+         'FROM'   => 'glpi_documents',
+         'WHERE'  => ['id' => $bl_doc_id],
+         'LIMIT'  => 1,
+      ])->current();
+      $rel_path = ltrim(str_replace('\\', '/', (string)($doc_row['filepath'] ?? '')), '/');
+      $doc_name = trim((string)($doc_row['name'] ?? ''));
+   }
+   $abs_path = $rel_path !== '' ? GLPI_DOC_DIR . '/' . $rel_path : '';
+
+   if ($abs_path !== '' && is_file($abs_path) && @copy($mergedPath, $abs_path)) {
+      // Le contenu a change : l'empreinte doit suivre, sinon GLPI garde celle
+      // du bon seul et toute verification d'integrite echouerait.
+      pluginGestionFixDocumentFile($bl_doc_id, $rel_path);
+
+      // Le nom annonce ce que le document contient desormais. Seul l'intitule
+      // change : le fichier telecharge garde le nom du bon, sur lequel d'autres
+      // traitements s'appuient.
+      if ($doc_name !== '' && stripos($doc_name, 'rapport') === false) {
+         $DB->update('glpi_documents', ['name' => $doc_name . ' + Rapport'], ['id' => $bl_doc_id]);
+      }
+
+      if ($DB->tableExists('glpi_plugin_rp_cridetails')) {
+         $DB->update(
+            'glpi_plugin_rp_cridetails',
+            ['id_documents' => $bl_doc_id],
+            ['id_ticket' => $ticket_id, 'id_documents' => $rp_doc_id]
+         );
+
+         if ($rp_doc_id !== $bl_doc_id) {
+            $rp_doc = new Document();
+            if ($rp_doc->getFromDB($rp_doc_id)) {
+               // 2e argument : purge — le fichier part avec la ligne.
+               $rp_doc->delete(['id' => $rp_doc_id], 1);
+            }
+         }
+      }
+   }
 }
 
 // Envoi mails (client/Zendoc)

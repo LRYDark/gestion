@@ -225,6 +225,191 @@ Ces options servent à:
 - `front/api_docs.php`: documentation / tests des APIs.
 - Onglets Ticket / configuration / profil selon les droits.
 
+### Rangement des PDF signés
+`<dossier configuré>/<Entité>/<année>/<mois>/<fichier>` — appliqué à **tous** les points
+d'écriture, local comme SharePoint :
+- `front/traitement.php` (signature d'un BL seul) ;
+- `front/traitement_combined.php` (BL + rapport), qui inclut `traitement.php` ;
+- `front/traitement_combined_multi.php` (plusieurs BL + un rapport fusionnés).
+
+Le mois est en toutes lettres sans accent (`janvier`, `fevrier`, … `aout`). Le plugin RP suit
+la même convention depuis `pluginRpDatedFolder()`.
+
+`survey.form.php` et `ajax/quick_add_survey_form.php` ne rangent rien : ils **référencent** le
+BL source non signé là où il a été déposé (`_plugins/gestion/Documents`). Le `$destinationPath`
+de `inc/ticketconfig.class.php` est une variable morte — elle ne fait que créer le dossier de
+base, aucune écriture n'en dépend.
+
+### Onglet Ticket « Gestion BL » : bandeau « Étape suivante »
+Au-dessus du tableau des BL, deux sources dans cet ordre :
+
+1. **Plugin `rp` actif** — `PluginRpCridetail::getNextStepHtml()` : même recommandation que
+   l'onglet RP, le bouton flottant et le scanner (source unique `PluginRpTicketActions`).
+   Évite l'aller-retour entre les deux onglets quand l'étape réelle est « BL + rapport
+   ensemble » et non « BL seul ».
+2. **Repli Gestion** — `PluginGestionTicket::getBlNextStepHtml()` : « Signer le bon de
+   livraison », sur le plus ancien bon non signé. Il ouvre `gestion_loadCriForm` avec les
+   **mêmes paramètres que les boutons du tableau**, donc les mêmes règles (choix Rapport/BL,
+   `NoTaskSignMode`…) — aucune logique de signature réécrite.
+
+Le repli ne sert pas qu'au cas « `rp` désinstallé » : RP rend une chaîne vide dès qu'aucune
+de *ses* étapes ne se dégage (rapport déjà fait, droits manquants, aucune tâche), et le bon
+restait alors à signer sans que rien ne le dise. Gestion fonctionne donc seul, et
+`method_exists` couvre un `rp` antérieur à cette méthode.
+
+Présentation identique dans les deux cas — bouton `btn-info` et liseré
+`card-status-start bg-info`, pour trancher avec les boutons `primary` du tableau. Classes
+sémantiques Tabler, jamais de couleur en dur : le bandeau suit le thème GLPI, sombre compris.
+
+### Signature groupée des BL : « Rapport + BL » ou « BL seul »
+`front/traitement_combined_multi.php` porte **deux parcours**, pilotés par le champ POST
+`bl_only`, et une seule chaîne de traitement (fusion → archivage daté → mise à jour des
+lignes → mails → nettoyage) :
+
+| | Documents fusionnés | Quand |
+|---|---|---|
+| défaut | BL cochés **+ 1 rapport d'intervention** | rapport pas encore signé |
+| `bl_only` | BL cochés **seuls** | rapport déjà signé, **ou** plugin `rp` absent |
+
+Dans les deux cas, **tous** les bons non signés du ticket sont listés avec une case à cocher :
+on en signe un, plusieurs ou tous, et on revient signer les autres plus tard.
+
+**Tout est précoché par défaut.** Seul le paramètre `one_bl` renverse la règle, et il n'est
+posé que là où l'utilisateur a cliqué sur **un bon précis** :
+
+| Point d'entrée | Précoché |
+|---|---|
+| Bandeaux « Étape suivante » / « Continuer », page mobile, scanner OCR, bouton flottant, « Signature BL » de `survey.php`, « Régénérer » du rapport | **tous** les bons en attente |
+| Ligne du tableau des BL (onglet ticket), colonne « Signature » de la liste, fiche d'un BL, lien du planning | **le seul bon désigné** — les autres restent visibles et cochables |
+
+Signer plusieurs bons d'un coup est le cas courant ; désigner un bon précis est l'exception,
+d'où le défaut. Tout précocher sur un clic de ligne faisait signer trois bons à qui n'en avait
+demandé qu'un.
+
+Si l'identifiant transmis ne correspond à aucun bon en attente (déjà signé entre-temps), tout
+est recoché plutôt que de présenter un formulaire où rien n'est sélectionné.
+
+**Le choix « Signature BL »** n'apparaît dans le radio « Que signe le client ? » **que si le
+rapport d'intervention est déjà signé** — ailleurs il serait un piège : signer le bon sans le
+rapport laisserait l'intervention sans trace. Une fois le rapport signé, l'inverse devient
+vrai, et ce mode devient le **défaut**. Décision unique : `PluginGestionCri::defaultCombinedMode()`,
+qui s'appuie sur `hasSignedRpReport()` → `PluginRpCridetail::getSignedTypes()`. Gestion ne
+redevine jamais ce que RP considère comme signé.
+
+**Le rapport doit aussi être encore d'actualité.** `defaultCombinedMode()` repasse à
+`both` dès que le ticket a **évolué depuis** le rapport : `PluginRpCridetail::countChangesSinceReport()`
+compte les **tâches et suivis** créés ou modifiés après lui. Un changement de statut, une
+clôture, une réattribution ne comptent pas — ils ne changent rien à ce que raconte le rapport.
+Les **trois** horodatages sont interrogés (`date_mod`, `date_creation`, `date`) : `date` est la
+date métier, antidatable, les deux autres disent quand la ligne est réellement apparue.
+
+Le filtre `use_publictask` de RP est repris tel quel — sur une installation qui exclut les
+tâches privées du rapport, en ajouter une ne le périme pas. Une tolérance de **30 secondes**
+évite qu'un rapport se déclare périmé à cause du suivi ou de la tâche que sa propre génération
+crée quelques secondes après l'avoir horodaté.
+
+Le modal affiche sous le choix : la **date du rapport**, son ancienneté en clair, et le cas
+échéant ce qui a bougé (« Le ticket a évolué depuis : 2 tâches, 1 suivi »).
+
+> **Aucun seuil d'ancienneté.** Un rapport n'est périmé que par un ajout de tâche ou de suivi,
+> jamais par le temps qui passe : un ticket sans le moindre mouvement depuis un mois n'a rien
+> de plus à raconter, et le régénérer produirait le même document.
+
+La mention reste **en gris dans les deux cas**, seule l'icône change (`ti-file-check` /
+`ti-refresh`) et l'essentiel est mis en gras. Elle constate, elle n'alerte pas : le choix étant
+déjà repositionné sur « Rapport + BL », une ligne orange criait plus fort que nécessaire pour
+un fait aussi banal.
+
+**Ce défaut ne vaut que pour les écrans partant d'un BL** (liste des bons, bandeau « Signer
+le bon de livraison », planning, page mobile). Un écran partant du **rapport** connaît son
+intention et la déclare : le bouton « Régénérer » de la carte *Rapport d'intervention* passe
+`force_combined = 1`. Sans cela, cliquer « Régénérer » sur un ticket dont le rapport était
+déjà signé ouvrait un formulaire « Signature BL » — qui ne régénérait aucun rapport.
+Les actions RP en `mode => 'rp'` (bouton flottant, scanner) ouvrent le formulaire de RP
+directement et ne passent pas par ce choix.
+
+**Hôte du formulaire** : le formulaire groupé n'écrit ni signature ni champ client, il se
+greffe sur un formulaire existant dont il réécrit l'action et le libellé du bouton —
+le formulaire **rapport de RP** en mode combiné, le formulaire de signature **de Gestion** en
+mode BL seul. Les deux postent exactement les mêmes champs (`name`, `url`, `photo_base64_N`,
+`pdf_base64`, `comment`, `mailtoclient`, `email`, `REPORT_ID`), donc aucune correspondance à
+écrire. En mode BL seul, seule la liste à cocher est injectée : l'hôte porte déjà sa capture
+photo/PDF et son commentaire, les injecter produirait des identifiants HTML en double.
+
+**Sans le plugin `rp`**, la même liste à cocher est proposée : Gestion signe plusieurs bons
+d'un coup au lieu d'un par un.
+
+#### Un seul chemin, quelle que soit la porte
+Tous ces écrans passent par `ajax/cri.php`, et **aucun** n'a de règle propre :
+
+| Écran | `root_modal` |
+|---|---|
+| Onglet ticket « Gestion BL » (liste + bandeau de repli) | `ticket-form` |
+| Bandeau « Étape suivante » du plugin RP | `rp-next-step` |
+| Page mobile RP (QR code) | `rp-mobile-modal` |
+| Planning GLPI | `planning-form` |
+| Scanner OCR | `scan-form` (redirige vers le ticket) |
+| Boutons flottants RP et Gestion, liste des BL, signature à l'ajout de tâche | — |
+
+Le formulaire ne dépend **que** de deux faits : le bon appartient-il à un ticket, et le
+rapport est-il déjà signé. Réserver la liste à cocher à certaines portes aurait recréé la
+divergence qu'on cherche à supprimer — le même bon signé d'une façon ici, d'une autre là.
+
+Le choix « Compléter l'intervention / Signer » proposé hors ticket suit le même arbitrage :
+il propose « Signer le BL » quand le rapport est signé, « Signer Rapport + BL » sinon.
+
+La page mobile RP ne force plus « Rapport + BL » en dur : elle interroge
+`defaultCombinedMode()` comme les autres. Le bouton flottant Gestion ne liste plus une entrée
+par bon non signé — elles menaient toutes au même écran ; une entrée annonce le nombre en
+attente.
+
+`ajax/task_signature_form.php` et la fonction JS `openSignatureModal()` (première occurrence,
+vers la ligne 884 de `scripts_gestion.js`) sont du **code mort** : la signature à l'ajout de
+tâche passe par `gestion_loadCriForm` depuis la refonte. Ils sont laissés en place mais ne
+doivent pas servir de modèle — ils ne suivent pas l'arbitrage ci-dessus.
+
+#### Archivage : dossiers créés, échecs annoncés
+`<Entité>/<année>/<mois>` n'existe pas au premier document du mois : il est créé
+récursivement (`mkdir(..., true)`), **et l'échec n'est pas silencieux**. Sans dossier, la
+copie échoue et le Document GLPI enregistré ensuite pointe vers un fichier absent — c'est
+le « Fichier introuvable sur le disque » des listes. `traitement.php` et
+`traitement_combined_multi.php` s'arrêtent donc net, avec un message, **avant** de marquer
+quoi que ce soit signé : le technicien recommence, plutôt que de découvrir des semaines plus
+tard des bons `signed = 1` pointant vers rien.
+
+Côté SharePoint, Microsoft Graph crée les dossiers intermédiaires à l'upload
+(`PUT /root:/{chemin}/{fichier}:/content`) — rien à prévoir.
+
+### Onglet Ticket « Gestion BL » : liste et suppression définitive
+Le tableau à cinq colonnes est remplacé par une **liste**, identique à celle des cartes du
+plugin RP : numéro de BL en gras **suivi du badge** **Signé** / **À faire signer**, ID /
+technicien / signataire en gris dessous, action unique et **« Signé le : <date> »** à droite.
+Les cases à cocher des actions massives restent en place, dans le formulaire ouvert au-dessus.
+
+Le badge est **contre le nom** et non dans la colonne de droite : il y formait une troisième
+pile sous le bouton et la date, trois éléments empilés pour une ligne qui n'en dit qu'un.
+
+Suppression par la barre **« Actions »** de GLPI (droit `plugin_gestion_sign` en **PURGE**),
+sans bouton « Supprimer » par ligne : les deux auraient offert la même chose.
+
+Le ménage est fait par `PluginGestionTicket::cleanDBonPurge()`, donc identique quelle que soit
+la voie empruntée. La ligne disparaissait jusqu'ici seule, en laissant le PDF sur le disque ;
+le Document GLPI est maintenant **purgé** (`delete(..., 1)`), ce qui déclenche
+`Document::cleanDBonPurge()` et retire le fichier.
+
+> Un bon stocké dans **SharePoint** ou servi par **Sage** n'est **pas** supprimé chez son
+> hébergeur : seule la trace GLPI l'est, et l'utilisateur en est averti. Supprimer à distance
+> depuis un ticket serait irréversible et invisible pour les autres utilisateurs de la
+> bibliothèque.
+
+`isMobile()` a disparu avec le tableau — elle n'y masquait que des colonnes trop larges, et
+étant déclarée dans le corps d'une méthode elle aurait provoqué un « Cannot redeclare » au
+deuxième appel.
+
+Libellé au singulier : ce parcours ne signe que le bon désigné. S'il en reste d'autres, leur
+nombre est rappelé (« BL… — 3 bons non signés au total ») plutôt que promis. La signature
+groupée de tous les bons reste le parcours combiné de RP.
+
 ## APIs / intégrations (résumé fonctionnel)
 
 ### APIs BL / signatures
@@ -283,11 +468,22 @@ GLPI (`GLPI_LOG_DIR`, par défaut `files/_log/`, configurable dans GLPI). Le fic
 consultable directement dans GLPI : **Administration → Journaux → Fichier de log**
 (lecture, filtre, téléchargement, purge).
 
-Format d'une entrée : `[NIVEAU] [contexte] message` avec niveau `INFO` / `WARN` / `ERROR`.
+Format d'une entrée : `[NIVEAU] [contexte] message`, avec niveau **`WARN` ou `ERROR`
+uniquement**.
+
+> Le niveau `INFO` est **désactivé** : `PluginGestionLogger::info()` ne écrit plus rien.
+> Le fichier se remplissait de lignes de fonctionnement normal — mails envoyés, bons
+> signés — qui noyaient les seules lignes qu'on vient y chercher. Les messages
+> correspondants restent affichés **à l'écran** (`Session::addMessageAfterRedirect`) : c'est
+> le fichier qu'on allège, pas le retour à l'utilisateur. Pour rétablir la trace complète,
+> décommenter l'appel dans `inc/logger.class.php`.
 
 Contextes utilisés :
-- `signature`, `signature-combinee`, `signature-groupee` : flux de signature BL / Rapport+BL (début, succès, erreurs).
-- `mail` : envois de mails (destinataires, pièce jointe, échecs transport).
+- `signature`, `signature-combinee`, `signature-groupee` : flux de signature BL / Rapport+BL.
+  Une ligne par bon en échec, avec sa **source** (SharePoint / Sage / Local), sa **référence**
+  et la cause — un « signature impossible » anonyme ne permettait pas de savoir lequel des
+  bons du ticket avait échoué.
+- `mail` : échecs de transport.
 - `resend-mail` : renvoi d'un document signé depuis l'onglet BL.
 - `scanner` : recherche/vérification BL (Sage).
 - `api:<endpoint>.php` : toute réponse en erreur (HTTP >= 400) des endpoints `public/api/`.

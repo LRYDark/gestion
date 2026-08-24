@@ -299,9 +299,16 @@ class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSear
       </script>';
       echo '<script src="' . PLUGIN_GESTION_WEBDIR . '/public/js/scripts_gestion.js?r=' . (defined('PLUGIN_GESTION_ASSETS_REV') ? PLUGIN_GESTION_ASSETS_REV : '1') . '" defer></script>';
 
+      /*
+       * `one_bl` : cette fiche EST celle d'un bon precis. Lui seul est precoche
+       * dans le formulaire de signature (cf. ajax/cri.php) ; les autres bons du
+       * meme ticket y restent visibles et cochables. Sans ce marqueur, ouvrir
+       * la fiche d'un bon en aurait precoche trois.
+       */
       $params = ['job'           => $ID,
                  'root_doc'      => PLUGIN_GESTION_WEBDIR,
-                 'root_modal'    => 'survey-form'];
+                 'root_modal'    => 'survey-form',
+                 'one_bl'        => 1];
 
       if (!$this->canView()) {
          return false;

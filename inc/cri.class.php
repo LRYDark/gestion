@@ -79,12 +79,242 @@ class PluginGestionCri extends CommonDBTM {
     *                       de l'utilisateur qui les repose, sinon un ancien
     *                       forçage écraserait le nouveau.
     */
+   /**
+    * Un rapport d'intervention SIGNE existe-t-il deja pour ce ticket ?
+    *
+    * Determine a lui seul si la signature du BL peut se passer du rapport. La
+    * reponse vient du plugin RP, qui seul sait ce qu'il considere comme signe
+    * (`getSignedTypes`, type 1 = rapport d'intervention) : Gestion ne redevine
+    * rien, sans quoi les deux plugins finiraient par ne plus dire la meme chose.
+    *
+    * Faux si RP est absent : il n'y a alors pas de rapport du tout, et le choix
+    * ne se pose pas — Gestion signe des bons, point.
+    */
+   static function hasSignedRpReport(int $ticket_id): bool {
+      if ($ticket_id <= 0
+          || !Plugin::isPluginActive('rp')
+          || !class_exists('PluginRpCriDetail')
+          || !method_exists('PluginRpCriDetail', 'getSignedTypes')) {
+         return false;
+      }
+
+      if (in_array(1, PluginRpCriDetail::getSignedTypes($ticket_id), true)) {
+         return true;
+      }
+
+      /*
+       * Signature du rapport DESACTIVEE en configuration RP (`sign_rp_tech`).
+       *
+       * Aucun rapport ne peut alors etre « signe » : s'en tenir a ce seul
+       * critere rendrait l'option « Signature BL » inatteignable, et forcerait
+       * a regenerer un rapport a chaque bon. Sur ces installations, un rapport
+       * d'intervention PRESENT vaut rapport fait — c'est la seule preuve que la
+       * configuration permet d'avoir.
+       */
+      if (!class_exists('PluginRpConfig') || !class_exists('PluginRpTicketActions')) {
+         return false;
+      }
+      $rp_config = PluginRpConfig::getInstance();
+      if ((int)($rp_config->fields['sign_rp_tech'] ?? 1) === 1) {
+         return false;
+      }
+
+      $state = PluginRpTicketActions::getReportState($ticket_id);
+      return !empty($state['intervention']);
+   }
+
+   /**
+    * Mode preselectionne du choix « Que signe le client ? ».
+    *
+    * Source unique, pour que le choix propose et le choix applique ne puissent
+    * pas diverger. Rapport deja signe => `bl` : le technicien qui revient
+    * signer les bons restants ne doit pas regenerer un second rapport sans
+    * l'avoir demande.
+    */
+   static function defaultCombinedMode(int $ticket_id): string {
+      if (!self::hasSignedRpReport($ticket_id)) {
+         return 'both';
+      }
+
+      /*
+       * Rapport present, mais le ticket a bouge depuis : tache ou suivi ajoute,
+       * donc le rapport ne decrit plus l'intervention. On repropose « Rapport +
+       * BL » — le technicien peut toujours revenir a « Signature BL » si ces
+       * ajouts ne concernent pas le client.
+       */
+      $changes = self::rpChangesSinceReport($ticket_id);
+      if (($changes['tasks'] + $changes['followups']) > 0) {
+         return 'both';
+      }
+
+      return 'bl';
+   }
+
+   /**
+    * Passe-plat vers le plugin RP, tolerant a son absence.
+    *
+    * Gestion ne compte rien lui-meme : c'est RP qui sait ce que son rapport
+    * contient (taches publiques ou non, suivis) et donc ce qui le perime.
+    */
+   private static function rpChangesSinceReport(int $ticket_id): array {
+      if (!class_exists('PluginRpCriDetail')
+          || !method_exists('PluginRpCriDetail', 'countChangesSinceReport')) {
+         return ['tasks' => 0, 'followups' => 0];
+      }
+      return PluginRpCriDetail::countChangesSinceReport($ticket_id, 1);
+   }
+
+   /**
+    * De quand date le rapport d'intervention de ce ticket.
+    *
+    * Affiche sous le choix « Que signe le client ? » lorsque la signature du
+    * bon SEUL est possible : elle ne l'est que parce qu'un rapport existe deja,
+    * et le technicien doit savoir de quand il date avant de faire signer le
+    * client.
+    *
+    * La date est une INFORMATION, jamais un reproche : seul un ajout de tache
+    * ou de suivi depuis le rapport declenche l'avertissement. L'anciennete
+    * seule ne prouve rien — un ticket sans mouvement depuis un mois n'a rien
+    * de plus a raconter.
+    *
+    * @return string chaine vide si aucun rapport, ou si RP ne sait pas repondre
+    */
+   private static function renderRpReportAge(int $ticket_id): string {
+      if ($ticket_id <= 0
+          || !class_exists('PluginRpCriDetail')
+          || !method_exists('PluginRpCriDetail', 'getLastReportDate')) {
+         return '';
+      }
+
+      $date = PluginRpCriDetail::getLastReportDate($ticket_id, 1);
+      if ($date === null) {
+         return '';
+      }
+
+      $ts = strtotime($date);
+      if ($ts === false) {
+         return '';
+      }
+
+      $days = (int)floor((time() - $ts) / 86400);
+      if ($days < 0) {
+         $days = 0;
+      }
+
+      if ($days === 0) {
+         $age = __("aujourd'hui", 'gestion');
+      } elseif ($days === 1) {
+         $age = __('hier', 'gestion');
+      } else {
+         $age = sprintf(__('il y a %d jours', 'gestion'), $days);
+      }
+
+      /*
+       * SEUL ce qui a ete ajoute au ticket perime un rapport.
+       *
+       * Un seuil d'anciennete avait ete pose a 7 jours : il alertait sur des
+       * rapports parfaitement valides. Un ticket sans la moindre tache ni le
+       * moindre suivi depuis un mois n'a rien de plus a raconter — regenerer
+       * son rapport produirait le meme document. La date reste affichee, pour
+       * information, mais elle n'accuse plus rien par elle-meme.
+       */
+      $changes = self::rpChangesSinceReport($ticket_id);
+      $moved   = ($changes['tasks'] + $changes['followups']) > 0;
+
+      /*
+       * Ton neutre dans les deux cas.
+       *
+       * La ligne entiere passait en orange des qu'une tache avait ete ajoutee :
+       * pour un fait aussi banal — le ticket a avance depuis le rapport — cela
+       * criait bien plus fort que necessaire, et le choix etant deja
+       * repositionne sur « Rapport + BL », l'alerte n'apprenait rien de plus.
+       * Le gris suffit ; c'est la mise en gras qui porte l'essentiel.
+       */
+      $h  = '<div class="mt-2 small text-secondary">';
+      $h .= '<i class="ti ' . ($moved ? 'ti-refresh' : 'ti-file-check') . ' me-1"></i>';
+      $h .= sprintf(
+         __("Rapport d'intervention du %1\$s (%2\$s).", 'gestion'),
+         htmlspecialchars(Html::convDateTime($date), ENT_QUOTES),
+         $age
+      );
+
+      if ($moved) {
+         $parts = [];
+         if ($changes['tasks'] > 0) {
+            $parts[] = sprintf(
+               _n('%d tâche', '%d tâches', $changes['tasks'], 'gestion'),
+               $changes['tasks']
+            );
+         }
+         if ($changes['followups'] > 0) {
+            $parts[] = sprintf(
+               _n('%d suivi', '%d suivis', $changes['followups'], 'gestion'),
+               $changes['followups']
+            );
+         }
+         $h .= ' <strong>'
+            . sprintf(
+               __('Le ticket a évolué depuis : %s.', 'gestion'),
+               implode(', ', $parts)
+            )
+            . '</strong> '
+            . __('Le rapport doit être remis à jour.', 'gestion');
+      }
+
+      $h .= '</div>';
+
+      return $h;
+   }
+
    static function renderCombinedModeRadio(string $mode, int $bl_id, array $params): string {
       $base = $params;
       unset($base['force_rp'], $base['force_combined'], $base['force_bl']);
       $data = htmlspecialchars(json_encode($base), ENT_QUOTES);
       $rp   = ($mode === 'rp')   ? 'checked' : '';
       $both = ($mode === 'both') ? 'checked' : '';
+      $bl   = ($mode === 'bl')   ? 'checked' : '';
+
+      /*
+       * L'option « Signature BL » n'apparait QUE si le rapport est deja signe.
+       *
+       * Ailleurs elle serait un piege : signer le bon sans le rapport laisse
+       * l'intervention sans trace, et c'est precisement ce que le parcours
+       * cherche a eviter. Une fois le rapport signe, l'inverse devient vrai —
+       * proposer d'en refaire un serait le piege.
+       */
+      /*
+       * L'option n'est offerte QUE si signer le bon seul est legitime.
+       *
+       * `defaultCombinedMode()` en est le seul juge : rapport present ET ticket
+       * inchange depuis. Des qu'une tache ou un suivi s'est ajoute, le rapport
+       * ne decrit plus l'intervention — l'option disparait donc entierement,
+       * exactement comme s'il n'existait aucun rapport. La laisser visible,
+       * meme decochee, aurait suffi a ce qu'on la reprenne par habitude.
+       */
+      /*
+       * Le ticket est repris du BON, pas de `job`.
+       *
+       * `job` ne designe le ticket que depuis l'onglet ticket. Depuis la liste
+       * des BL (hook.php) et depuis la fiche d'un bon (survey.class.php), il
+       * porte l'identifiant du BON : le rapport et les modifications etaient
+       * alors cherches sur un ticket qui n'existe pas, et « Signature BL » ne
+       * pouvait jamais apparaitre sur ces ecrans.
+       */
+      $ticket_id = (int)($params['job'] ?? 0);
+      if ($bl_id > 0) {
+         global $DB;
+         $bl_row = $DB->request([
+            'SELECT' => ['tickets_id'],
+            'FROM'   => 'glpi_plugin_gestion_surveys',
+            'WHERE'  => ['id' => $bl_id],
+            'LIMIT'  => 1,
+         ])->current();
+         if ($bl_row && (int)$bl_row['tickets_id'] > 0) {
+            $ticket_id = (int)$bl_row['tickets_id'];
+         }
+      }
+
+      $allow_bl = (self::defaultCombinedMode($ticket_id) === 'bl');
 
       /*
        * Taille imposee sur le bouton lui-meme.
@@ -114,7 +344,27 @@ class PluginGestionCri extends CommonDBTM {
       $h .= '<input class="form-check-input" style="' . $size . '" type="radio" name="gestion_combined_mode" id="gcm_both" value="both" ' . $both . ' onchange="gestion_switchCombinedMode(this);">';
       $h .= '<label class="form-check-label" for="gcm_both">' . __('Signature Rapport + BL', 'gestion') . '</label>';
       $h .= '</div>';
+      if ($allow_bl) {
+         $h .= '<div class="form-check form-check-inline">';
+         $h .= '<input class="form-check-input" style="' . $size . '" type="radio" name="gestion_combined_mode" id="gcm_bl" value="bl" ' . $bl . ' onchange="gestion_switchCombinedMode(this);">';
+         $h .= '<label class="form-check-label" for="gcm_bl">' . __('Signature BL', 'gestion') . '</label>';
+         $h .= '</div>';
+      }
       $h .= '</div>';
+
+      /*
+       * Mention du rapport, rendue DES QU'IL EXISTE — et non plus seulement
+       * quand « Signature BL » est offert.
+       *
+       * Elle était conditionnée à cette option, donc elle disparaissait avec
+       * elle : le seul moment où l'utilisateur a besoin d'une explication —
+       * l'option vient de s'effacer parce que le ticket a évolué — était
+       * justement celui où plus rien ne l'expliquait.
+       *
+       * `renderRpReportAge()` rend une chaîne vide s'il n'y a pas de rapport.
+       */
+      $h .= self::renderRpReportAge($ticket_id);
+
       $h .= '</div>';
       $h .= '</div>';
 
@@ -274,8 +524,16 @@ class PluginGestionCri extends CommonDBTM {
             echo '</div>';
          echo '</div>';
          
-         // === CARTE PDF (affichee uniquement si la previsualisation est activee) ===
-         if ($config->fields['SharePointLinkDisplay'] == 1) {
+         /*
+          * === CARTE PDF (affichee uniquement si la previsualisation est activee) ===
+          *
+          * `multi_bl` : ce formulaire sert alors d'hote a la signature groupee de
+          * plusieurs bons, et la liste a cocher injectee au-dessus porte deja
+          * l'apercu de CHACUN d'eux. Garder ici celui du premier bon afficherait
+          * deux fois le meme document et laisserait croire qu'il est le seul
+          * concerne.
+          */
+         if ($config->fields['SharePointLinkDisplay'] == 1 && empty($options['multi_bl'])) {
             echo '<div class="form-card">';
                try {
                   if ($DOC->save == 'SharePoint'){
@@ -1151,6 +1409,11 @@ class PluginGestionCri extends CommonDBTM {
                form.value = "Signature en cours...";
                var loader = document.getElementById("gestion-loader");
                if (loader) loader.classList.add("active");
+               // Retire le voile et recharge quand le formulaire vise un
+               // nouvel onglet : sans navigation, rien ne le ferait.
+               if (typeof gestionAfterSubmit === "function") {
+                  gestionAfterSubmit(form.closest("form"));
+               }
             });
          })();
          </script>';
@@ -1736,6 +1999,11 @@ class PluginGestionCri extends CommonDBTM {
                submitBtn.value = "Signature en cours...";
                var loader = document.getElementById("gestion-loader");
                if (loader) loader.classList.add("active");
+               // Formulaire visant un nouvel onglet : la page ne navigue pas,
+               // il faut retirer le voile et recharger nous-memes.
+               if (typeof gestionAfterSubmit === "function") {
+                  gestionAfterSubmit(form);
+               }
             });
          });
       })();
@@ -1743,14 +2011,53 @@ class PluginGestionCri extends CommonDBTM {
    }
 
    /**
-    * Formulaire combine MULTI : tous les BL non signes du ticket + 1 rapport => 1 PDF.
-    * Affiche chaque BL avec une case a cocher (cochee par defaut) + apercu,
-    * une capture photos/PDF partagee, puis le formulaire rapport (1 signature).
+    * Signature GROUPEE de plusieurs BL d'un ticket => 1 PDF fusionne.
+    *
+    * Chaque bon non signe est propose avec une case a cocher (cochee par
+    * defaut) et son apercu : on peut donc en signer un seul, deux, ou tous.
+    *
+    * Deux modes, selon `$options['bl_only']` :
+    *   - false (defaut) : BL coches + UN rapport d'intervention ;
+    *   - true           : BL coches SEULS, sans rapport.
+    *
+    * Le second sert quand le rapport est deja signe — en produire un second
+    * n'aurait pas de sens — et quand le plugin RP est absent, cas ou Gestion
+    * doit malgre tout savoir signer plusieurs bons d'un coup.
+    *
+    * Traitement commun : front/traitement_combined_multi.php.
     */
    function showCombinedMultiForm($ticket_id, $options = []) {
       global $DB, $CFG_GLPI;
 
-      echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css?r=' . (defined('PLUGIN_GESTION_ASSETS_REV') ? PLUGIN_GESTION_ASSETS_REV : '1') . '">';
+      /*
+       * Mode résolu UNE FOIS, en tête : trois endroits en dépendent (feuille de
+       * style, choix de l'hôte, loader). Les laisser relire l'option brute
+       * chacun de leur côté, c'était s'exposer à ce qu'ils divergent.
+       *
+       * Sans le plugin RP, le mode combiné n'a pas d'hôte : on retombe sur
+       * « BL seul », qui ne dépend que de Gestion. Les appelants vérifient déjà
+       * que RP est actif avant de demander le combiné — mais cette méthode est
+       * publique, et la branche combinée instancie `PluginRpCri` et lit
+       * `PLUGIN_RP_WEBDIR`. Une classe et une constante absentes sont une
+       * erreur fatale, pas une dégradation : l'invariant est donc vérifié ici,
+       * là où il est utilisé.
+       */
+      $bl_only = !empty($options['bl_only'])
+                 || !Plugin::isPluginActive('rp')
+                 || !class_exists('PluginRpCri')
+                 || !defined('PLUGIN_RP_WEBDIR');
+
+      /*
+       * Feuille de style emise ici SEULEMENT en mode combine.
+       *
+       * En mode « BL seul », l'hote est `showForm()`, qui emet deja la sienne —
+       * ainsi que `scripts_gestion.js`. Les emettre aussi ici chargerait le
+       * script deux fois : jQuery reexecute un `<script src>` injecte, et les
+       * blocs d'initialisation repartiraient de zero.
+       */
+      if (!$bl_only) {
+         echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css?r=' . (defined('PLUGIN_GESTION_ASSETS_REV') ? PLUGIN_GESTION_ASSETS_REV : '1') . '">';
+      }
 
       $config = PluginGestionConfig::getInstance();
       require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
@@ -1785,16 +2092,45 @@ class PluginGestionCri extends CommonDBTM {
          return '';
       };
 
-      // ---- Section BL (liste + cases a cocher + apercu) ----
+      /*
+       * ---- Section BL (liste + cases a cocher + apercu) ----
+       *
+       * Ce qui est PRECOCHE depend de la porte empruntee :
+       *
+       *  - un bouton de LIGNE (tableau des BL, planning, scanner, bouton
+       *    flottant) designe UN bon precis : lui seul est coche. Les autres
+       *    restent visibles et cochables — on peut toujours en ajouter.
+       *  - un BANDEAU (« Étape suivante », « Continuer ») ne designe personne :
+       *    il propose de solder ce qui attend, donc tout est coche.
+       *
+       * Tout precocher dans le premier cas faisait signer trois bons a qui
+       * n'en avait demande qu'un.
+       *
+       * `check_only` inconnu ou deja signe : on recoche tout, plutot que de
+       * presenter un formulaire ou rien n'est selectionne.
+       */
+      $check_only = (int)($options['check_only'] ?? 0);
+      if ($check_only > 0) {
+         $ids = array_map(static fn($b) => (int)$b->id, $bls);
+         if (!in_array($check_only, $ids, true)) {
+            $check_only = 0;
+         }
+      }
+
       ob_start();
       echo '<div class="form-card"><div class="form-label">Bons de livraison à signer (' . count($bls) . ')</div>';
       echo '<div class="form-content">';
-      echo '<div style="font-size:.85em;color:#666;margin-bottom:6px;">Décochez un BL pour ne pas le signer maintenant.</div>';
+      echo '<div style="font-size:.85em;color:#666;margin-bottom:6px;">'
+         . ($check_only > 0
+            ? 'Cochez un autre BL pour le signer en même temps.'
+            : 'Décochez un BL pour ne pas le signer maintenant.')
+         . '</div>';
       foreach ($bls as $b) {
-         $url = ($config->fields['SharePointLinkDisplay'] == 1) ? $previewUrl($b) : '';
+         $url     = ($config->fields['SharePointLinkDisplay'] == 1) ? $previewUrl($b) : '';
+         $checked = ($check_only === 0 || $check_only === (int)$b->id) ? ' checked' : '';
          echo '<div class="form-card" style="border:1px solid #dee2e6;">';
          echo '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;text-align:left;">';
-         echo '<input type="checkbox" id="gestion_bl_chk_' . (int)$b->id . '" name="bl_ids[]" value="' . (int)$b->id . '" checked style="flex:0 0 auto;width:18px;height:18px;min-width:18px;max-width:18px;margin:0;padding:0;cursor:pointer;">';
+         echo '<input type="checkbox" id="gestion_bl_chk_' . (int)$b->id . '" name="bl_ids[]" value="' . (int)$b->id . '"' . $checked . ' style="flex:0 0 auto;width:18px;height:18px;min-width:18px;max-width:18px;margin:0;padding:0;cursor:pointer;">';
          echo '<label for="gestion_bl_chk_' . (int)$b->id . '" style="flex:1 1 auto;min-width:0;margin:0;cursor:pointer;font-size:16px;font-weight:700;color:#343a40;overflow-wrap:anywhere;">' . htmlspecialchars((string)$b->bl, ENT_QUOTES) . '</label>';
          if (!empty($url)) {
             echo '<a href="' . htmlspecialchars($url, ENT_QUOTES) . '" target="_blank" class="pdf-link" style="flex:0 0 auto;white-space:nowrap;">Voir le PDF</a>';
@@ -1806,6 +2142,54 @@ class PluginGestionCri extends CommonDBTM {
          echo '</div>';
       }
       echo '</div></div>';
+
+      /*
+       * La liste s'arrete ici, le reste est mis de cote separement.
+       *
+       * En mode « BL seul », l'hote du formulaire est celui du plugin Gestion :
+       * il porte DEJA sa capture photo/PDF et son champ commentaire. Y injecter
+       * ceux-ci produirait des identifiants HTML en double — `capture-file-input`,
+       * `photo-base64-1`… — et le navigateur ne rattacherait plus les fichiers
+       * qu'au premier. Ils ne servent qu'a l'hote RP, qui n'en a pas.
+       */
+      $blListHtml = ob_get_clean();
+
+      /*
+       * Garde-fou « au moins un bon coché », attaché DANS la liste.
+       *
+       * En mode « BL seul », la liste est injectée en tête du formulaire de
+       * l'hôte, donc ce script s'exécute AVANT le sien : son écouteur est
+       * enregistré en premier et passe donc en premier. `stopImmediatePropagation`
+       * est indispensable — sans lui, l'écouteur de l'hôte s'exécutait quand
+       * même, désactivait le bouton et affichait le voile de chargement alors
+       * que l'envoi venait d'être annulé : bouton mort, page figée.
+       *
+       * En mode combiné, la liste est injectée dans le formulaire du plugin RP,
+       * qui n'a pas de garde-fou sur les cases : le même script y fait office
+       * de contrôle unique.
+       */
+      $blListHtml .= '<script>
+      (function(){
+         /*
+          * Le formulaire est retrouve par une case, jamais par
+          * `document.currentScript` : ce contenu est injecte par jQuery, qui
+          * reconstruit les balises `<script>` et laisse `currentScript` a null.
+          */
+         var box  = document.querySelector("input[name=\'bl_ids[]\']");
+         var form = box ? box.closest("form") : null;
+         if (!form || form.dataset.gestionBlGuard === "1") { return; }
+         form.dataset.gestionBlGuard = "1";
+         form.addEventListener("submit", function (e) {
+            if (form.querySelectorAll("input[name=\'bl_ids[]\']:checked").length === 0) {
+               e.preventDefault();
+               e.stopImmediatePropagation();
+               alert("Sélectionnez au moins un bon de livraison.");
+            }
+         });
+      })();
+      </script>';
+
+      ob_start();
 
       // ---- Capture photos / PDF (partagee) ----
       echo '<div class="form-card">';
@@ -1881,76 +2265,136 @@ class PluginGestionCri extends CommonDBTM {
       // ---- Commentaire (une fois) ----
       echo '<div class="form-card"><div class="form-label">Commentaire</div><textarea id="comment" name="comment" class="email-input" placeholder="Commentaire éventuel..." rows="3"></textarea></div>';
 
-      $blSectionHtml = ob_get_clean();
+      $blExtrasHtml = ob_get_clean();
 
-      // ---- Formulaire RP (1 rapport, 1 signature) ----
-      $_POST['modal'] = 'form_rapport';
-      ob_start();
-      $rp = new PluginRpCri();
-      $rp->showForm($ticket_id, ['modal' => 'form_rapport', 'embedded' => true]);
-      $rpHtml = ob_get_clean();
-
-      // Action => handler MULTI
-      $rpHtml = str_replace(
-         PLUGIN_RP_WEBDIR . '/front/cripdf.form.php',
-         PLUGIN_GESTION_WEBDIR . '/front/traitement_combined_multi.php',
-         $rpHtml
-      );
-
-      // Injecter combined_mode + section BL
-      // `target="_blank"` : meme raison que pour la signature d'un seul BL —
-      // le PDF fusionne s'ouvre a cote, la page du ticket reste vivante.
-      $hidden = Html::hidden('combined_mode', ['value' => 1]);
+      /*
+       * ---- Hote du formulaire ----
+       *
+       * Le formulaire groupe n'ecrit ni signature ni champ client : il se greffe
+       * sur un formulaire existant, dont il reecrit l'action et le libelle du
+       * bouton. Deux hotes possibles :
+       *
+       *   - mode combine   : le formulaire RAPPORT du plugin RP, qui apporte en
+       *                      plus les champs du rapport a generer ;
+       *   - mode « BL seul » : le formulaire de signature de Gestion lui-meme,
+       *                      qui porte deja signature, nom du client, capture
+       *                      photo/PDF et commentaire. C'est aussi le seul
+       *                      disponible quand le plugin RP est absent.
+       *
+       * Dans les deux cas la liste a cocher est injectee en tete du conteneur,
+       * et le jeton CSRF est renouvele : celui du rendu AJAX peut avoir ete
+       * consomme par un autre POST avant la soumission.
+       */
       $target = ((int)($config->fields['DisplayPdfEnd'] ?? 0) === 1) ? ' target="_blank"' : '';
-      $rpHtml = preg_replace('/<form\b([^>]*)>/', '<form$1' . $target . '>' . $hidden, $rpHtml, 1);
 
-      // Token CSRF standalone (meme raison que showForm : le token partage du rendu
-      // AJAX peut etre consomme par un autre POST avant la soumission).
-      $rpHtml = preg_replace(
+      if ($bl_only) {
+
+         ob_start();
+         $this->showForm($ticket_id, ['modal' => (int)$bls[0]->id, 'multi_bl' => true]);
+         $html = ob_get_clean();
+
+         $html = str_replace(
+            PLUGIN_GESTION_WEBDIR . '/front/traitement.php',
+            PLUGIN_GESTION_WEBDIR . '/front/traitement_combined_multi.php',
+            $html
+         );
+
+         $hidden = Html::hidden('bl_only', ['value' => 1]);
+         $inject = $blListHtml;   // sans les extras : l'hote les porte deja
+         $label  = 'Signer les BL sélectionnés';
+      } else {
+         $_POST['modal'] = 'form_rapport';
+         ob_start();
+         $rp = new PluginRpCri();
+         $rp->showForm($ticket_id, ['modal' => 'form_rapport', 'embedded' => true]);
+         $html = ob_get_clean();
+
+         $html = str_replace(
+            PLUGIN_RP_WEBDIR . '/front/cripdf.form.php',
+            PLUGIN_GESTION_WEBDIR . '/front/traitement_combined_multi.php',
+            $html
+         );
+
+         $hidden = Html::hidden('combined_mode', ['value' => 1]);
+         $inject = $blListHtml . $blExtrasHtml;
+         $label  = 'Signer tous les BL + Rapport';
+      }
+
+      // `target="_blank"` : le PDF fusionne s'ouvre a cote, la page du ticket
+      // reste vivante.
+      $html = preg_replace('/<form\b([^>]*)>/', '<form$1' . $target . '>' . $hidden, $html, 1);
+
+      $html = preg_replace(
          '/(<input type="hidden" name="_glpi_csrf_token" value=")[^"]*(")/',
          '${1}' . Session::getNewCSRFToken(true) . '${2}',
-         $rpHtml
+         $html
       );
-      $rpHtml = preg_replace('/<div class="form-container">/', '<div class="form-container">' . $blSectionHtml, $rpHtml, 1);
+      /*
+       * Injection par `substr_replace` et non `preg_replace`.
+       *
+       * Le motif est une chaîne littérale, et le contenu injecté porte des noms
+       * de bons de livraison : un `$1` ou un antislash dans l'un d'eux serait
+       * lu comme une référence arrière par le remplacement d'une expression
+       * régulière, et disparaîtrait silencieusement du formulaire.
+       */
+      $anchor = '<div class="form-container">';
+      $at     = strpos($html, $anchor);
+      if ($at !== false) {
+         $html = substr_replace($html, $anchor . $inject, $at, strlen($anchor));
+      }
 
-      // Libelle bouton
-      // Bouton vise par son identifiant, meme raison que le formulaire combine
-      // simple : le libelle du plugin RP varie, l'identifiant non.
-      $rpHtml = preg_replace(
+      // Bouton vise par son identifiant : le libelle varie d'un hote a l'autre,
+      // l'identifiant non.
+      $html = preg_replace(
          '/(<input[^>]*id="sig-submitBtn"[^>]*\bvalue=")[^"]*(")/',
-         '${1}Signer tous les BL + Rapport${2}',
-         $rpHtml,
+         '${1}' . $label . '${2}',
+         $html,
          1
       );
 
-      echo $rpHtml;
+      echo $html;
 
-      // Loader + anti double-clic
-      echo '<div class="gestion-loader-overlay" id="gestion-loader">';
-         echo '<div class="gestion-loader-spinner"></div>';
-         echo '<div class="gestion-loader-text">Signature en cours, veuillez patienter...</div>';
-      echo '</div>';
-      echo '<script>
-      (function(){
-         var forms = document.querySelectorAll("form");' . self::getPostSizeCheckJs() . '
-         forms.forEach(function(form) {
-            var submitBtn = form.querySelector("input[type=submit]");
-            if (!submitBtn) return;
-            var submitted = false;
-            form.addEventListener("submit", function(e) {
-               var checked = form.querySelectorAll("input[name=\'bl_ids[]\']:checked").length;
-               if (checked === 0) { e.preventDefault(); alert("Sélectionnez au moins un BL."); return; }
-               if (submitted) { e.preventDefault(); return; }
-               if (gestionPostTooBig(form)) { e.preventDefault(); return; }
-               submitted = true;
-               submitBtn.disabled = true;
-               submitBtn.value = "Signature en cours...";
-               var loader = document.getElementById("gestion-loader");
-               if (loader) loader.classList.add("active");
+      /*
+       * Loader + garde-fous de soumission.
+       *
+       * En mode « BL seul », l'hote (`showForm`) porte DEJA son loader
+       * `#gestion-loader` et son gestionnaire de soumission. En emettre un
+       * second dupliquait l'identifiant HTML et, surtout, faisait cohabiter
+       * deux ecouteurs sur le meme formulaire : celui de l'hote s'executait en
+       * premier, desactivait le bouton et affichait le loader, puis le
+       * verificateur de cases annulait l'envoi — bouton mort, loader tournant,
+       * rien de signe. La verification des cases est donc injectee AVANT lui
+       * (cf. $blListHtml) et coupe la chaine avec `stopImmediatePropagation`.
+       */
+      if (!$bl_only) {
+         echo '<div class="gestion-loader-overlay" id="gestion-loader">';
+            echo '<div class="gestion-loader-spinner"></div>';
+            echo '<div class="gestion-loader-text">Signature en cours, veuillez patienter...</div>';
+         echo '</div>';
+         echo '<script>
+         (function(){
+            var forms = document.querySelectorAll("form");' . self::getPostSizeCheckJs() . '
+            forms.forEach(function(form) {
+               var submitBtn = form.querySelector("input[type=submit]");
+               if (!submitBtn) return;
+               var submitted = false;
+               form.addEventListener("submit", function(e) {
+                  var checked = form.querySelectorAll("input[name=\'bl_ids[]\']:checked").length;
+                  if (checked === 0) { e.preventDefault(); alert("Sélectionnez au moins un BL."); return; }
+                  if (submitted) { e.preventDefault(); return; }
+                  if (gestionPostTooBig(form)) { e.preventDefault(); return; }
+                  submitted = true;
+                  submitBtn.disabled = true;
+                  submitBtn.value = "Signature en cours...";
+                  var loader = document.getElementById("gestion-loader");
+                  if (loader) loader.classList.add("active");
+                  if (typeof gestionAfterSubmit === "function") {
+                     gestionAfterSubmit(form);
+                  }
+               });
             });
-         });
-      })();
-      </script>';
+         })();
+         </script>';
+      }
    }
 }
-?>

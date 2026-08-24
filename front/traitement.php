@@ -210,7 +210,21 @@ if (file_put_contents($signaturePath, $signatureData) === false) {
     gestion_message("Échec de la sauvegarde de l'image de signature.", ERROR);
 }
 
-if ($DOC->save == "SharePoint"){ //Récup BL depuis sharepoint
+/*
+ * LA COPIE LOCALE D'ABORD, quand elle est bien celle de CE bon.
+ *
+ * Meme raisonnement — et meme garde-fou — que la signature groupee
+ * (front/sign_bl.core.php) : le Document GLPI rattache n'est pris pour source
+ * que s'il porte le numero du bon. Apres une signature groupee, `doc_id`
+ * designe le PDF FUSIONNE du lot ; s'en servir produisait un document ou
+ * chaque « bon signe » contenait le lot entier.
+ *
+ * Les trois branches ci-dessous restent le repli : sans document propre, on va
+ * bien le chercher a la source declaree.
+ */
+$existingPdfPath = pluginGestionLocalSourcePdf($DOC);
+
+if ($existingPdfPath === '' && $DOC->save == "SharePoint"){ //Récup BL depuis sharepoint
     try {
         $folderPath = ""; // Par défaut, $folderPath est vide
         if (!empty($DOC->url_bl)){
@@ -240,12 +254,12 @@ if ($DOC->save == "SharePoint"){ //Récup BL depuis sharepoint
     // Vérifiez que le PDF source existe
     $existingPdfPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
 }
-if ($DOC->save == "Local"){ //Récup BL depuis local
+if ($existingPdfPath === '' && $DOC->save == "Local"){ //Récup BL depuis local
     // Vérifiez que le PDF source existe
     $url = str_replace("_plugins", "", $DOC->url_bl.$DOC->bl);
     $existingPdfPath = GLPI_PLUGIN_DOC_DIR . $url;
 }
-if ($DOC->save == "Sage"){ //Récup BL depuis local
+if ($existingPdfPath === '' && $DOC->save == "Sage"){ //Récup BL depuis Sage
     // Vérifiez que le PDF source existe
     $existingPdfPath = downloadDocument($DOC->url_bl, GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/Sage_Temp_".$nombreAleatoire.".pdf");
 }
@@ -665,8 +679,23 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
                 gestion_message("Erreur de suppression du document non signé : " . $e->getMessage(), ERROR);
             }
         }
-        if ($DOC->save == "Sage"){ //Récup BL depuis local
-            unlink($existingPdfPath);
+        /*
+         * Nettoyage du TEMPORAIRE Sage, et de lui seul.
+         *
+         * Cette ligne effaçait `$existingPdfPath` sans condition, en supposant
+         * qu'il désignait forcément la copie temporaire téléchargée depuis Sage.
+         * Depuis que la source peut être le Document GLPI déjà rattaché au bon,
+         * cette supposition est fausse : elle aurait supprimé l'ORIGINAL du
+         * disque, laissant un Document GLPI pointant dans le vide.
+         *
+         * On ne supprime donc que ce qui se trouve dans le dossier de travail.
+         */
+        if ($DOC->save == "Sage") {
+            $tmp_dir = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/";
+            if (str_starts_with(str_replace('\\', '/', (string)$existingPdfPath), str_replace('\\', '/', $tmp_dir))
+                && is_file($existingPdfPath)) {
+                @unlink($existingPdfPath);
+            }
         }
     }
 }
@@ -696,17 +725,34 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         if ($FolderDes == 'Local'){
             $destDir = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folderPath;
 
-            // Crée le dossier s’il n’existe pas
-            if (!is_dir($destDir)) {
-                @mkdir($destDir, 0755, true);
+            /*
+             * Le dossier <Entité>/<année>/<mois> n'existe pas au premier
+             * document du mois : il est créé récursivement.
+             *
+             * L'échec n'est PAS silencieux : sans dossier, la copie échoue,
+             * et le Document GLPI enregistré ensuite pointerait vers un fichier
+             * absent — c'est exactement le « Fichier introuvable sur le disque »
+             * qu'on voit dans les listes. Mieux vaut une erreur nette ici, sur
+             * l'écran de signature, qu'une ligne muette découverte des semaines
+             * plus tard.
+             */
+            if (!is_dir($destDir) && !@mkdir($destDir, 0755, true) && !is_dir($destDir)) {
+                gestion_message("Impossible de créer le dossier d'archivage : $destDir", ERROR);
+                Html::back();
+                exit;
             }
+
             // Construire le chemin complet de destination
             $destPath = $destDir . '/' . $fileName;
             if (!str_ends_with($destPath, '.pdf')) {
                 $destPath .= '.pdf';
             }
             // Copier le fichier
-            copy($outputPathTemp, $destPath);
+            if (!@copy($outputPathTemp, $destPath)) {
+                gestion_message("Impossible d'écrire le PDF signé dans : $destPath", ERROR);
+                Html::back();
+                exit;
+            }
         }
     } catch (Exception $e) {
         gestion_message("Erreur : " . $e->getMessage(), ERROR);

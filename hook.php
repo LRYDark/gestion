@@ -114,6 +114,20 @@ function plugin_gestion_install() { // fonction installation du plugin
    }
 
    CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
+
+   // update_180_181 : mise à jour unique 1.8.1 — purge des actions automatiques
+   // fantômes de la lignée du plugin (héritage du nom « rpauto » :
+   // PluginRpautoReminder::cronRpautoMail indéfinie à chaque passage du cron).
+   // Appelé APRÈS CronTask::Register() : la tâche valide du plugin existe alors
+   // en base, la purge ne supprime donc que ce qui n'est plus exécutable.
+   $update181 = dirname(__FILE__) . '/install/update_180_181.php';
+   if (file_exists($update181)) {
+      require_once $update181;
+      if (function_exists('update_180_181')) {
+         update_180_181();
+      }
+   }
+
    return true;
 }
 
@@ -200,6 +214,10 @@ function plugin_gestion_giveItem($itemtype, $orig_id, $data, $num) {
       'root_doc'     => $base,
       'root_modal'   => 'survey-form',
       'fallback_url' => $fallback,
+      // `one_bl` : on a cliqué sur CE bon dans la liste. Lui seul est précoché
+      // dans le formulaire de signature (cf. ajax/cri.php), les autres bons du
+      // même ticket restent visibles et cochables.
+      'one_bl'       => 1,
    ];
    $onclick = "if (typeof gestion_loadCriForm === 'function') {"
       . " gestion_loadCriForm('showCriForm', '" . $survey_id . "', " . json_encode($params) . ");"
@@ -220,10 +238,10 @@ function plugin_gestion_uninstall() { // fonction desintallation du plugin
    // Sur certains FS (disque reseau/mappe Windows), chmod echoue et GLPI 11 l'enveloppe
    // dans Safe\chmod() qui leve une exception -> sans ce try/catch, toute la
    // desinstallation s'interrompt (les tables ne seraient jamais supprimees).
-   $rep_files_rp = GLPI_PLUGIN_DOC_DIR . "/gestion";
+   $rep_files_gestion = GLPI_PLUGIN_DOC_DIR . "/gestion";
    try {
-      if (file_exists($rep_files_rp)) {
-         Toolbox::deleteDir($rep_files_rp);
+      if (file_exists($rep_files_gestion)) {
+         Toolbox::deleteDir($rep_files_gestion);
       }
    } catch (Throwable $e) {
       // On poursuit la desinstallation meme si le dossier n'a pas pu etre supprime.
@@ -254,7 +272,12 @@ function plugin_gestion_uninstall() { // fonction desintallation du plugin
       PluginGestionProfile::removeRightsFromSession();
       PluginGestionMenu::removeRightsFromSession();
    
-      CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
+      // Désinstallation : la tâche de cron doit être RETIRÉE, pas ré-enregistrée.
+      // L'ancien CronTask::Register() laissait une ligne dans glpi_crontasks après
+      // suppression du plugin : GLPI tentait ensuite de l'exécuter indéfiniment
+      // (« Fonction PluginXxx::cronXxx indéfinie » dans cron.log).
+      // unregister() supprime toutes les taches PluginGestion* et leurs logs.
+      CronTask::unregister('Gestion');
 
    return true;
 }

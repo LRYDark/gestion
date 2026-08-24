@@ -33,9 +33,10 @@ if (!defined('GLPI_ROOT')) {
 }
 
 /**
- * Class PluginGestionSurvey
+ * Class PluginGestionReminder
  *
- * Used to store reminders to send automatically
+ * Action automatique du plugin : recuperation des PDF SharePoint
+ * (cron « GestionPdf », voir cronGestionPdf()).
  */
 class PluginGestionReminder extends CommonDBTM {
 

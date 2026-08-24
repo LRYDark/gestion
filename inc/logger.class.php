@@ -15,8 +15,22 @@ class PluginGestionLogger {
 
    const LOGFILE = 'plugin-gestion';
 
+   /**
+    * Volontairement SANS effet.
+    *
+    * Le fichier se remplissait de lignes de fonctionnement normal — mails
+    * envoyés, bons signés — qui n'apprenaient rien et noyaient les seules
+    * lignes qu'on vient y chercher : ce qui a échoué. Le journal ne retient
+    * donc plus que les avertissements et les erreurs.
+    *
+    * La méthode est conservée : elle est appelée depuis une trentaine
+    * d'endroits, et les messages correspondants restent affichés à l'écran par
+    * `Session::addMessageAfterRedirect()` — c'est le fichier qu'on allège, pas
+    * le retour à l'utilisateur. Rétablir la trace complète tient en une ligne :
+    * décommenter l'appel ci-dessous.
+    */
    static function info(string $context, string $message): void {
-      self::write('INFO', $context, $message);
+      // self::write('INFO', $context, $message);
    }
 
    static function warning(string $context, string $message): void {

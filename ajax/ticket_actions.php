@@ -55,20 +55,40 @@ if ($can_sign_bl && $DB->tableExists('glpi_plugin_gestion_surveys')) {
       'LIMIT'  => 10,
    ]);
 
+   /*
+    * UNE seule action, même s'il reste plusieurs bons.
+    *
+    * Le bouton en listait un par bon non signé. Depuis que la signature ouvre
+    * une liste à cocher — on y signe un, plusieurs ou tous les bons du ticket —
+    * ces entrées menaient toutes au même écran : autant de lignes pour un seul
+    * geste. On garde le bon le plus ancien comme point d'entrée et on annonce
+    * combien attendent.
+    */
    $signed_count = 0;
+   $unsigned     = [];
    foreach ($rows as $row) {
       if ((int)$row['signed'] === 1) {
          $signed_count++;
          continue;
       }
+      $unsigned[] = $row;
+   }
+
+   if (count($unsigned) > 0) {
+      $first = $unsigned[count($unsigned) - 1];   // tri `id DESC` : le plus ancien en dernier
+      $nb    = count($unsigned);
       $actions[] = [
          'key'     => 'bl',
-         'label'   => __('Signer le bon de livraison', 'gestion'),
-         'hint'    => (string)$row['bl'],
+         'label'   => $nb > 1
+            ? __('Signer les bons de livraison', 'gestion')
+            : __('Signer le bon de livraison', 'gestion'),
+         'hint'    => $nb > 1
+            ? sprintf(_n('%d bon en attente', '%d bons en attente', $nb, 'gestion'), $nb)
+            : (string)$first['bl'],
          'icon'    => 'ti ti-signature',
          'mode'    => 'gestion',
-         'bl_id'   => (int)$row['id'],
-         'primary' => count($actions) === 0,
+         'bl_id'   => (int)$first['id'],
+         'primary' => true,
       ];
    }
 

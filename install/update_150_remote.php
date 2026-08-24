@@ -2,11 +2,32 @@
 function update_150_remote() {
    global $DB;
 
-   // --- 1) Tables ------------------------------------------------------------
+   /*
+    * --- 1) Tables ------------------------------------------------------------
+    *
+    * `int {$default_key_sign}` et NON `int(10) unsigned`.
+    *
+    * Deux corrections en une :
+    *
+    * 1. GLPI 11 inspecte le TEXTE de la requête pour signaler les clés en
+    *    entiers signés (DBmysql::checkForDeprecatedTableOptions). Son motif
+    *    cherche un champ `id` / `*_id` suivi de `int` NON suivi de ` unsigned`
+    *    — or avec la largeur d'affichage `(10)` intercalée, `unsigned` ne suit
+    *    plus `int` : l'avertissement se déclenchait à chaque installation ou
+    *    mise à jour, alors que les colonnes étaient bel et bien non signées.
+    *    La largeur d'affichage est de toute façon obsolète depuis MySQL 8.
+    *
+    * 2. Le signe est repris de la connexion, comme dans tout le reste du plugin
+    *    (hook.php, config.class.php, ticket.class.php). Le coder en dur aurait
+    *    donné, sur une base configurée en clés signées, un `tickets_id` non
+    *    signé face à un `glpi_tickets.id` signé.
+    */
+   $default_key_sign = DBConnection::getDefaultPrimaryKeySignOption();
+
    $create_remote_sign_requests = "
    CREATE TABLE IF NOT EXISTS `glpi_plugin_gestion_remote_sign_requests` (
-     `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-     `tickets_id` int(10) unsigned NOT NULL,
+     `id` int {$default_key_sign} NOT NULL AUTO_INCREMENT,
+     `tickets_id` int {$default_key_sign} NOT NULL,
      `device_id` varchar(191) NOT NULL,
      `device_token` varchar(191) NOT NULL,
      `parameters` longtext DEFAULT NULL,
@@ -24,7 +45,7 @@ function update_150_remote() {
 
    $create_signaturedevices = "
    CREATE TABLE IF NOT EXISTS `glpi_plugin_gestion_signaturedevices` (
-     `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+     `id` int {$default_key_sign} NOT NULL AUTO_INCREMENT,
      `device_id` varchar(190) NOT NULL,
      `serial` varchar(190) DEFAULT NULL,
      `device_token` varchar(128) NOT NULL,

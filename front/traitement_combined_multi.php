@@ -1,11 +1,15 @@
 <?php
 /*
- * Signature GROUPEE : tous les BL coches d'un ticket + 1 rapport => 1 PDF fusionne.
- * - Une seule signature client appliquee a chaque BL et au rapport.
- * - Rapport genere une seule fois.
- * - Fusion [BL1, BL2, ..., rapport] => 1 PDF final.
- * - PDF fusionne : archive selon config (SharePoint/Local), maile client + ZenDoc.
- * - Chaque BL coche est marque signe et pointe vers le PDF fusionne (doc_url).
+ * Signature GROUPEE des BL coches d'un ticket => 1 PDF fusionne.
+ *
+ * Deux modes, une seule chaine de traitement (drapeau POST `bl_only`) :
+ *   - defaut  : BL coches + UN rapport d'intervention  => [BL1, BL2, ..., rapport]
+ *   - bl_only : BL coches SEULS                        => [BL1, BL2, ...]
+ *
+ * Commun aux deux : une seule signature client appliquee a chaque document, un
+ * PDF fusionne archive selon la config (SharePoint/Local, range par annee/mois),
+ * maile au client et a ZenDoc, et chaque BL coche marque signe pointant vers ce
+ * PDF fusionne (doc_url).
  */
 
 include('../../../inc/includes.php');
@@ -51,8 +55,25 @@ if ($ticket_id <= 0 || empty($bl_ids)) {
    exit;
 }
 
+/*
+ * Deux parcours dans ce fichier, une seule chaine de traitement.
+ *
+ *  - defaut          : BL coches + UN rapport d'intervention => 1 PDF fusionne ;
+ *  - `bl_only`       : BL coches SEULS => 1 PDF fusionne, sans rapport.
+ *
+ * Le second sert quand le rapport est deja signe — le regenerer n'apporterait
+ * rien et en produirait un second — et quand le plugin RP est absent : Gestion
+ * doit alors savoir signer plusieurs bons d'un coup, pas seulement un par un.
+ *
+ * Tout ce qui suit la signature (fusion, archivage date, mise a jour des
+ * lignes, mails, nettoyage) est STRICTEMENT identique dans les deux cas : d'ou
+ * un drapeau plutot qu'un second fichier, qui aurait divergé.
+ */
+$bl_only = !empty($_POST['bl_only']);
+
 $plugin = new Plugin();
-if (!$plugin->isInstalled('rp') || !$plugin->isActivated('rp') || !class_exists('PluginRpCri')) {
+if (!$bl_only
+    && (!$plugin->isInstalled('rp') || !$plugin->isActivated('rp') || !class_exists('PluginRpCri'))) {
    gestion_multi_message("Le plugin RP n'est pas disponible.", ERROR);
    Html::back();
    exit;
@@ -164,29 +185,40 @@ if (!empty($pdfBase64) && strpos($pdfBase64, 'data:application/pdf;base64,') ===
    }
 }
 
-// ---- 1. Generer le rapport RP une seule fois ----
-$rp_pdf = '';
+// ---- 1. Generer le rapport RP une seule fois (sauf en mode BL seul) ----
+$rp_pdf       = '';
+$rp_doc_id    = 0;      // Document GLPI cree par le generateur RP
+$rp_repointed = false;  // ce Document a-t-il ete remplace par le PDF fusionne ?
 $SeeFilePath = '';
 $saved_mailto = $_POST['mailtoclient'] ?? null;
 $_POST['mailtoclient'] = 0; // jamais de mail depuis le rapport
-try {
-   $rp_dir = Plugin::getPhpDir('rp');
-   ob_start();
-   /*
-    * Marqueur lu par le generateur : il produit alors le document sans decider
-    * de l'afficher ni de rediriger, ces deux choix appartenant au parcours qui
-    * l'appelle. Sans lui, le reglage « Affichage du PDF apres signature » du
-    * plugin RP sur Non le ferait rediriger ici meme, coupant la signature des
-    * bons avant qu'elle n'ait lieu.
-    */
-   $GLOBALS['PLUGIN_RP_PDF_EMBEDDED'] = true;
-   include $rp_dir . '/front/cripdf.form.php';
-   unset($GLOBALS['PLUGIN_RP_PDF_EMBEDDED']);
-   ob_end_clean();
-   $rp_pdf = $SeeFilePath ?? '';
-} catch (Throwable $e) {
-   unset($GLOBALS['PLUGIN_RP_PDF_EMBEDDED']);
-   $rp_pdf = '';
+if (!$bl_only) {
+   try {
+      $rp_dir = Plugin::getPhpDir('rp');
+      ob_start();
+      /*
+       * Marqueur lu par le generateur : il produit alors le document sans decider
+       * de l'afficher ni de rediriger, ces deux choix appartenant au parcours qui
+       * l'appelle. Sans lui, le reglage « Affichage du PDF apres signature » du
+       * plugin RP sur Non le ferait rediriger ici meme, coupant la signature des
+       * bons avant qu'elle n'ait lieu.
+       */
+      $GLOBALS['PLUGIN_RP_PDF_EMBEDDED'] = true;
+      include $rp_dir . '/front/cripdf.form.php';
+      unset($GLOBALS['PLUGIN_RP_PDF_EMBEDDED']);
+      ob_end_clean();
+      $rp_pdf = $SeeFilePath ?? '';
+      /*
+       * Le generateur est INCLUS dans cette portee : `$NewDoc` y designe le
+       * Document GLPI qu'il vient de creer pour le rapport. On le retient tout
+       * de suite, avant que la suite du fichier ne reutilise ce nom — c'est lui
+       * qu'il faudra faire pointer vers le PDF fusionne.
+       */
+      $rp_doc_id = (int)($NewDoc ?? 0);
+   } catch (Throwable $e) {
+      unset($GLOBALS['PLUGIN_RP_PDF_EMBEDDED']);
+      $rp_pdf = '';
+   }
 }
 $_POST['mailtoclient'] = $saved_mailto;
 
@@ -201,7 +233,7 @@ $_POST['mailtoclient'] = $saved_mailto;
  */
 $config = PluginGestionConfig::getInstance();
 
-if (empty($rp_pdf) || !file_exists($rp_pdf)) {
+if (!$bl_only && (empty($rp_pdf) || !file_exists($rp_pdf))) {
    @unlink($signaturePath);
    gestion_multi_message("Generation du rapport impossible.", ERROR);
    Html::back();
@@ -210,6 +242,7 @@ if (empty($rp_pdf) || !file_exists($rp_pdf)) {
 
 // ---- 2. Signer chaque BL (photos/PDF joint sur le 1er seulement) ----
 $signed_bl_pdfs = [];
+$failed_bls     = [];
 $first = true;
 foreach ($valid_bls as $DOC) {
    $signed = pluginGestionRenderSignedBl(
@@ -223,24 +256,59 @@ foreach ($valid_bls as $DOC) {
    );
    if ($signed && file_exists($signed)) {
       $signed_bl_pdfs[(int)$DOC->id] = $signed;
+   } else {
+      // Le detail (source, reference, cause) est journalise par
+      // pluginGestionRenderSignedBl ; on retient ici le nom du bon.
+      $failed_bls[] = (string)$DOC->bl;
    }
    $first = false;
 }
 
 if (empty($signed_bl_pdfs)) {
    @unlink($signaturePath);
-   if (!empty($rp_pdf) && file_exists($rp_pdf)) { @unlink($rp_pdf); }
-   gestion_multi_message("Signature des BL impossible.", ERROR);
+   if ($rp_repointed && !empty($rp_pdf) && file_exists($rp_pdf)) { @unlink($rp_pdf); }
+   /*
+    * Message nomme : « Signature des BL impossible » ne disait ni quel bon ni
+    * pourquoi. Sur un ticket a plusieurs bons, il fallait deviner.
+    */
+   gestion_multi_message(
+      "Signature impossible : le document source est introuvable pour "
+      . implode(', ', $failed_bls)
+      . ". Il a probablement ete supprime de sa source (Sage / SharePoint / local).",
+      ERROR
+   );
    Html::back();
    exit;
 }
 
-// ---- 3. Fusion : tous les BL signes puis le rapport => 1 PDF ----
-$mergedPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/BL_Rapport_T" . $ticket_id . "_" . date('Ymd_His') . ".pdf";
+if (!empty($failed_bls)) {
+   // Echec PARTIEL : les autres bons sont signes, celui-ci ne l'est pas et
+   // reste donc en attente. Le dire, sinon il passe inapercu.
+   gestion_multi_message(
+      "Document source introuvable, ces bons n'ont pas ete signes : " . implode(', ', $failed_bls),
+      WARNING
+   );
+}
+
+// ---- 3. Fusion : tous les BL signes (+ le rapport hors mode BL seul) => 1 PDF ----
+/*
+ * `$report_merged` decrit ce qui est REELLEMENT dans le PDF produit, la ou
+ * `$bl_only` ne dit que ce qui avait ete demande. Les libelles, le nom du
+ * fichier et les mails s'appuient desormais dessus : un document annonce
+ * « BL seuls » alors qu'il porte le rapport — ou l'inverse — est un document
+ * qui ment sur son contenu, et c'est ce que le technicien lit avant de
+ * l'envoyer au client.
+ */
+$report_merged = (!$bl_only && !empty($rp_pdf) && file_exists($rp_pdf));
+
+$merged_prefix = $report_merged ? 'BL_Rapport_T' : 'BL_T';
+$mergedPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/" . $merged_prefix . $ticket_id . "_" . date('Ymd_His') . ".pdf";
 try {
    $pdf = new Fpdi();
    $sources = array_values($signed_bl_pdfs);
-   $sources[] = $rp_pdf;
+   if ($report_merged) {
+      $sources[] = $rp_pdf;
+   }
    foreach ($sources as $src) {
       if (!file_exists($src)) { continue; }
       $stream = StreamReader::createByFile($src);
@@ -254,7 +322,7 @@ try {
 } catch (Throwable $e) {
    @unlink($signaturePath);
    foreach ($signed_bl_pdfs as $p) { @file_exists($p) && @unlink($p); }
-   if (file_exists($rp_pdf)) { @unlink($rp_pdf); }
+   if ($rp_repointed && !empty($rp_pdf) && file_exists($rp_pdf)) { @unlink($rp_pdf); }
    gestion_multi_message("Fusion des PDF impossible : " . $e->getMessage(), ERROR);
    Html::back();
    exit;
@@ -288,7 +356,7 @@ if ($entity_id > 0) {
    $er = $DB->doQuery("SELECT name FROM glpi_entities WHERE id = $entity_id")->fetch_object();
    if ($er && !empty($er->name)) { $EntitiesName = $er->name; }
 }
-$mergedName = "BL_Rapport_T" . $ticket_id . "_" . date('Ymd_His') . ".pdf";
+$mergedName = $merged_prefix . $ticket_id . "_" . date('Ymd_His') . ".pdf";
 $year = date('Y');
 $monthsFr = [1=>'janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
 $monthName = $monthsFr[(int)date('n')] ?? strtolower(date('F'));
@@ -304,9 +372,22 @@ try {
       $merged_doc_url = $sharepoint->getFileUrl($folderPath . '/' . $mergedName);
    } else {
       $destDir = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folderPath;
-      if (!is_dir($destDir)) { @mkdir($destDir, 0755, true); }
+
+      /*
+       * Creation recursive du dossier <Entite>/<annee>/<mois>, qui n'existe pas
+       * au premier document du mois — et echec ANNONCE. Sans dossier, la copie
+       * echoue ; le Document GLPI cree juste apres pointerait alors vers un
+       * fichier absent, ce qui produit le « Fichier introuvable sur le disque »
+       * des listes. On leve donc l'erreur ici, avant d'enregistrer quoi que ce
+       * soit, plutot que de laisser une trace muette derriere soi.
+       */
+      if (!is_dir($destDir) && !@mkdir($destDir, 0755, true) && !is_dir($destDir)) {
+         throw new RuntimeException("Impossible de créer le dossier d'archivage : $destDir");
+      }
       $destPath = $destDir . '/' . $mergedName;
-      copy($mergedPath, $destPath);
+      if (!@copy($mergedPath, $destPath)) {
+         throw new RuntimeException("Impossible d'écrire le PDF fusionné dans : $destPath");
+      }
       $merged_url_bl = "_plugins/gestion/" . $folderPath . '/';
       $doc = new Document();
       $input = [
@@ -328,6 +409,66 @@ try {
    }
 } catch (Throwable $e) {
    gestion_multi_message("Archivage du PDF fusionne en erreur : " . $e->getMessage(), WARNING);
+}
+
+/*
+ * Archivage local rate : on ARRETE avant de marquer quoi que ce soit.
+ *
+ * Marquer les bons signes en les faisant pointer vers un document inexistant
+ * les rendrait insignables — `signed = 1` les retire de toutes les listes — au
+ * profit d'un PDF que personne ne pourra jamais ouvrir. Le technicien perd sa
+ * signature, mais rien n'est casse : il recommence une fois le dossier
+ * accessible. SharePoint n'entre pas dans ce controle : son echec est deja
+ * signale et ne produit pas de Document local a verifier.
+ */
+if ($FolderDes !== 'SharePoint' && $merged_doc_id <= 0) {
+   @unlink($signaturePath);
+   foreach ($signed_bl_pdfs as $p) { if (file_exists($p)) { @unlink($p); } }
+   if ($rp_repointed && !empty($rp_pdf) && file_exists($rp_pdf)) { @unlink($rp_pdf); }
+   gestion_multi_message(
+      "Archivage impossible : aucun bon n'a ete marque signe. Verifiez les droits d'ecriture du dossier de destination.",
+      ERROR
+   );
+   Html::back();
+   exit;
+}
+
+/*
+ * ---- 5 bis. Le rapport RP pointe vers le MEME document que les bons ----
+ *
+ * Le rapport et les bons ne font plus qu'un PDF : il n'y a plus qu'un document
+ * a montrer, et les deux plugins doivent designer celui-la. Le plugin RP
+ * continuait de pointer vers son propre PDF de rapport — que ce fichier-ci
+ * supprime apres la fusion. Resultat : « Visualiser » depuis le tableau
+ * « Rapport PDF » de RP ouvrait un fichier absent (404 sur document.send.php),
+ * alors que « Voir » depuis l'onglet Gestion fonctionnait.
+ *
+ * Le Document RP devenu inutile est purge : son fichier vient d'etre fusionne
+ * dans un autre, le garder ne laisserait qu'une ligne pointant dans le vide.
+ *
+ * Sans document fusionne local — destination SharePoint — on ne repointe rien :
+ * RP garde son propre PDF, qui n'est alors pas supprime (cf. nettoyage final).
+ * Chaque plugin reste ainsi autonome quand la fusion ne produit pas de document
+ * GLPI a partager.
+ */
+if ($report_merged && $rp_doc_id > 0 && $merged_doc_id > 0
+    && $DB->tableExists('glpi_plugin_rp_cridetails')) {
+
+   $DB->update(
+      'glpi_plugin_rp_cridetails',
+      ['id_documents' => $merged_doc_id],
+      ['id_ticket' => $ticket_id, 'id_documents' => $rp_doc_id]
+   );
+
+   if ($rp_doc_id !== $merged_doc_id) {
+      $rp_doc = new Document();
+      if ($rp_doc->getFromDB($rp_doc_id)) {
+         // 2e argument : purge — le fichier part avec la ligne.
+         $rp_doc->delete(['id' => $rp_doc_id], 1);
+      }
+   }
+
+   $rp_repointed = true;
 }
 
 // ---- 6. Marquer chaque BL signe (pointant vers le PDF fusionne) ----
@@ -360,17 +501,17 @@ if ($client_mail_enabled == 1 && !empty($config->fields['MailTo'])
 }
 if (!empty($config->fields['ZenDocMail'])) {
    $bl_list = implode(', ', array_map(fn($d) => $d->bl, $valid_bls));
-   $msg = "BL signes + Rapport d'intervention.<br><br>Ticket ID : $ticket_id<br><br>BL : $bl_list";
-   $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $mergedPath, "Envoye vers ZenDoc", null, null, null, null, "BL + Rapport signes", $msg);
+   $msg = ($report_merged ? "BL signes + Rapport d'intervention." : "BL signes.") . "<br><br>Ticket ID : $ticket_id<br><br>BL : $bl_list";
+   $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $mergedPath, "Envoye vers ZenDoc", null, null, null, null, ($report_merged ? "BL + Rapport signes" : "BL signes"), $msg);
 }
 
 // ---- 8. Nettoyage ----
 @unlink($signaturePath);
 foreach ($signed_bl_pdfs as $p) { if (file_exists($p)) { @unlink($p); } }
-if (file_exists($rp_pdf)) { @unlink($rp_pdf); }
+if ($rp_repointed && !empty($rp_pdf) && file_exists($rp_pdf)) { @unlink($rp_pdf); }
 if ($attachedPdfPath && file_exists($attachedPdfPath)) { @unlink($attachedPdfPath); }
 
-gestion_multi_message(count($valid_bls) . " BL + Rapport signes et fusionnes.", INFO);
+gestion_multi_message(count($valid_bls) . ($report_merged ? " BL + Rapport signes et fusionnes." : " BL signes et fusionnes."), INFO);
 
 /*
  * Affichage du document produit, comme les autres signatures.

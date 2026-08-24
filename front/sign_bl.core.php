@@ -48,15 +48,52 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
       $rand       = rand(1, 100000);
       $DOC_NAME   = (string)$DOC->bl;
 
-      // ---- 1. Recuperer le PDF source du BL (SharePoint / Local / Sage) ----
+      // ---- 1. Recuperer le PDF source du BL (local / SharePoint / Sage) ----
       $existingPdfPath = '';
+
+      /*
+       * LA COPIE LOCALE D'ABORD, quand elle est bien celle de CE bon.
+       *
+       * `pluginGestionLocalSourcePdf()` (setup.php) verifie que le Document
+       * GLPI rattache porte le numero du bon : apres une signature groupee,
+       * `doc_id` designe le PDF FUSIONNE du lot, qu'il ne faut surtout pas
+       * prendre pour la source d'un bon. La source distante reste le repli.
+       */
+      $existingPdfPath = pluginGestionLocalSourcePdf($DOC);
+
       try {
-         if ($DOC->save == "SharePoint") {
-            $folderPath = !empty($DOC->url_bl) ? ($DOC->url_bl . "/") : "";
-            $filePath   = $folderPath . $DOC_NAME;
-            $downloadUrl = $sharepoint->getDownloadUrl($filePath);
+         if ($existingPdfPath !== '') {
+            // Rien a faire : la copie locale sert de source.
+         } elseif ($DOC->save == "SharePoint") {
+            /*
+             * Deuxieme tentative, comme pour Sage (cf. downloadDocument).
+             *
+             * Un telechargement rate ne prouve pas que le document est absent :
+             * une coupure reseau ou un jeton Graph expire au mauvais moment
+             * donnent le meme resultat qu'une suppression. On reessaie une fois
+             * avant de conclure ; si le fichier arrive, personne n'a rien vu.
+             */
+            $folderPath      = !empty($DOC->url_bl) ? ($DOC->url_bl . "/") : "";
+            $filePath        = $folderPath . $DOC_NAME;
             $existingPdfPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_" . $rand . ".pdf";
-            $sharepoint->downloadFileFromUrl($downloadUrl, $existingPdfPath);
+
+            for ($sp_try = 1; $sp_try <= 2; $sp_try++) {
+               try {
+                  $downloadUrl = $sharepoint->getDownloadUrl($filePath);
+                  $sharepoint->downloadFileFromUrl($downloadUrl, $existingPdfPath);
+               } catch (Throwable $sp_e) {
+                  // Avalee tant qu'il reste un essai ; relancee au dernier.
+                  if ($sp_try >= 2) {
+                     throw $sp_e;
+                  }
+               }
+               if (file_exists($existingPdfPath)) {
+                  break;
+               }
+               if ($sp_try < 2) {
+                  usleep(700000);
+               }
+            }
          } elseif ($DOC->save == "Local") {
             $url = str_replace("_plugins", "", $DOC->url_bl . $DOC->bl);
             $existingPdfPath = GLPI_PLUGIN_DOC_DIR . $url;
@@ -64,10 +101,52 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
             $existingPdfPath = downloadDocument($DOC->url_bl, GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/Sage_Temp_" . $rand . ".pdf");
          }
       } catch (Throwable $e) {
+         /*
+          * L'echec etait muet : la fonction rendait `null` sans dire pourquoi,
+          * et l'appelant ne pouvait annoncer qu'un « Signature des BL
+          * impossible » qui ne nommait ni le bon ni la cause. Sur un ticket a
+          * trois bons, impossible de savoir lequel avait echoue.
+          */
+         if (class_exists('PluginGestionLogger')) {
+            PluginGestionLogger::error(
+               'signature',
+               sprintf(
+                  'BL %s (source %s) : recuperation du PDF impossible — %s',
+                  $DOC_NAME,
+                  (string)($DOC->save ?? '?'),
+                  $e->getMessage()
+               )
+            );
+         }
          return null;
       }
 
       if (empty($existingPdfPath) || !file_exists($existingPdfPath)) {
+         /*
+          * On arrive ici APRES la seconde tentative : le document est donc bien
+          * absent de sa source, ou celle-ci reste injoignable.
+          *
+          * `downloadDocument()` ne leve pas d'exception sur une reponse
+          * HTTP >= 400 — il supprime le fichier et rend malgre tout son chemin.
+          * Seule l'absence du fichier trahit l'echec, d'ou ce controle.
+          */
+         if (class_exists('PluginGestionLogger')) {
+            /*
+             * `warning` et non `error` : un document absent de sa source n'est
+             * pas une défaillance du plugin. La cause précise — 404, accès
+             * refusé, source injoignable — a déjà été journalisée juste avant
+             * par la couche qui a interrogé Sage ou SharePoint.
+             */
+            PluginGestionLogger::warning(
+               'signature',
+               sprintf(
+                  'BL %s (source %s) : PDF source introuvable, bon non signe (reference : %s)',
+                  $DOC_NAME,
+                  (string)($DOC->save ?? '?'),
+                  (string)($DOC->url_bl ?? '')
+               )
+            );
+         }
          return null;
       }
 
@@ -207,8 +286,20 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
       }
 
       if ($pdf->Output('F', $outputPathTemp) === '' || file_exists($outputPathTemp)) {
-         // Nettoyage des sources temporaires telechargees.
-         if ($DOC->save == "SharePoint" || $DOC->save == "Sage") {
+         /*
+          * Nettoyage des sources TEMPORAIRES telechargees, et d'elles seules.
+          *
+          * Le test portait sur `$DOC->save`, en supposant qu'une source distante
+          * impliquait forcement une copie temporaire. Depuis que le Document
+          * GLPI deja rattache au bon peut servir de source, cette supposition
+          * est fausse : on aurait supprime l'ORIGINAL du disque, laissant un
+          * Document GLPI pointant dans le vide.
+          *
+          * Le dossier de travail est desormais le seul critere.
+          */
+         $tmp_dir = str_replace('\\', '/', GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/");
+         if (str_starts_with(str_replace('\\', '/', (string)$existingPdfPath), $tmp_dir)
+             && is_file($existingPdfPath)) {
             @unlink($existingPdfPath);
          }
          return file_exists($outputPathTemp) ? $outputPathTemp : null;

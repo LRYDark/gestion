@@ -198,6 +198,58 @@ function gestion_signBlOnly(btn, blId, params) {
 
 // Bascule du radio « Signature Rapport » / « Signature Rapport + BL » en haut du modal :
 // recharge le formulaire correspondant DANS le modal courant (sans changer de page).
+/**
+ * Après soumission d'un formulaire de signature.
+ *
+ * Quand le réglage « Affichage du PDF après signature » est actif, le
+ * formulaire porte `target="_blank"` : le PDF produit s'ouvre dans un onglet
+ * voisin et la page courante NE NAVIGUE PAS. Le voile de chargement, posé au
+ * moment de l'envoi, restait donc affiché indéfiniment, et la page continuait
+ * d'afficher les bons comme non signés.
+ *
+ * On retire le voile une fois la requête partie, puis on recharge dès que
+ * l'utilisateur revient sur cet onglet — c'est le moment exact où il veut voir
+ * l'état à jour. Filet de sécurité à 20 s s'il ne quitte jamais la page.
+ *
+ * Sans `target`, la page navigue d'elle-même : cette fonction ne fait rien.
+ */
+function gestionAfterSubmit(form) {
+   if (!form || form.target !== '_blank') {
+      return;
+   }
+
+   /*
+    * `__rpReloadScheduled` : garde-fou PARTAGÉ avec le plugin RP, dont
+    * l'écouteur global voit lui aussi cet envoi (les deux formulaires portent
+    * le nom `formReport`). Sans lui, deux rechargements concurrents seraient
+    * programmés sur la même page.
+    */
+   if (window.__rpReloadScheduled) {
+      return;
+   }
+   window.__rpReloadScheduled = true;
+
+   window.setTimeout(function () {
+      var loader = document.getElementById('gestion-loader');
+      if (loader) {
+         loader.classList.remove('active');
+      }
+   }, 2000);
+
+   var done = false;
+   function reloadOnce() {
+      if (done) { return; }
+      done = true;
+      window.location.reload();
+   }
+
+   window.addEventListener('focus', function () {
+      window.setTimeout(reloadOnce, 400);
+   }, { once: true });
+
+   window.setTimeout(reloadOnce, 30000);
+}
+
 function gestion_switchCombinedMode(radio) {
    try {
       var wrap = radio.closest ? radio.closest('[data-params]') : null;
@@ -207,7 +259,15 @@ function gestion_switchCombinedMode(radio) {
       try { params = JSON.parse(wrap.getAttribute('data-params') || '{}'); } catch (e) { params = {}; }
       var p = $.extend({}, params);
       delete p.force_rp; delete p.force_combined; delete p.force_bl;
-      if (radio.value === 'rp') { p.force_rp = 1; } else { p.force_combined = 1; }
+      // Trois modes possibles ; `bl` n'est propose que lorsque le rapport est
+      // deja signe (cf. PluginGestionCri::renderCombinedModeRadio).
+      if (radio.value === 'rp') {
+         p.force_rp = 1;
+      } else if (radio.value === 'bl') {
+         p.force_bl = 1;
+      } else {
+         p.force_combined = 1;
+      }
       var container = radio.closest('.modal-body') || radio.closest('.modal-content') || wrap.parentElement;
       if (!container) { return; }
       $.ajax({
@@ -1544,7 +1604,11 @@ function initializeSignatureGestion(uniqId) {
         job: ticketId,
         root_doc: root,
         root_modal: 'planning-form',
-        fallback_url: fallbackUrl
+        fallback_url: fallbackUrl,
+        // `one_bl` : on a cliqué sur CE bon dans le planning. Lui seul est
+        // précoché dans le formulaire de signature (cf. ajax/cri.php) ; les
+        // autres bons du même ticket restent visibles et cochables.
+        one_bl: 1
       };
       const fallbackTimer = window.setTimeout(function() {
         const modalShown = !!document.querySelector('#showCriForm.show, #showCriForm.modal.show');

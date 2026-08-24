@@ -131,6 +131,20 @@ switch ($action) {
       $force_bl         = !empty($params['force_bl']);       // « Signer le BL seul quand meme »
       $force_combined   = !empty($params['force_combined']); // « Signer Rapport + BL »
       $force_rp         = !empty($params['force_rp']);       // « Signature Rapport » seul (bascule radio)
+      /*
+       * Quel(s) bon(s) precocher dans la liste.
+       *
+       * Par defaut TOUS : la signature groupee sert a solder ce qui attend, et
+       * c'est le cas de presque toutes les portes — bandeaux, page mobile,
+       * scanner OCR, bouton flottant, bouton « Signature BL ».
+       *
+       * `one_bl` renverse la regle et n'est pose que la ou l'utilisateur a
+       * clique sur UN bon precis : ligne du tableau des BL, colonne
+       * « Signature » de la liste, fiche d'un BL, lien du planning. Tout
+       * precocher dans ces cas-la faisait signer trois bons a qui n'en avait
+       * designe qu'un. Les autres restent visibles, et cochables.
+       */
+      $check_only = !empty($params['one_bl']) ? $bl_id : 0;
 
       // Charger le BL pour connaitre son ticket associe et son etat de signature.
       $bl_row = null;
@@ -200,7 +214,19 @@ switch ($action) {
 
       // Radio « Rapport seul » / « Rapport + BL » : rendu du formulaire choisi DANS le modal.
       // (force_combined = « Signer Rapport + BL » ; force_rp = bascule vers « Rapport seul ».)
-      if (($force_combined || $force_rp) && $rp_allowed && $ticket_id > 0 && !$is_signed && $task_count > 0) {
+      /*
+       * `$force_bl` entre ici comme les deux autres.
+       *
+       * Il en etait exclu : choisir « Signature BL » dans le radio rechargeait
+       * un formulaire SANS radio, et le technicien ne pouvait plus revenir a
+       * « Rapport + BL » sans refermer et rouvrir le modal. Les trois modes
+       * doivent reafficher le meme choix, seul le formulaire dessous change.
+       *
+       * Le `force_bl` du parcours SANS tache n'est pas concerne : ce bloc exige
+       * `$task_count > 0`, il continue donc son chemin habituel plus bas.
+       */
+      if (($force_combined || $force_rp || $force_bl)
+          && $rp_allowed && $ticket_id > 0 && !$is_signed && $task_count > 0) {
          /*
           * Le technicien vient du rapport d'atelier du plugin RP, ou il y a
           * repondu « le client repart avec ». Sa reponse reste affichee ici,
@@ -228,9 +254,24 @@ switch ($action) {
              && method_exists('PluginRpPreparation', 'showDestinationCard')) {
             PluginRpPreparation::showDestinationCard($ticket_id, 'form_rapport');
          }
-         echo gestion_render_combined_radio($force_rp ? 'rp' : 'both', $bl_id, $params);
+         /*
+          * `force_bl` n'est honore que si signer le bon seul est encore
+          * legitime. Le lien a pu etre construit avant qu'une tache ne soit
+          * ajoutee — bandeau « Etape suivante » deja affiche, modal reste
+          * ouvert, bouton flottant charge plus tot. Dans ce cas on retombe sur
+          * « Rapport + BL », et l'option BL n'apparait meme plus dans le choix.
+          */
+         $bl_allowed = (PluginGestionCri::defaultCombinedMode($ticket_id) === 'bl');
+         $force_bl   = $force_bl && $bl_allowed;
+
+         $mode = $force_rp ? 'rp' : ($force_bl ? 'bl' : 'both');
+         echo gestion_render_combined_radio($mode, $bl_id, $params);
          echo '</div>';
-         if ($force_rp) {
+         if ($force_bl) {
+            // Liste a cocher, meme pour un seul bon : le parcours ne doit pas
+            // changer de forme selon leur nombre.
+            $PluginGestionCri->showCombinedMultiForm($ticket_id, ['bl_only' => true, 'check_only' => $check_only]);
+         } elseif ($force_rp) {
             $_POST['modal'] = 'form_rapport';
             $rp = new PluginRpCri();
             /*
@@ -247,7 +288,7 @@ switch ($action) {
          } else {
             $unsigned_count = countElementsInTable('glpi_plugin_gestion_surveys', ['tickets_id' => $ticket_id, 'signed' => 0]);
             if ($unsigned_count > 1) {
-               $PluginGestionCri->showCombinedMultiForm($ticket_id, []);
+               $PluginGestionCri->showCombinedMultiForm($ticket_id, ['check_only' => $check_only]);
             } else {
                $PluginGestionCri->showCombinedForm($ticket_id, $bl_id, []);
             }
@@ -310,15 +351,32 @@ switch ($action) {
                break;
             }
             if ($on_ticket) {
-               // Sur le ticket : radio (Rapport / Rapport + BL) + modal combinee (1 BL) ou groupee (>=2 BL).
+               /*
+                * Sur le ticket : le choix « Que signe le client ? », puis le
+                * formulaire correspondant.
+                *
+                * Le mode preselectionne n'est plus « Rapport + BL » en toutes
+                * circonstances : quand le rapport d'intervention est DEJA signe,
+                * le technicien revient signer les bons restants, et regenerer un
+                * second rapport ne repond a rien. `defaultCombinedMode()` decide,
+                * et c'est la meme methode qui autorise l'option « Signature BL ».
+                */
+               $mode = PluginGestionCri::defaultCombinedMode($ticket_id);
+
                // Meme gouttiere que le formulaire qui suit : rendue avant lui,
                // la carte serait sinon plus large que toutes les autres.
                echo '<div class="form-container">'
-                  . gestion_render_combined_radio('both', $bl_id, $params)
+                  . gestion_render_combined_radio($mode, $bl_id, $params)
                   . '</div>';
+
                $unsigned_count = countElementsInTable('glpi_plugin_gestion_surveys', ['tickets_id' => $ticket_id, 'signed' => 0]);
-               if ($unsigned_count > 1) {
-                  $PluginGestionCri->showCombinedMultiForm($ticket_id, []);
+
+               if ($mode === 'bl') {
+                  // BL seul : liste a cocher meme pour UN bon, pour que le
+                  // parcours ne change pas de forme selon leur nombre.
+                  $PluginGestionCri->showCombinedMultiForm($ticket_id, ['bl_only' => true, 'check_only' => $check_only]);
+               } elseif ($unsigned_count > 1) {
+                  $PluginGestionCri->showCombinedMultiForm($ticket_id, ['check_only' => $check_only]);
                } else {
                   $PluginGestionCri->showCombinedForm($ticket_id, $bl_id, []);
                }
@@ -328,19 +386,36 @@ switch ($action) {
                // quoi il s'agit avant de choisir.
                // `gestion-choice` : repère du modal de choix, que le CSS ouvre
                // en feuille du bas sur téléphone (usage à une main).
+               /*
+                * La question posee suit le MEME arbitrage que le choix radio de
+                * l'onglet ticket (`defaultCombinedMode`). Rapport deja signe :
+                * on ne propose pas d'en refaire un, on propose de signer le bon.
+                * Sans cela, cet ecran restait le seul a exiger un second
+                * rapport pour signer un bon.
+                */
+               $bl_mode = PluginGestionCri::defaultCombinedMode($ticket_id);
+
                echo '<div class="gestion-choice">';
                echo '<div class="alert alert-important alert-info d-flex">';
-               echo '<b>' . __("Un ticket est associé à ce BL. Signez le Rapport + BL ici, ou complétez d'abord l'intervention.", 'gestion') . '</b>';
+               echo '<b>' . ($bl_mode === 'bl'
+                  ? __("Un ticket est associé à ce BL, et son rapport d'intervention est déjà signé. Signez le BL ici, ou complétez d'abord l'intervention.", 'gestion')
+                  : __("Un ticket est associé à ce BL. Signez le Rapport + BL ici, ou complétez d'abord l'intervention.", 'gestion')) . '</b>';
                echo '</div>';
                echo gestion_render_ticket_summary($ticket_id, $bl_row ? (int)$bl_row['signed'] : null, (string)($bl_row['bl'] ?? ''));
                echo '<div class="text-center mt-2 d-flex gap-2 justify-content-center flex-wrap gestion-choice-actions">';
                echo '<a href="' . htmlspecialchars($task_url, ENT_QUOTES) . '" class="btn btn-outline-primary">'
                   . __("Compléter l'intervention", 'gestion') . '</a>';
                $btn_params = $params;
-               $btn_params['force_combined'] = 1;
+               if ($bl_mode === 'bl') {
+                  $btn_params['force_bl'] = 1;
+                  $btn_label = __('Signer le BL', 'gestion');
+               } else {
+                  $btn_params['force_combined'] = 1;
+                  $btn_label = __('Signer Rapport + BL', 'gestion');
+               }
                $onclick = "gestion_signBlOnly(this, '" . $bl_id . "', " . json_encode($btn_params) . "); return false;";
                echo '<button type="button" class="btn btn-primary" onclick="' . htmlspecialchars($onclick, ENT_QUOTES) . '">'
-                  . __("Signer Rapport + BL", 'gestion') . '</button>';
+                  . $btn_label . '</button>';
                echo '</div>';
                echo '</div>';
             }
@@ -395,7 +470,38 @@ switch ($action) {
          break;
       }
 
-      // Signature BL seule : force_bl, ou pas de ticket / rp inactif / deja signe.
+      /*
+       * Signature BL seule : force_bl, ou pas de ticket / rp inactif / deja signe.
+       *
+       * Depuis l'onglet d'un ticket, on propose la liste a cocher plutot que le
+       * bon seul : c'est le seul endroit ou plusieurs bons peuvent attendre
+       * ensemble, et les signer un par un obligeait a rouvrir le modal autant de
+       * fois. Vrai AUSSI quand le plugin RP est absent — Gestion doit savoir le
+       * faire seul.
+       *
+       * Ailleurs (survey.form.php, planning, scanner), le contexte designe UN
+       * bon precis : la liste n'aurait aucun sens, on garde le formulaire unique.
+       */
+      /*
+       * AUCUNE condition sur `root_modal` : le formulaire ne doit pas changer
+       * de forme selon la porte empruntee.
+       *
+       * Ces ecrans mènent tous ici — onglet « Gestion BL », bandeau « Étape
+       * suivante », page mobile RP, boutons flottants, planning, liste des BL,
+       * signature a l'ajout de tache. Reserver la liste a cocher a certains
+       * d'entre eux aurait recree exactement la divergence qu'on cherche a
+       * supprimer : le meme bon signe d'une facon ici, d'une autre la.
+       *
+       * Seule condition : le bon appartient a un ticket. Sans ticket il n'y a
+       * pas d'autres bons a lui associer, la liste n'aurait rien a montrer.
+       */
+      $bl_ticket_id = $bl_row ? (int)$bl_row['tickets_id'] : 0;
+
+      if ($bl_ticket_id > 0 && !$is_signed) {
+         $PluginGestionCri->showCombinedMultiForm($bl_ticket_id, ['bl_only' => true, 'check_only' => $check_only]);
+         break;
+      }
+
       // On passe le vrai ticket du BL comme "job" quand on le connait
       // (corrige le ticket/emails errones depuis survey.form.php).
       $PluginGestionCri->showForm($job, ['modal' => $bl_id, 'root_modal' => $params["root_modal"] ?? '']);
