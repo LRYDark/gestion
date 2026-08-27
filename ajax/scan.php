@@ -55,6 +55,37 @@ if ($q === '') {
    gestion_scan_end(['ok' => true, 'results' => []]);
 }
 
+/*
+ * ---- Recherche approfondie (2e onglet du modal) ----
+ *
+ * Parcours distinct, et non un repli du premier : ici on ne résout pas un
+ * identifiant, on fouille le CONTENU des tickets. C'est plus long — d'où le
+ * bouton « Rechercher » plutôt qu'une frappe qui déclenche — et cela ne doit
+ * jamais rediriger : un terme qui ressemble à une URL ou à un numéro de ticket
+ * reste ici un terme à chercher.
+ */
+if (($_POST['mode'] ?? $_GET['mode'] ?? '') === 'deep') {
+   if (!$can_read_ticket) {
+      gestion_scan_end(['ok' => false, 'error' => __("Vous n'avez pas accès aux tickets.", 'gestion')]);
+   }
+   if (mb_strlen($q) < PluginGestionScanSearch::MIN_LENGTH) {
+      gestion_scan_end(['ok' => false, 'error' => sprintf(
+         __('Saisissez au moins %d caractères.', 'gestion'),
+         PluginGestionScanSearch::MIN_LENGTH
+      )]);
+   }
+   /*
+    * Portée choisie par l'interrupteur devant le champ. Les deux ne se cumulent
+    * pas : fouiller le texte des tickets coûte cent fois ce que coûte retrouver
+    * un client, et qui cherche un client n'a pas à payer ce prix.
+    */
+   $scope = ($_POST['scope'] ?? $_GET['scope'] ?? '') === PluginGestionScanSearch::SCOPE_ENTITY
+      ? PluginGestionScanSearch::SCOPE_ENTITY
+      : PluginGestionScanSearch::SCOPE_TICKET;
+
+   gestion_scan_end(['ok' => true] + PluginGestionScanSearch::run($q, PluginGestionScanSearch::LIMIT, $scope));
+}
+
 // QR code contenant une URL du même GLPI : on suit le lien
 if (preg_match('#^https?://#i', $q)) {
    $base_host = parse_url((string)($CFG_GLPI['url_base'] ?? ''), PHP_URL_HOST);

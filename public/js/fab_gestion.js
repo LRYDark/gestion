@@ -215,6 +215,28 @@
          '        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>',
          '      </div>',
          '      <div class="modal-body">',
+         // Deux questions distinctes, deux onglets : « quel est ce numéro ? »
+         // (identification immédiate, la frappe cherche au fil des lettres) et
+         // « où ai-je vu ce mot ? » (fouille du contenu, lancée à la demande).
+         // Les mêler dans un seul champ obligerait à deviner l\'intention.
+         '        <ul class="nav nav-tabs mb-3" role="tablist">',
+         '          <li class="nav-item" role="presentation">',
+         '            <button class="nav-link active" id="gestionScanTabBtn" data-bs-toggle="tab"',
+         '                    data-bs-target="#gestionScanPaneScan" type="button" role="tab"',
+         '                    aria-controls="gestionScanPaneScan" aria-selected="true">',
+         '              <i class="ti ti-scan me-1"></i>BL / Ticket',
+         '            </button>',
+         '          </li>',
+         '          <li class="nav-item" role="presentation">',
+         '            <button class="nav-link" id="gestionDeepTabBtn" data-bs-toggle="tab"',
+         '                    data-bs-target="#gestionScanPaneDeep" type="button" role="tab"',
+         '                    aria-controls="gestionScanPaneDeep" aria-selected="false">',
+         '              <i class="ti ti-list-search me-1"></i>Par mot-clé',
+         '            </button>',
+         '          </li>',
+         '        </ul>',
+         '        <div class="tab-content">',
+         '        <div class="tab-pane fade show active" id="gestionScanPaneScan" role="tabpanel" aria-labelledby="gestionScanTabBtn">',
          '        <div class="input-group mb-2">',
          '          <input type="text" class="form-control" id="gestionScanInput" inputmode="search"',
          '                 autocomplete="off" autocapitalize="characters" spellcheck="false"',
@@ -247,6 +269,38 @@
          '          </div>',
          '        </div>',
          '        <div class="list-group" id="gestionScanResults"></div>',
+         '        </div>',
+         // ---- Onglet « Dans les tickets » : recherche par mot-clé ----
+         '        <div class="tab-pane fade" id="gestionScanPaneDeep" role="tabpanel" aria-labelledby="gestionDeepTabBtn">',
+         // Interrupteur de portée. Les deux recherches n'ont rien de comparable
+         // en coût : fouiller le texte des tickets lit des centaines de milliers
+         // de lignes, retrouver un client en lit quelques centaines. Les cumuler
+         // ferait payer la première à qui ne demandait que la seconde.
+         // Discret et de la taille de ce qu'il fait : ce choix accompagne la
+         // recherche, il ne la précède pas en importance. Pleine largeur et en
+         // couleur d'accent, il occupait le regard avant le champ lui-même.
+         '          <div class="d-flex align-items-center flex-wrap gap-2 mb-2">',
+         '            <span class="text-muted small">Chercher dans</span>',
+         '            <div class="btn-group btn-group-sm" role="group" aria-label="Où chercher">',
+         '              <input type="radio" class="btn-check" name="gestionDeepScope" id="gestionDeepScopeTicket" value="ticket" autocomplete="off" checked>',
+         '              <label class="btn btn-outline-secondary" for="gestionDeepScopeTicket"><i class="ti ti-ticket me-1"></i>Tickets</label>',
+         '              <input type="radio" class="btn-check" name="gestionDeepScope" id="gestionDeepScopeEntity" value="entity" autocomplete="off">',
+         '              <label class="btn btn-outline-secondary" for="gestionDeepScopeEntity"><i class="ti ti-building me-1"></i>Entités</label>',
+         '            </div>',
+         '          </div>',
+         '          <div class="input-group mb-2">',
+         '            <input type="text" class="form-control" id="gestionDeepInput" inputmode="search"',
+         '                   autocomplete="off" autocapitalize="off" spellcheck="false"',
+         '                   placeholder="N° de série, mot-clé">',
+         '            <button type="button" class="btn btn-primary" id="gestionDeepBtn">',
+         '              <i class="ti ti-search me-1"></i>Rechercher',
+         '            </button>',
+         '          </div>',
+         '          <div class="form-text mb-2" id="gestionDeepHint"></div>',
+         '          <div class="alert alert-danger d-none" id="gestionDeepMsg" role="alert"></div>',
+         '          <div class="list-group" id="gestionDeepResults"></div>',
+         '        </div>',
+         '        </div>',
          '      </div>',
          '    </div>',
          '  </div>',
@@ -266,7 +320,14 @@
          hint:    modalEl.querySelector('#gestionScanHint'),
          shoot:   modalEl.querySelector('#gestionScanShoot'),
          stop:    modalEl.querySelector('#gestionScanStop'),
-         results: modalEl.querySelector('#gestionScanResults')
+         results: modalEl.querySelector('#gestionScanResults'),
+         deepTab:     modalEl.querySelector('#gestionDeepTabBtn'),
+         deepInput:   modalEl.querySelector('#gestionDeepInput'),
+         deepBtn:     modalEl.querySelector('#gestionDeepBtn'),
+         deepMsg:     modalEl.querySelector('#gestionDeepMsg'),
+         deepHint:    modalEl.querySelector('#gestionDeepHint'),
+         deepResults: modalEl.querySelector('#gestionDeepResults'),
+         deepScopes:  modalEl.querySelectorAll('input[name="gestionDeepScope"]')
       };
 
       if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
@@ -360,6 +421,46 @@
       els.stop.addEventListener('click', stopCamera);
       els.shoot.addEventListener('click', shootAndRead);
 
+      /*
+       * Onglet « Dans les tickets » : la recherche ne part QU'au bouton (ou à
+       * Entrée). Elle fouille la description, les tâches et les suivis de tous
+       * les tickets visibles : la déclencher à chaque lettre ferait courir au
+       * serveur cinq requêtes lourdes pour un numéro de série de dix
+       * caractères, dont une seule intéresse.
+       */
+      els.deepBtn.addEventListener('click', function () {
+         deepSearch(els.deepInput.value);
+      });
+      els.deepInput.addEventListener('keydown', function (e) {
+         if (e.key === 'Enter') {
+            e.preventDefault();
+            deepSearch(els.deepInput.value);
+         }
+      });
+      /*
+       * Changer de portée efface les résultats affichés : ils répondaient à
+       * l'autre question, les laisser sous un interrupteur qui dit maintenant
+       * le contraire tromperait sur ce qu'ils sont. La recherche ne repart pas
+       * toute seule pour autant — c'est au bouton de la déclencher.
+       */
+      Array.prototype.forEach.call(els.deepScopes, function (radio) {
+         radio.addEventListener('change', function () {
+            els.deepResults.innerHTML = '';
+            deepMessage('');
+            applyScope();
+         });
+      });
+
+      // La caméra appartient au premier onglet : en partir doit l'éteindre.
+      els.deepTab.addEventListener('shown.bs.tab', function () {
+         stopCamera();
+         if (!isMobile()) {
+            els.deepInput.focus();
+         }
+      });
+
+      applyScope();
+
       function message(text) {
          if (!text) {
             els.msg.classList.add('d-none');
@@ -450,7 +551,7 @@
                return;
             }
             message('');
-            renderResults(data.results || []);
+            renderResults(els.results, data.results || []);
          })
          .catch(function () {
             els.results.innerHTML = '';
@@ -458,10 +559,17 @@
          });
       }
 
-      function renderResults(items) {
-         els.results.innerHTML = '';
+      /**
+       * Rend une liste de résultats dans le conteneur donné.
+       *
+       * Les deux onglets partagent ce rendu : le serveur leur renvoie la même
+       * forme, et une ligne de résultat doit se présenter pareil quel que soit
+       * le chemin qui l'a trouvée.
+       */
+      function renderResults(container, items) {
+         container.innerHTML = '';
          if (!items.length) {
-            els.results.innerHTML = '<div class="list-group-item text-muted">Aucun résultat.</div>';
+            container.innerHTML = '<div class="list-group-item text-muted">Aucun résultat.</div>';
             return;
          }
          items.forEach(function (item) {
@@ -470,9 +578,16 @@
 
             var badge = '';
             if (item.badge && item.badge.label) {
-               badge = '<span class="badge ms-2 '
-                  + (item.badge.style === 'warn' ? 'bg-warning text-dark' : 'bg-success')
-                  + '">' + esc(item.badge.label) + '</span>';
+               // `muted` : un état constaté (statut du ticket, entité), qui
+               // informe sans rien réclamer — le vert et l'orange sont réservés
+               // à ce qui attend une action.
+               var tone = 'bg-success';
+               if (item.badge.style === 'warn') {
+                  tone = 'bg-warning text-dark';
+               } else if (item.badge.style === 'muted') {
+                  tone = 'bg-secondary';
+               }
+               badge = '<span class="badge ms-2 ' + tone + '">' + esc(item.badge.label) + '</span>';
             }
 
             var actions = '';
@@ -503,7 +618,100 @@
                + (item.subtitle ? '<div class="text-muted small">' + esc(item.subtitle) + '</div>' : '')
                + '<div class="d-flex flex-wrap gestion-scan-actions">' + actions + '</div>';
 
-            els.results.appendChild(row);
+            container.appendChild(row);
+         });
+      }
+
+      // ---- Onglet « Par mot-clé » -------------------------------------------
+      function deepScope() {
+         for (var i = 0; i < els.deepScopes.length; i++) {
+            if (els.deepScopes[i].checked) {
+               return els.deepScopes[i].value;
+            }
+         }
+         return 'ticket';
+      }
+
+      /** Le champ et l'explication suivent la portée choisie. */
+      function applyScope() {
+         if (deepScope() === 'entity') {
+            els.deepInput.placeholder = 'Client, désignation, adresse';
+            els.deepHint.textContent = "Cherche le client par son nom, sa désignation ou son adresse, "
+               + 'et remonte ses tickets les plus récents.';
+         } else {
+            els.deepInput.placeholder = 'N° de série, mot-clé';
+            els.deepHint.textContent = 'Cherche dans le titre, la description, les tâches, les suivis, '
+               + "le n° de série du matériel et les BL. 20 tickets au maximum.";
+         }
+      }
+
+      function deepMessage(text) {
+         if (!text) {
+            els.deepMsg.classList.add('d-none');
+            els.deepMsg.textContent = '';
+            return;
+         }
+         els.deepMsg.className = 'alert alert-danger';
+         els.deepMsg.textContent = text;
+      }
+
+      function deepSearch(value) {
+         var q = (value || '').trim();
+         if (q.length < 3) {
+            els.deepResults.innerHTML = '';
+            deepMessage('Saisissez au moins 3 caractères.');
+            return;
+         }
+         deepMessage('');
+         els.deepResults.innerHTML = '<div class="list-group-item text-center text-muted">'
+            + '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Recherche…</div>';
+
+         var body = new URLSearchParams();
+         body.append('mode', 'deep');
+         body.append('scope', deepScope());
+         body.append('q', q);
+         body.append('_glpi_csrf_token', csrf());
+
+         fetch(scanUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+               'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+               'X-Requested-With': 'XMLHttpRequest',
+               'X-Glpi-Csrf-Token': csrf()
+            },
+            body: body.toString()
+         })
+         .then(function (r) { return r.json(); })
+         .then(function (data) {
+            if (!data || data.ok === false) {
+               els.deepResults.innerHTML = '';
+               deepMessage((data && data.error) || 'Recherche impossible.');
+               return;
+            }
+            renderResults(els.deepResults, data.results || []);
+            if (data.loose) {
+               // Le terme n'a pas été trouvé tel quel : ces résultats viennent
+               // du second passage, qui tolère les séparateurs. Le dire explique
+               // à la fois l'attente et pourquoi le texte trouvé ne s'écrit pas
+               // comme ce qui a été tapé.
+               var loose = document.createElement('div');
+               loose.className = 'list-group-item text-muted small';
+               loose.textContent = 'Terme introuvable tel quel : résultats trouvés en ignorant les séparateurs.';
+               els.deepResults.insertBefore(loose, els.deepResults.firstChild);
+            }
+            if (data.truncated) {
+               // Une liste tronquée en silence se lit comme une liste complète :
+               // le technicien croirait avoir vu tous les tickets du client.
+               var more = document.createElement('div');
+               more.className = 'list-group-item text-muted small';
+               more.textContent = 'Seuls les 20 tickets les plus récents sont affichés — précisez la recherche.';
+               els.deepResults.appendChild(more);
+            }
+         })
+         .catch(function () {
+            els.deepResults.innerHTML = '';
+            deepMessage('Erreur de communication avec GLPI.');
          });
       }
 
