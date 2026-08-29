@@ -233,6 +233,37 @@ $_POST['mailtoclient'] = $saved_mailto;
  */
 $config = PluginGestionConfig::getInstance();
 
+/*
+ * BL seul : le rapport DEJA signe est joint, sans en produire un nouveau.
+ *
+ * Ce parcours ne s'ouvre que lorsqu'un rapport signe existe et que le ticket
+ * n'a pas bouge depuis (`defaultCombinedMode`) : le client repart donc avec un
+ * document complet plutot qu'avec deux moities a rapprocher.
+ *
+ * Ce sont les PAGES du document archive qui sont recopiees. Rien n'est
+ * regenere, rien n'est resigne, et le Document GLPI d'origine reste intact sur
+ * le ticket — d'ou une variable distincte de `$rp_pdf` : ce dernier designe un
+ * fichier temporaire que le nettoyage final a le droit de supprimer, celui-ci
+ * jamais.
+ */
+$archived_report_pdf = '';
+if ($bl_only) {
+   $archived_report = PluginGestionCri::reportToMergeOnBlOnly($ticket_id);
+   if ($archived_report !== null) {
+      $archived_report_pdf = $archived_report['path'];
+      /*
+       * MEME variable que le rapport fraichement genere, volontairement.
+       *
+       * Des lors qu'il est fusionne, ce Document doit subir exactement le meme
+       * sort : les deux plugins pointent vers le PDF fusionne (etape 5). Sans
+       * cela, le tableau « Rapport PDF » du plugin RP continuerait de designer
+       * un document qui ne contient pas les bons — et, une fois l'ancien
+       * fichier remplace, ouvrirait un fichier absent.
+       */
+      $rp_doc_id = (int)$archived_report['id'];
+   }
+}
+
 if (!$bl_only && (empty($rp_pdf) || !file_exists($rp_pdf))) {
    @unlink($signaturePath);
    gestion_multi_message("Generation du rapport impossible.", ERROR);
@@ -290,7 +321,7 @@ if (!empty($failed_bls)) {
    );
 }
 
-// ---- 3. Fusion : tous les BL signes (+ le rapport hors mode BL seul) => 1 PDF ----
+// ---- 3. Fusion : tous les BL signes (+ le rapport, selon le mode) => 1 PDF ----
 /*
  * `$report_merged` decrit ce qui est REELLEMENT dans le PDF produit, la ou
  * `$bl_only` ne dit que ce qui avait ete demande. Les libelles, le nom du
@@ -299,7 +330,13 @@ if (!empty($failed_bls)) {
  * qui ment sur son contenu, et c'est ce que le technicien lit avant de
  * l'envoyer au client.
  */
-$report_merged = (!$bl_only && !empty($rp_pdf) && file_exists($rp_pdf));
+/*
+ * Le rapport a joindre vient soit du generateur (mode « Rapport + BL »), soit
+ * de l'archive (mode « BL seul »). Une seule variable ensuite : la fusion, le
+ * nom du fichier et les libelles n'ont pas a savoir d'ou il sort.
+ */
+$merged_report_pdf = $bl_only ? $archived_report_pdf : $rp_pdf;
+$report_merged     = (!empty($merged_report_pdf) && file_exists($merged_report_pdf));
 
 $merged_prefix = $report_merged ? 'BL_Rapport_T' : 'BL_T';
 $mergedPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/" . $merged_prefix . $ticket_id . "_" . date('Ymd_His') . ".pdf";
@@ -307,7 +344,7 @@ try {
    $pdf = new Fpdi();
    $sources = array_values($signed_bl_pdfs);
    if ($report_merged) {
-      $sources[] = $rp_pdf;
+      $sources[] = $merged_report_pdf;
    }
    foreach ($sources as $src) {
       if (!file_exists($src)) { continue; }
@@ -451,6 +488,15 @@ if ($FolderDes !== 'SharePoint' && $merged_doc_id <= 0) {
  * Chaque plugin reste ainsi autonome quand la fusion ne produit pas de document
  * GLPI a partager.
  */
+/*
+ * Les DEUX modes passent par ici — rapport fraichement genere comme rapport
+ * deja archive : des lors que le PDF fusionne porte le rapport, il est le seul
+ * document a montrer, et les deux plugins doivent designer celui-la.
+ *
+ * `$report_merged` en decide seul : le reglage « Joindre le rapport signe » sur
+ * Non le laisse a faux, rien n'est alors fusionne et rien n'est repointe — les
+ * deux plugins gardent chacun leur document, exactement comme avant.
+ */
 if ($report_merged && $rp_doc_id > 0 && $merged_doc_id > 0
     && $DB->tableExists('glpi_plugin_rp_cridetails')) {
 
@@ -460,7 +506,26 @@ if ($report_merged && $rp_doc_id > 0 && $merged_doc_id > 0
       ['id_ticket' => $ticket_id, 'id_documents' => $rp_doc_id]
    );
 
-   if ($rp_doc_id !== $merged_doc_id) {
+   /*
+    * Purge SEULEMENT si plus rien d'autre ne s'appuie sur ce document.
+    *
+    * Mode « Rapport + BL » : il vient d'etre cree, rien ne le reference, la
+    * purge a lieu comme avant — `pluginRpDocumentSharedWithBl()` repond non.
+    *
+    * Mode « BL seul » : il a des jours. Un bon signe plus tot peut deja pointer
+    * dessus (`glpi_plugin_gestion_surveys.doc_id`), et le supprimer casserait
+    * SON lien — un « Voir » sur un bon signe le mois dernier ouvrirait un
+    * fichier absent. On se contente alors de repointer : RP designe le document
+    * complet, et l'ancien reste ouvrable pour qui le reference encore.
+    *
+    * Meme fonction que celle dont RP se sert avant d'ecraser un document
+    * (front/cripdf.form.php) : la question « ce PDF appartient-il aussi a des
+    * bons ? » ne doit avoir qu'une seule reponse dans les deux plugins.
+    */
+   $rp_doc_still_used = function_exists('pluginRpDocumentSharedWithBl')
+                     && pluginRpDocumentSharedWithBl($rp_doc_id);
+
+   if ($rp_doc_id !== $merged_doc_id && !$rp_doc_still_used) {
       $rp_doc = new Document();
       if ($rp_doc->getFromDB($rp_doc_id)) {
          // 2e argument : purge — le fichier part avec la ligne.
@@ -528,7 +593,8 @@ if ((int)($config->fields['DisplayPdfEnd'] ?? 0) === 1
     && !headers_sent()) {
 
    header('Content-Type: application/pdf');
-   header('Content-Disposition: inline; filename="BL_Rapport.pdf"');
+   // Le nom annonce ce que le fichier contient reellement, comme son nom d'archive.
+   header('Content-Disposition: inline; filename="' . ($report_merged ? 'BL_Rapport.pdf' : 'BL.pdf') . '"');
    header('Content-Length: ' . filesize($mergedPath));
    readfile($mergedPath);
    @unlink($mergedPath);

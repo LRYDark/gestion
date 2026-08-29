@@ -23,6 +23,7 @@ function update_177_180() {
          `users_id` INT UNSIGNED NOT NULL,
          `fab_home` TINYINT NOT NULL DEFAULT 1,
          `fab_ticket` TINYINT NOT NULL DEFAULT 1,
+         `fab_home_tabs` TINYINT NOT NULL DEFAULT 3,
          PRIMARY KEY (`id`),
          UNIQUE KEY `users_id` (`users_id`)
          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";

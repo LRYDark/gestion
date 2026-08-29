@@ -158,6 +158,37 @@ class PluginGestionConfig extends CommonDBTM
 
             <div class="col-md-6">
             <label class="form-label mb-1">
+               <?php echo __("Joindre le rapport signé lors d'une signature « BL seul »", 'gestion'); ?>
+               <i class='fa-solid fa-circle-info text-secondary ms-1'
+                  data-bs-toggle='tooltip' data-bs-placement='top'
+                  title="<?php echo __("L'option « Signature BL » n'est proposée que lorsqu'un rapport d'intervention est déjà signé et que le ticket n'a pas évolué depuis. Sur Oui, ce rapport est ajouté au PDF fusionné du bon : le client repart avec un document complet. Aucun rapport n'est régénéré ni resigné, et le document d'origine reste intact sur le ticket. Sur Non, le PDF ne contient que les bons.", 'gestion'); ?>"></i>
+            </label>
+            <?php
+               /*
+                * Réglage sans objet sans le plugin RP : il n'y a alors aucun
+                * rapport à joindre. Rendu désactivé plutôt que masqué — même
+                * traitement que « Mode d'envoi mail » juste au-dessus — pour
+                * que la valeur enregistrée reste visible et soit repostée
+                * telle quelle plutôt que remise à zéro à chaque sauvegarde.
+                */
+               // Recalculé plutôt que repris du bloc précédent : ce champ ne doit
+               // pas dépendre de l'ordre des blocs du formulaire.
+               $rpActiveMerge = Plugin::isPluginActive('rp') && class_exists('PluginRpCriDetail');
+               $mergeVal      = $config->BlOnlyMergeReport();
+               if ($rpActiveMerge) {
+                  Dropdown::showYesNo('BlOnlyMergeReport', $mergeVal, -1);
+               } else {
+                  echo Html::hidden('BlOnlyMergeReport', ['value' => $mergeVal]);
+                  echo '<select class="form-select" disabled>';
+                  echo '<option>' . ($mergeVal === 1 ? __('Yes') : __('No')) . '</option>';
+                  echo '</select>';
+                  echo '<div class="form-text text-muted">Necessite le plugin RP.</div>';
+               }
+            ?>
+            </div>
+
+            <div class="col-md-6">
+            <label class="form-label mb-1">
                <?php echo __("Signature sur ticket sans tâche (rapport impossible)", 'gestion'); ?>
                <i class='fa-solid fa-circle-info text-secondary ms-1'
                   data-bs-toggle='tooltip' data-bs-placement='top'
@@ -2086,6 +2117,17 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
    function NoTaskSignMode(){
       return isset($this->fields['NoTaskSignMode']) ? (int)$this->fields['NoTaskSignMode'] : 0;
    }
+   /*
+    * Défaut à 1, et non à 0 comme les autres réglages neufs.
+    *
+    * Ce parcours ne s'ouvre QUE lorsqu'un rapport signé existe déjà : joindre
+    * ce rapport au bon est ce qu'on attend, laisser le client repartir avec
+    * deux moitiés à rapprocher est le cas particulier. Le réglage existe pour
+    * ceux qui envoient les deux documents séparément, pas l'inverse.
+    */
+   function BlOnlyMergeReport(){
+      return isset($this->fields['BlOnlyMergeReport']) ? (int)$this->fields['BlOnlyMergeReport'] : 1;
+   }
    function AutoAssociateBl(){
       return isset($this->fields['AutoAssociateBl']) ? (int)$this->fields['AutoAssociateBl'] : 1;
    }
@@ -2265,6 +2307,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `CombinedMailMode` TINYINT NOT NULL DEFAULT '0',
                   `NoTaskSignMode` TINYINT NOT NULL DEFAULT '0',
+                  `BlOnlyMergeReport` TINYINT NOT NULL DEFAULT '1',
                   `AutoAssociateBl` TINYINT NOT NULL DEFAULT '1',
                   `PlanningBLSignatureOn` TINYINT NOT NULL DEFAULT '0',
                   `ConfigModes` TINYINT NOT NULL DEFAULT '0',

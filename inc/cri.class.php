@@ -165,6 +165,71 @@ class PluginGestionCri extends CommonDBTM {
    }
 
    /**
+    * PDF du rapport d'intervention à joindre à une signature « BL seul ».
+    *
+    * Ce parcours ne s'ouvre que lorsqu'un rapport signé existe et que le ticket
+    * n'a pas bougé depuis (`defaultCombinedMode`). Joindre ce rapport au PDF du
+    * bon évite au client de repartir avec deux moitiés à rapprocher — sans rien
+    * régénérer ni faire resigner : ce sont les pages du document déjà archivé
+    * qui sont recopiées, et l'original reste intact sur le ticket.
+    *
+    * Trois façons d'obtenir `null`, toutes traitées de la même manière par
+    * l'appelant — on signe le bon seul, comme avant :
+    *   - le réglage `BlOnlyMergeReport` est sur Non ;
+    *   - le plugin RP est absent ou trop ancien (il n'y a alors pas de rapport) ;
+    *   - RP ne reconnaît aucun rapport exploitable pour cet utilisateur.
+    *
+    * C'est RP qui décide de ce qui compte : Gestion ne redevine rien, sinon les
+    * deux plugins finiraient par ne plus désigner le même document.
+    *
+    * @return array{id:int,path:string}|null Document GLPI et chemin du PDF, ou
+    *                                        null s'il n'y a rien à joindre
+    */
+   static function reportToMergeOnBlOnly(int $ticket_id): ?array {
+      if ($ticket_id <= 0
+          || !Plugin::isPluginActive('rp')
+          || !class_exists('PluginRpCriDetail')
+          || !method_exists('PluginRpCriDetail', 'getLastReportDocument')) {
+         return null;
+      }
+
+      if (PluginGestionConfig::getInstance()->BlOnlyMergeReport() !== 1) {
+         return null;
+      }
+
+      $report = PluginRpCriDetail::getLastReportDocument($ticket_id, 1);
+      if ($report === null) {
+         return null;
+      }
+      $pdf = $report['path'];
+
+      /*
+       * ---- Ne jamais rejoindre un PDF qui porte deja des bons ----
+       *
+       * Apres une signature « Rapport + BL » archivee en local, ce fichier-ci
+       * REPOINTE le rapport vers le PDF fusionne et purge le sien
+       * (traitement_combined_multi.php, etape 5) : RP ne connait alors plus
+       * d'autre rapport que ce document-la, qui contient aussi les bons signes
+       * ce jour-la.
+       *
+       * Le joindre a une nouvelle signature ferait signer au client des bons
+       * deja signes — parfois par quelqu'un d'autre — et le PDF les montrerait
+       * deux fois. On s'en abstient : le bon part seul, comme avant ce reglage.
+       *
+       * Le nom du fichier tranche, seule marque que le document porte apres la
+       * fusion : `BL_Rapport_T55375_...` / `BL_T55375_...` pour un fusionne,
+       * `20250829-143000_R_Ticket_55375.pdf` pour un rapport de RP. Meme
+       * convention que `pluginGestionLocalSourcePdf()` (setup.php), qui
+       * distingue les deux de la meme facon.
+       */
+      if (stripos(basename($pdf), 'BL_') === 0) {
+         return null;
+      }
+
+      return $report;
+   }
+
+   /**
     * De quand date le rapport d'intervention de ce ticket.
     *
     * Affiche sous le choix « Que signe le client ? » lorsque la signature du
@@ -1579,6 +1644,27 @@ class PluginGestionCri extends CommonDBTM {
    function showCombinedForm($ID, $bl_id, $options = []) {
       global $DB, $CFG_GLPI;
 
+      /*
+       * Sans le plugin RP, le formulaire combiné n'a pas de second volet : on
+       * retombe sur la signature du bon seul, qui ne dépend que de Gestion.
+       *
+       * Même invariant que showCombinedMultiForm(), et pour la même raison :
+       * les appelants vérifient déjà que RP est actif, mais cette méthode est
+       * publique et son corps instancie `PluginRpCri` puis lit
+       * `PLUGIN_RP_WEBDIR`. Une classe et une constante absentes sont une
+       * erreur fatale, pas une dégradation — la garde est donc posée là où
+       * l'invariant est utilisé.
+       */
+      if (!Plugin::isPluginActive('rp')
+          || !class_exists('PluginRpCri')
+          || !defined('PLUGIN_RP_WEBDIR')) {
+         $this->showForm($ID, [
+            'modal'      => (int)$bl_id,
+            'root_modal' => $options['root_modal'] ?? '',
+         ]);
+         return;
+      }
+
       // CSS gestion pour les cartes BL
       echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css?r=' . (defined('PLUGIN_GESTION_ASSETS_REV') ? PLUGIN_GESTION_ASSETS_REV : '1') . '">';
 
@@ -2301,6 +2387,21 @@ class PluginGestionCri extends CommonDBTM {
 
          $hidden = Html::hidden('bl_only', ['value' => 1]);
          $inject = $blListHtml;   // sans les extras : l'hote les porte deja
+
+         /*
+          * Le technicien doit savoir ce que contiendra le PDF AVANT de le faire
+          * signer : c'est lui qui le tend au client. La meme question est posee
+          * a la generation (`reportToMergeOnBlOnly`) — on l'interroge ici
+          * pour annoncer, la-bas pour agir, et les deux ne peuvent donc pas
+          * dire des choses differentes.
+          */
+         if (self::reportToMergeOnBlOnly($ticket_id) !== null) {
+            $inject .= '<div class="mt-2 small text-secondary">'
+               . '<i class="ti ti-paperclip me-1"></i>'
+               . __("Le rapport d'intervention déjà signé sera joint au PDF.", 'gestion')
+               . '</div>';
+         }
+
          $label  = 'Signer les BL sélectionnés';
       } else {
          $_POST['modal'] = 'form_rapport';

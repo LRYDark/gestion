@@ -79,7 +79,7 @@ class PluginGestionProfile extends Profile {
          ['itemtype' => 'PluginGestionConfig',
             'label'    => __('Boutons flottants', 'gestion'),
             'field'    => 'plugin_gestion_boutons',
-            'rights'   => [READ   => __("Bouton d'accueil (scan)", 'gestion'),
+            'rights'   => [READ   => __("Bouton d'accueil (scanner / rechercher)", 'gestion'),
                            UPDATE => __('Bouton sur les tickets', 'gestion')]
          ],
       ];

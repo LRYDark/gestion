@@ -1,7 +1,7 @@
 <?php
 /**
  * Enregistrement des préférences personnelles du plugin Gestion
- * (onglet « Gestion » des Préférences GLPI).
+ * (onglet « Boutons flottants » des Préférences GLPI).
  */
 include('../../../inc/includes.php');
 

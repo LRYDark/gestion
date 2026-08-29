@@ -11,7 +11,7 @@ define('PLUGIN_GESTION_VERSION', '1.8.1'); // version du plugin
  *
  * À incrémenter à chaque modification d'un fichier de public/js ou public/css.
  */
-define('PLUGIN_GESTION_ASSETS_REV', '23');
+define('PLUGIN_GESTION_ASSETS_REV', '24');
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 /**
@@ -251,6 +251,20 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
          if (!Plugin::isPluginActive('rp')) {
             Plugin::registerClass('PluginGestionUserpref', ['addtabon' => 'Preference']);
 
+            /*
+             * L'affichage croise trois conditions, comme chez RP :
+             *   - le droit de profil `plugin_gestion_boutons` (bit READ =
+             *     accueil, bit UPDATE = ticket) ;
+             *   - la préférence personnelle (0 = jamais, 1 = mobile uniquement
+             *     par défaut, 2 = toujours) ;
+             *   - pour le bouton d'accueil, ce que l'utilisateur peut en faire
+             *     (PluginGestionUserpref::canUseHomeButton() : sans accès aux
+             *     bons de livraison, il n'ouvrirait qu'un écran vide).
+             *
+             * getEffectiveMode() les croise, et l'écran des préférences
+             * applique la même règle : il ne propose jamais de régler un bouton
+             * qui ne s'affichera pas.
+             */
             $gestion_mode_home   = PluginGestionUserpref::getEffectiveMode('fab_home');
             $gestion_mode_ticket = PluginGestionUserpref::getEffectiveMode('fab_ticket');
 
@@ -263,8 +277,14 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
                      'properties' => [
                         'name'    => 'gestion:fab',
                         'content' => json_encode([
-                           'fab_home'   => $gestion_mode_home,
-                           'fab_ticket' => $gestion_mode_ticket,
+                           'fab_home'      => $gestion_mode_home,
+                           'fab_ticket'    => $gestion_mode_ticket,
+                           // Onglets du modal d'accueil : 1 = résolution d'un
+                           // identifiant, 2 = « Par mot-clé », 3 = les deux.
+                           'fab_home_tabs' => PluginGestionUserpref::getHomeTabs(),
+                           // Les bons de livraison sont-ils atteignables ? Le
+                           // premier onglet est nommé d'après la réponse.
+                           'fab_home_bl'   => PluginGestionUserpref::hasBl(),
                         ]),
                      ],
                   ],
