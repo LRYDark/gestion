@@ -534,6 +534,244 @@ class PluginGestionTicket extends CommonDBTM {
    }
 
    /**
+    * Numeros de BL cites par un ticket : titre + description + suivis + taches.
+    *
+    * Extraite de autoAssociateBl() parce que la reprise d'un BL pris par un
+    * autre ticket (findClaimableBl) doit lire EXACTEMENT le meme texte avec la
+    * meme regex : deux extractions divergentes, et un bon associe
+    * automatiquement ici ne serait pas propose a la reprise la.
+    *
+    * @param int        $ticket_id
+    * @param array|null $preload  $item->fields a la creation (hook item_add) :
+    *                             plus fiable que la BDD selon l'etat transactionnel.
+    * @return array{numbers: string[], entities_id: int}
+    */
+   static function collectBlNumbers($ticket_id, $preload = null): array {
+      global $DB;
+
+      $empty     = ['numbers' => [], 'entities_id' => 0];
+      $ticket_id = (int)$ticket_id;
+      if ($ticket_id <= 0) {
+         return $empty;
+      }
+
+      if (is_array($preload) && (array_key_exists('content', $preload) || array_key_exists('name', $preload))) {
+         $ticketRow = $preload;
+      } else {
+         $ticketRow = $DB->request([
+            'SELECT' => ['name', 'content', 'entities_id'],
+            'FROM'   => 'glpi_tickets',
+            'WHERE'  => ['id' => $ticket_id],
+            'LIMIT'  => 1,
+         ])->current();
+      }
+      if (!$ticketRow) {
+         return $empty;
+      }
+
+      $text = ' ' . (string)($ticketRow['name'] ?? '') . ' ' . (string)($ticketRow['content'] ?? '');
+      foreach ($DB->request([
+         'SELECT' => ['content'],
+         'FROM'   => 'glpi_itilfollowups',
+         'WHERE'  => ['itemtype' => 'Ticket', 'items_id' => $ticket_id],
+      ]) as $f) {
+         $text .= ' ' . (string)($f['content'] ?? '');
+      }
+      foreach ($DB->request([
+         'SELECT' => ['content'],
+         'FROM'   => 'glpi_tickettasks',
+         'WHERE'  => ['tickets_id' => $ticket_id],
+      ]) as $tk) {
+         $text .= ' ' . (string)($tk['content'] ?? '');
+      }
+
+      // On remplace les balises par des ESPACES (et NON strip_tags qui colle les
+      // paragraphes : "<p>bl203846</p><p>texte</p>" -> "bl203846texte" cassait le match).
+      $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+      $text = preg_replace('/<[^>]*>/u', ' ', $text);
+      // Numero = BL|BC + 4 a 8 chiffres, NON suivi d'un chiffre. Pas de \b final
+      // (sinon "bl203846texte" ne matchait pas) -> tolere du texte colle apres.
+      $nbMatch = preg_match_all('/\bB[LC]\s?\d{4,8}(?!\d)/i', $text, $m);
+
+      $entities_id = (int)($ticketRow['entities_id'] ?? 0);
+      if (!$nbMatch || empty($m[0])) {
+         return ['numbers' => [], 'entities_id' => $entities_id];
+      }
+
+      $numbers = [];
+      foreach ($m[0] as $raw) {
+         $num = function_exists('pluginGestionBlNumber')
+            ? pluginGestionBlNumber($raw)
+            : strtoupper(preg_replace('/\s+/', '', $raw));
+         if ($num !== '') {
+            $numbers[$num] = $num;
+         }
+      }
+
+      return ['numbers' => $numbers, 'entities_id' => $entities_id];
+   }
+
+   /**
+    * BL cites par ce ticket mais RATTACHES A UN AUTRE ticket.
+    *
+    * autoAssociateBl() s'interdit de toucher un bon deja pris (`continue` des
+    * que `tickets_id` est renseigne) : c'est ce qui evite les doublons, mais
+    * c'est aussi ce qui bloque le cas reel du ticket cree par megarde. Le bon
+    * part sur le doublon, et le vrai ticket ne peut plus rien en faire.
+    *
+    * Un bon DEJA SIGNE ailleurs n'est pas retourne du tout : son document signe
+    * vit sur l'autre ticket, le deplacer casserait le lien. Il ne s'agit pas
+    * d'un cas a proposer puis refuser — il n'a rien a faire dans la liste, et le
+    * filtre est en SQL pour qu'aucun appelant ne puisse l'oublier.
+    *
+    * @return array<int, array> une entree par bon reprenable
+    */
+   static function findClaimableBl(int $ticket_id): array {
+      global $DB;
+
+      $ticket_id = (int)$ticket_id;
+      if ($ticket_id <= 0 || !$DB->tableExists('glpi_plugin_gestion_surveys')) {
+         return [];
+      }
+
+      $found = self::collectBlNumbers($ticket_id);
+      if (empty($found['numbers'])) {
+         return [];
+      }
+
+      $out = [];
+      foreach ($DB->request([
+         'SELECT' => ['id', 'bl', 'bl_number', 'tickets_id'],
+         'FROM'   => 'glpi_plugin_gestion_surveys',
+         'WHERE'  => [
+            'bl_number' => array_values($found['numbers']),
+            'signed'    => ['<>', 1],
+            'NOT'       => ['tickets_id' => [0, $ticket_id]],
+         ],
+         'ORDER'  => ['id DESC'],
+         'LIMIT'  => 20,
+      ]) as $row) {
+         $other_id = (int)$row['tickets_id'];
+
+         /*
+          * Le titre de l'autre ticket n'est repris que si l'utilisateur a le
+          * droit de le voir : sans cela, le panneau divulguerait l'intitule
+          * d'un ticket qui ne le regarde pas. Le numero, lui, reste affiche —
+          * c'est ce qu'il faut pour comprendre la situation.
+          */
+         $other        = new Ticket();
+         $other_exists = (bool)$other->getFromDB($other_id);
+         $other_name   = ($other_exists && $other->canViewItem())
+            ? (string)$other->fields['name']
+            : '';
+
+         $out[] = [
+            'id'            => (int)$row['id'],
+            'bl_number'     => (string)($row['bl_number'] ?? ''),
+            'bl'            => (string)($row['bl'] ?? ''),
+            'tickets_id'    => $other_id,
+            'ticket_name'   => $other_name,
+            'ticket_exists' => $other_exists,
+         ];
+      }
+
+      return $out;
+   }
+
+   /**
+    * Bascule des BL depuis leur ticket actuel vers $ticket_id.
+    *
+    * Rien n'est supprime : la ligne du bon change de `tickets_id`, donc elle
+    * disparait de l'onglet de l'autre ticket et apparait sur celui-ci. Un bon
+    * n'appartenant qu'a un seul ticket, la reprise est aussi ce qui retire le
+    * doublon.
+    *
+    * Les identifiants recus sont REVERIFIES contre findClaimableBl() : seul un
+    * bon effectivement cite par le texte de ce ticket, pris par un autre et non
+    * signe, peut bouger — c'est cette methode-la qui porte les trois conditions.
+    * Un id forge dans la requete ne deplace donc rien.
+    *
+    * @param int[] $survey_ids  vide = tous les bons reprenables du ticket
+    * @return array{moved: array, skipped: array}
+    */
+   static function claimBl(int $ticket_id, array $survey_ids = []): array {
+      global $DB;
+
+      $result    = ['moved' => [], 'skipped' => []];
+      $claimable = self::findClaimableBl($ticket_id);
+      if (empty($claimable)) {
+         return $result;
+      }
+
+      /*
+       * L'entite suit le ticket.
+       *
+       * Le bon a ete cree dans l'entite du ticket qui l'avait capte. Le laisser
+       * dessus rendrait la ligne invisible aux techniciens du ticket de
+       * destination des que les deux tickets ne sont pas dans la meme entite —
+       * un bon deplace mais introuvable est pire que le doublon d'origine.
+       */
+      $target_entity = null;
+      $target_ticket = new Ticket();
+      if ($target_ticket->getFromDB($ticket_id)) {
+         $target_entity = (int)$target_ticket->fields['entities_id'];
+      }
+
+      $wanted = [];
+      foreach ($survey_ids as $id) {
+         $id = (int)$id;
+         if ($id > 0) {
+            $wanted[$id] = $id;
+         }
+      }
+
+      foreach ($claimable as $row) {
+         if (!empty($wanted) && !isset($wanted[$row['id']])) {
+            continue;
+         }
+         $values = ['tickets_id' => $ticket_id];
+         if ($target_entity !== null) {
+            $values['entities_id'] = $target_entity;
+         }
+
+         /*
+          * La condition porte AUSSI sur l'ancien ticket : si le bon a bouge
+          * entre l'affichage du panneau et le clic, aucune ligne ne correspond
+          * plus. La requete reussit quand meme — c'est `affectedRows()`, et non
+          * son retour, qui dit si quelque chose a reellement change.
+          */
+         $ok = $DB->update(
+            'glpi_plugin_gestion_surveys',
+            $values,
+            ['id' => $row['id'], 'tickets_id' => $row['tickets_id']]
+         );
+         if (!$ok || $DB->affectedRows() < 1) {
+            $result['skipped'][] = $row;
+            continue;
+         }
+
+         $result['moved'][] = $row;
+         /*
+          * Trace volontaire : un bon qui change de ticket est une correction
+          * manuelle sur une donnee de facturation. Le journal doit pouvoir dire
+          * qui l'a deplace, quand, et depuis quel ticket.
+          */
+         PluginGestionLogger::warning(
+            'claim-bl',
+            sprintf(
+               'BL %s repris du ticket #%d vers le ticket #%d par l\'utilisateur #%d',
+               $row['bl_number'] !== '' ? $row['bl_number'] : ('survey ' . $row['id']),
+               $row['tickets_id'],
+               $ticket_id,
+               (int)Session::getLoginUserID()
+            )
+         );
+      }
+
+      return $result;
+   }
+
+   /**
     * Association automatique des BL d'un ticket (creation + ouverture), IDEMPOTENTE.
     * Extrait les numeros BL (BL + 6 chiffres) du titre + description + suivis + taches,
     * puis associe / insere dans glpi_plugin_gestion_surveys avec dedoublonnage par
@@ -553,63 +791,14 @@ class PluginGestionTicket extends CommonDBTM {
          return; // desactive ou hors mode Sage
       }
 
-      // --- Texte du ticket : titre + description + suivis + taches ---
-      // A la creation (hook item_add) on recoit $item->fields (preload) : plus fiable
-      // que re-interroger la BDD selon l'etat transactionnel du chemin de creation.
-      if (is_array($preload) && (array_key_exists('content', $preload) || array_key_exists('name', $preload))) {
-         $ticketRow = $preload;
-      } else {
-         $ticketRow = $DB->request([
-            'SELECT' => ['name', 'content', 'entities_id'],
-            'FROM'   => 'glpi_tickets',
-            'WHERE'  => ['id' => $ticket_id],
-            'LIMIT'  => 1,
-         ])->current();
-      }
-      if (!$ticketRow) {
+      // --- Numeros de BL cites par le ticket (titre + description + suivis + taches) ---
+      $found = self::collectBlNumbers($ticket_id, $preload);
+      if (empty($found['numbers'])) {
          return;
       }
-      $text = ' ' . (string)($ticketRow['name'] ?? '') . ' ' . (string)($ticketRow['content'] ?? '');
-      foreach ($DB->request([
-         'SELECT' => ['content'],
-         'FROM'   => 'glpi_itilfollowups',
-         'WHERE'  => ['itemtype' => 'Ticket', 'items_id' => $ticket_id],
-      ]) as $f) {
-         $text .= ' ' . (string)($f['content'] ?? '');
-      }
-      foreach ($DB->request([
-         'SELECT' => ['content'],
-         'FROM'   => 'glpi_tickettasks',
-         'WHERE'  => ['tickets_id' => $ticket_id],
-      ]) as $tk) {
-         $text .= ' ' . (string)($tk['content'] ?? '');
-      }
+      $numbers = $found['numbers'];
 
-      // --- Extraction des numeros BL (regex d'abord => si aucun, zero appel Sage) ---
-      // On remplace les balises par des ESPACES (et NON strip_tags qui colle les
-      // paragraphes : "<p>bl203846</p><p>texte</p>" -> "bl203846texte" cassait le match).
-      $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-      $text = preg_replace('/<[^>]*>/u', ' ', $text);
-      // Numero = BL|BC + 4 a 8 chiffres, NON suivi d'un chiffre. Pas de \b final
-      // (sinon "bl203846texte" ne matchait pas) -> tolere du texte colle apres.
-      $nbMatch = preg_match_all('/\bB[LC]\s?\d{4,8}(?!\d)/i', $text, $m);
-      if (!$nbMatch || empty($m[0])) {
-         return;
-      }
-      $numbers = [];
-      foreach ($m[0] as $raw) {
-         $num = function_exists('pluginGestionBlNumber')
-            ? pluginGestionBlNumber($raw)
-            : strtoupper(preg_replace('/\s+/', '', $raw));
-         if ($num !== '') {
-            $numbers[$num] = $num;
-         }
-      }
-      if (empty($numbers)) {
-         return;
-      }
-
-      $entities_id = (int)($ticketRow['entities_id'] ?? 0);
+      $entities_id = (int)$found['entities_id'];
       require_once PLUGIN_GESTION_DIR . '/front/SageApi.php';
 
       foreach ($numbers as $serial) {

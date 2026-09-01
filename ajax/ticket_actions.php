@@ -99,6 +99,21 @@ if ($can_sign_bl && $DB->tableExists('glpi_plugin_gestion_surveys')) {
    }
 }
 
+/*
+ * Bons cites par ce ticket mais rattaches a un AUTRE ticket.
+ *
+ * Cas courant : un doublon cree par megarde a capte les bons a sa creation.
+ * L'association automatique ne les rendra jamais — elle ne touche pas un bon
+ * deja pris — donc le panneau les signale et propose la bascule, servie par
+ * ajax/claim_bl.php.
+ */
+$claimable    = [];
+$can_claim_bl = false;
+if ($can_sign_bl && class_exists('PluginGestionTicket')) {
+   $claimable    = PluginGestionTicket::findClaimableBl($ticket_id);
+   $can_claim_bl = Session::haveRight('plugin_gestion_survey', UPDATE) && $ticket->canUpdateItem();
+}
+
 gestion_ticket_actions_end([
    'ok'             => true,
    'ticket_id'      => $ticket_id,
@@ -106,4 +121,6 @@ gestion_ticket_actions_end([
    'notice'         => $notice,
    'gestion_webdir' => $webdir,
    'actions'        => $actions,
+   'claimable'      => $claimable,
+   'can_claim_bl'   => $can_claim_bl,
 ]);
