@@ -7,7 +7,9 @@
  *  - colonne `fab_home_tabs` sur glpi_plugin_gestion_userprefs : quels onglets
  *    le modal du bouton d'accueil propose ;
  *  - nettoyage des actions automatiques fantômes de la lignée du plugin (voir
- *    ci-dessous).
+ *    ci-dessous) ;
+ *  - table `glpi_plugin_gestion_offline_queue` : garde d'idempotence de la file
+ *    d'attente des signatures hors-ligne.
  *
  * ---- Actions automatiques fantômes ----
  *
@@ -127,5 +129,21 @@ function update_180_181() {
             "1.8.1 : echec suppression de l'action automatique {$itemtype}::{$method}\n"
          );
       }
+   }
+
+   /*
+    * File d'attente des signatures hors-ligne.
+    *
+    * La table ne retient QUE les signatures déjà traitées : la file elle-même
+    * vit dans le navigateur du technicien. C'est ce qui empêche un rejeu — la
+    * même requête renvoyée au retour du réseau — de signer une seconde fois le
+    * même bon et d'envoyer un second mail au client.
+    *
+    * La création est déléguée à la classe, qui sait aussi la faire à la demande
+    * si cette migration n'a pas été jouée. Une seule définition du schéma, donc
+    * aucun risque qu'il diverge entre les deux chemins.
+    */
+   if (class_exists('PluginGestionOfflinequeue')) {
+      PluginGestionOfflinequeue::createTable();
    }
 }

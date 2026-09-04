@@ -117,7 +117,8 @@ function plugin_gestion_install() { // fonction installation du plugin
 
    // update_180_181 : mise à jour unique 1.8.1 — purge des actions automatiques
    // fantômes de la lignée du plugin (héritage du nom « rpauto » :
-   // PluginRpautoReminder::cronRpautoMail indéfinie à chaque passage du cron).
+   // PluginRpautoReminder::cronRpautoMail indéfinie à chaque passage du cron),
+   // et table de garde de la file d'attente des signatures hors-ligne.
    // Appelé APRÈS CronTask::Register() : la tâche valide du plugin existe alors
    // en base, la purge ne supprime donc que ce qui n'est plus exécutable.
    $update181 = dirname(__FILE__) . '/install/update_180_181.php';

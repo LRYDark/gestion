@@ -484,7 +484,7 @@
 
 .signature-sub-card .sig-base {
     width: 100%;
-    height: 220px;
+    height: 120px; /* bande a signer, hauteur FIXE — même valeur que FIXED_BASE_H du moteur JS. Les proportions du tracé sont celles de la case du PDF : la signature y rentre parce qu elle a été tracée dans la bonne forme. */
     border: 2px solid #007bff;
     background: white;
     display: block;
@@ -890,3 +890,175 @@
 }
 
 @media print { .gestion-fab { display: none !important; } }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  File d'attente des signatures hors-ligne
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Ecran de confirmation montre AU CLIENT quand le reseau a lache.
+ *
+ * Il vient de signer et n'a rien devant lui : ni PDF, ni mail — ils ne
+ * partiront qu'au retour du reseau. Cet ecran est le SEUL recu qu'on puisse lui
+ * donner sur place. Il doit donc etre lisible a bout de bras, porter une date,
+ * et montrer sa propre signature : c'est ce qui distingue « c'est enregistre »
+ * d'un bouton qui n'aurait rien fait.
+ *
+ * Il couvre l'ecran entier, au-dessus des fenetres Bootstrap (1055) et du voile
+ * de chargement des deux plugins (99999) : rien ne doit pouvoir passer devant.
+ */
+.sign-outbox-captured {
+    position: fixed;
+    inset: 0;
+    z-index: 100010;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.72);
+    overflow-y: auto;
+}
+
+.sign-outbox-captured-card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--tblr-bg-surface, #fff);
+    color: var(--tblr-body-color, #182433);
+    border-radius: 12px;
+    padding: 24px 20px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    text-align: center;
+}
+
+.sign-outbox-captured-icon {
+    font-size: 2.6rem;
+    line-height: 1;
+    color: var(--tblr-warning, #f76707);
+    margin-bottom: 8px;
+}
+
+.sign-outbox-captured-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0 0 8px;
+}
+
+.sign-outbox-captured-lead {
+    margin: 0 0 16px;
+    color: var(--tblr-secondary, #667382);
+}
+
+/* Les faits sur deux colonnes : c'est ce que le client relit et compare. */
+.sign-outbox-captured-facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    margin: 0 0 16px;
+    text-align: left;
+    font-size: 0.95rem;
+}
+
+.sign-outbox-captured-facts dt {
+    color: var(--tblr-secondary, #667382);
+    font-weight: 400;
+}
+
+.sign-outbox-captured-facts dd {
+    margin: 0;
+    font-weight: 600;
+}
+
+/*
+ * Fond blanc IMPOSE sous la signature : elle est tracee en noir sur fond
+ * transparent, et disparaitrait purement et simplement en theme sombre.
+ */
+.sign-outbox-captured-sig {
+    background: #fff;
+    border: 1px solid var(--tblr-border-color, #dadfe5);
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 16px;
+}
+
+.sign-outbox-captured-sig img {
+    display: block;
+    width: 100%;
+    max-height: 130px;
+    object-fit: contain;
+}
+
+.sign-outbox-captured-actions {
+    display: grid;
+    gap: 8px;
+}
+
+/* Liste de la fenetre « Signatures en attente ». */
+.sign-outbox-list .list-group-item + .list-group-item {
+    border-top: 1px solid var(--tblr-border-color, #dadfe5);
+}
+
+/* Repli quand le dialogue natif de GLPI n'est pas disponible sur la page. */
+.sign-outbox-fallback {
+    position: fixed;
+    inset: auto 12px 12px 12px;
+    z-index: 100000;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ *  Anti-zoom iOS sur les champs du formulaire de signature
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Safari (iOS) zoome AUTOMATIQUEMENT la page quand le champ qui recoit le
+ * focus a une police de moins de 16 px — et ne revient JAMAIS en arriere une
+ * fois la saisie terminee : chaque champ touche laissait la fenetre zoomee,
+ * a dezoomer a la main.
+ *
+ * Bloquer le zoom est impossible (Safari ignore `user-scalable=no` depuis
+ * iOS 10) : on supprime donc son DECLENCHEUR en garantissant 16 px sur tout
+ * champ de saisie du formulaire. Uniquement sur ecrans tactiles — l'aspect
+ * dense des ecrans souris ne change pas. `!important` : ces champs sont
+ * stylises a 14 px par plusieurs regles plus specifiques au fil du fichier,
+ * et ce correctif doit gagner sur toutes.
+ */
+@media (pointer: coarse) {
+    .form-container input[type="text"],
+    .form-container input[type="email"],
+    .form-container input[type="tel"],
+    .form-container input[type="number"],
+    .form-container input[type="password"],
+    .form-container input[type="search"],
+    .form-container select,
+    .form-container textarea,
+    .form-container .select2-search__field {
+        font-size: 16px !important;
+    }
+}
+
+/*
+ * Réactivité des boutons au doigt.
+ *
+ * Après chaque tap, Safari attend ~300 ms pour savoir si un DOUBLE-tap de zoom
+ * suit — et ne déclenche le clic qu'ensuite. « Supprimer la signature »,
+ * « Agrandir », « Valider » : tous paraissaient lents, voire muets quand on
+ * retapait pendant l'attente. `touch-action: manipulation` déclare qu'aucun
+ * double-tap de zoom n'est attendu sur ces contrôles : le clic part
+ * immédiatement, et le zoom par pincement reste possible ailleurs.
+ */
+.form-container button,
+.form-container input[type="submit"],
+.form-container input[type="checkbox"],
+.form-container input[type="radio"],
+.form-container label,
+.resetButton,
+.zoom-btn,
+.sig-modal button,
+.signature-modal button {
+    /* Les DEUX fenêtres d'agrandissement : .sig-modal (plugin RP) et
+       .signature-modal (plugin Gestion). Sans la seconde, « Effacer » y
+       gardait ses 300 ms d'attente. */
+    touch-action: manipulation;
+}

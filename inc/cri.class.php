@@ -1096,8 +1096,26 @@ class PluginGestionCri extends CommonDBTM {
                
                // Script de récupération automatique des signatures déportées
                (function() {
+               /*
+                * Résolution dans la copie VISIBLE du formulaire.
+                *
+                * Le formulaire peut exister EN DOUBLE dans la page (conteneur
+                * caché + fenêtre ajoutée en fin de body par glpi_html_dialog,
+                * mêmes identifiants partout). `document.getElementById` renvoie
+                * la PREMIÈRE copie — la cachée : la signature reçue de la
+                * tablette se dessinait sur un canvas invisible et remplissait le
+                * champ d\'un formulaire jamais soumis, pendant que celui sous
+                * les yeux du technicien restait vide.
+                */
+               function gestionVisibleById(id) {
+                  let found = null;
+                  document.querySelectorAll("[id=\"" + id + "\"]").forEach(function (el) {
+                     if (el.offsetParent !== null) { found = el; }
+                  });
+                  return found || document.getElementById(id);
+               }
                function initRemoteSignatureCapture() {
-                  const stat = document.getElementById("remote-status");
+                  const stat = gestionVisibleById("remote-status");
                   if (!stat) {
                      setTimeout(initRemoteSignatureCapture, 2000);
                      return;
@@ -1121,7 +1139,7 @@ class PluginGestionCri extends CommonDBTM {
                   
                   async function retrieveSignatureData() {
                      try {
-                     const sel = document.getElementById("remote-device");
+                     const sel = gestionVisibleById("remote-device");
                      if (!sel) return;
 
                      const opt           = sel.options[sel.selectedIndex];
@@ -1131,17 +1149,25 @@ class PluginGestionCri extends CommonDBTM {
                      const r = await RemoteSign.pollTicket(ticket_id, { device_serial });
                      
                      if (r.ok && r.ready && r.signature_base64) {
-                        // Remplir le champ caché
-                        const hiddenArea = document.getElementById("sig-dataUrl");
+                        // Remplir le champ caché — celui du formulaire VISIBLE
+                        const hiddenArea = gestionVisibleById("sig-dataUrl");
                         if (hiddenArea) {
                            const sigData = r.signature_base64.startsWith("data:") ? r.signature_base64 : "data:image/png;base64," + r.signature_base64;
                            hiddenArea.value = sigData;
                         }
-                        
-                        // Dessiner sur le canvas
-                        const allCanvas = document.querySelectorAll("canvas");
-                        if (allCanvas.length > 0) {
-                           const canvas = allCanvas[0];
+
+                        /*
+                         * Dessiner sur LE canvas de signature de CE formulaire.
+                         * L\'ancien `querySelectorAll("canvas")[0]` prenait le
+                         * tout premier canvas du document — la copie cachée
+                         * quand le formulaire est en double : la signature de la
+                         * tablette n\'apparaissait jamais à l\'écran.
+                         */
+                        const sigFormEl = hiddenArea ? hiddenArea.closest("form") : null;
+                        const canvas = sigFormEl
+                           ? sigFormEl.querySelector("canvas.sig-base")
+                           : document.querySelector("canvas.sig-base");
+                        if (canvas) {
                            const ctx = canvas.getContext("2d");
                            
                            const img = new Image();
@@ -1177,17 +1203,17 @@ class PluginGestionCri extends CommonDBTM {
                            img.src = sigData;
                         }
                         
-                        // Remplir le champ nom
-                        const nameField = document.getElementById("name");
+                        // Remplir le champ nom — même règle : la copie visible
+                        const nameField = gestionVisibleById("name");
                         if (nameField && r.signer_name) {
                            nameField.value = r.signer_name;
                         }
-                        
+
                         // Remplir le champ email
-                        const emailField = document.getElementById("mail");
+                        const emailField = gestionVisibleById("mail");
                         if (emailField && r.signer_email) {
                            emailField.value = r.signer_email;
-                           const emailCheckbox = document.getElementById("send_email");
+                           const emailCheckbox = gestionVisibleById("send_email");
                            if (emailCheckbox && r.signer_email.trim() !== "") {
                               emailCheckbox.checked = true;
                            }

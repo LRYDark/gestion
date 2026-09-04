@@ -43,6 +43,41 @@ if (!$plugin->isInstalled('rp') || !$plugin->isActivated('rp') || !class_exists(
    exit;
 }
 
+/*
+ * Signature différée : ne pas produire DEUX FOIS le même envoi.
+ *
+ * Ce fichier est le point d'ENTRÉE de la signature combinée : il inclut ensuite
+ * le générateur du plugin RP puis `traitement.php`, qui se taisent tous deux
+ * (marqueur `PLUGIN_RP_PDF_EMBEDDED` pour l'un, `combined_mode` pour l'autre).
+ * La garde est donc posée ici, une seule fois, pour l'envoi entier.
+ *
+ * Elle vit dans la table de CE plugin : c'est lui qui orchestre, et lui seul
+ * sait si le rapport ET le bon sont allés au bout.
+ */
+$gestion_offline_claim = null;
+if (class_exists('PluginGestionOfflinequeue')) {
+   $gestion_offline_claim = PluginGestionOfflinequeue::claim(
+      (string)($_POST['sign_uid'] ?? ''),
+      $ticket_id,
+      (string)($_POST['sign_captured_at'] ?? '')
+   );
+
+   if (!$gestion_offline_claim['go']) {
+      // 200 « déjà produit » : la file peut retirer la signature.
+      // 409 « en cours » : une tentative travaille encore, l'issue est inconnue,
+      // la file doit GARDER l'élément et repasser plus tard.
+      $gestion_offline_done = ($gestion_offline_claim['state'] === 'done');
+      http_response_code($gestion_offline_done ? 200 : 409);
+      header('Content-Type: application/json; charset=UTF-8');
+      echo json_encode([
+         'ok'      => $gestion_offline_done,
+         'already' => true,
+         'state'   => $gestion_offline_claim['state'],
+      ], JSON_UNESCAPED_UNICODE);
+      exit;
+   }
+}
+
 $config = PluginGestionConfig::getInstance();
 $combined_mail_mode = (int)$config->CombinedMailMode();
 
@@ -266,6 +301,19 @@ if (!empty($config->fields['ZenDocMail'])) {
 }
 
 gestion_combined_message("BL + Rapport signés et fusionnés.", INFO);
+
+/*
+ * Le travail est terminé : la signature ne repartira plus.
+ *
+ * Posé ICI, avant l'affichage et avant tout `exit` : le rapport est généré, le
+ * BL signé, les deux fusionnés et enregistrés. Une ligne marquée « faite » alors
+ * qu'il resterait du travail empêcherait le rejeu de le finir, et le client
+ * n'aurait jamais ses documents.
+ */
+if (!empty($gestion_offline_claim) && $gestion_offline_claim['go']
+    && class_exists('PluginGestionOfflinequeue')) {
+   PluginGestionOfflinequeue::complete((string)($_POST['sign_uid'] ?? ''));
+}
 
 /*
  * Affichage du document produit, comme le fait la signature d'un BL seul et

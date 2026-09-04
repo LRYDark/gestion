@@ -11,7 +11,7 @@ define('PLUGIN_GESTION_VERSION', '1.8.1'); // version du plugin
  *
  * À incrémenter à chaque modification d'un fichier de public/js ou public/css.
  */
-define('PLUGIN_GESTION_ASSETS_REV', '31');
+define('PLUGIN_GESTION_ASSETS_REV', '40');
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 /**
@@ -150,7 +150,20 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
       // plugin_init s'execute AVANT le CheckCsrfListener du kernel : on trace ici
       // l'etat du token des POST vers traitement*.php pour comprendre les rejets.
       // On ne journalise jamais le token lui-meme (seulement un hash tronque).
+      /*
+       * Le rejeu d'une signature hors-ligne n'est PAS une anomalie.
+       *
+       * Il porte son jeton dans l'en-tete `X-Glpi-Csrf-Token` — c'est la branche
+       * AJAX du CheckCsrfListener, celle qui conserve le jeton pour que la file
+       * entiere parte avec un seul. Le corps n'en contient donc aucun, tout a
+       * fait normalement : sans cette exception, chaque signature differee
+       * remplirait le journal d'un avertissement « token ABSENT » alarmant et
+       * faux.
+       */
+      $diag_header_tok = (string)($_SERVER['HTTP_X_GLPI_CSRF_TOKEN'] ?? '');
+
       if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+          && $diag_header_tok === ''
           && strpos((string)($_SERVER['REQUEST_URI'] ?? ''), '/plugins/gestion/front/traitement') !== false
           && class_exists('PluginGestionLogger')) {
          $diag_tok   = array_key_exists('_glpi_csrf_token', $_POST) ? (string)$_POST['_glpi_csrf_token'] : null;
@@ -240,7 +253,34 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
          $gestion_rev = '?r=' . PLUGIN_GESTION_ASSETS_REV;
 
          $PLUGIN_HOOKS['add_css']['gestion'] = ["public/css/signature_gestion.css" . $gestion_rev];
-         $PLUGIN_HOOKS['add_javascript']['gestion'] = ['public/js/scripts_gestion.js' . $gestion_rev];
+         $PLUGIN_HOOKS['add_javascript']['gestion'] = [
+            'public/js/scripts_gestion.js' . $gestion_rev,
+            /*
+             * File d'attente des signatures hors-ligne, sur TOUTES les pages.
+             *
+             * Ce n'est pas un module d'écran de signature : c'est lui qui, au
+             * retour au bureau, voit qu'une signature recueillie sans réseau
+             * attend encore et la fait partir. Le charger seulement sur la
+             * fiche du ticket obligerait le technicien à rouvrir précisément le
+             * bon ticket pour que sa signature parte — donc à savoir laquelle
+             * n'est pas passée. La première page GLPI venue suffit.
+             *
+             * Jumeau exact de `rp/public/js/rp_outbox.js` : le premier des deux
+             * chargés prend la main, l'autre se contente de se déclarer. C'est
+             * ce qui permet de désinstaller l'un sans que la file de l'autre
+             * cesse de fonctionner.
+             */
+            'public/js/gestion_outbox.js' . $gestion_rev,
+         ];
+
+         /*
+          * Déclaration de la file, lue par le module côté navigateur.
+          *
+          * Émise INCONDITIONNELLEMENT, contrairement à celle des boutons
+          * flottants : une signature déjà en attente doit pouvoir repartir même
+          * chez un technicien qui a désactivé tout le reste.
+          */
+         $PLUGIN_HOOKS['add_header_tag']['gestion'] = [PluginGestionOfflinequeue::headerTag()];
 
          /*
           * Boutons flottants : relais du plugin RP.
@@ -271,7 +311,8 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
             if ($gestion_mode_home !== PluginGestionUserpref::MODE_NEVER
                 || $gestion_mode_ticket !== PluginGestionUserpref::MODE_NEVER) {
                $PLUGIN_HOOKS['add_javascript']['gestion'][] = 'public/js/fab_gestion.js' . $gestion_rev;
-               $PLUGIN_HOOKS['add_header_tag']['gestion'] = [
+               // AJOUT à la liste : la déclaration de la file d'attente y est déjà.
+               $PLUGIN_HOOKS['add_header_tag']['gestion'][] =
                   [
                      'tag'        => 'meta',
                      'properties' => [
@@ -287,8 +328,7 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
                            'fab_home_bl'   => PluginGestionUserpref::hasBl(),
                         ]),
                      ],
-                  ],
-               ];
+                  ];
             }
          }
       }

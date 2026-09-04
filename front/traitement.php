@@ -16,6 +16,55 @@ $config = new PluginGestionConfig();
 $doc = new Document();
 $combined_mode = !empty($_POST['combined_mode']);
 
+/*
+ * Signature différée : ne pas signer DEUX FOIS le même bon.
+ *
+ * Quand le réseau lâche pendant la signature, le navigateur met l'envoi en file
+ * et le rejoue plus tard — la même requête, à l'identique. Or un délai dépassé
+ * côté téléphone ne prouve pas que le serveur n'a rien fait : la requête a pu
+ * arriver entière, le bon être signé, déposé et le mail parti, seule la réponse
+ * s'étant perdue. Sans cette garde, le rejeu signerait une seconde fois.
+ *
+ * `sign_uid` est forgé par le navigateur AVANT le premier envoi et rejoué tel
+ * quel : c'est lui qui dit « c'est la même signature ».
+ *
+ * Rien de tout cela en mode combiné : ce fichier est alors INCLUS par
+ * `traitement_combined.php`, qui a déjà posé la garde pour l'envoi entier. Deux
+ * gardes pour une seule signature ouvriraient deux lignes.
+ */
+$gestion_offline_claim = null;
+if (!$combined_mode && class_exists('PluginGestionOfflinequeue')) {
+    $gestion_offline_claim = PluginGestionOfflinequeue::claim(
+        (string)($_POST['sign_uid'] ?? ''),
+        (int)($_POST['REPORT_ID'] ?? $_POST['job'] ?? 0),
+        (string)($_POST['sign_captured_at'] ?? '')
+    );
+
+    if (!$gestion_offline_claim['go']) {
+        /*
+         * Réponse en JSON, jamais un PDF : c'est la file du navigateur qui lit
+         * ceci, pas un technicien.
+         *
+         * Deux refus bien distincts :
+         *  - 200 « déjà signé » : plus rien à faire, la file peut retirer la
+         *    signature ;
+         *  - 409 « en cours » : une tentative précédente travaille ENCORE côté
+         *    serveur. Répondre 200 ferait croire à la file que c'est réglé et
+         *    lui ferait supprimer une signature dont on ignore encore l'issue.
+         */
+        $gestion_offline_done = ($gestion_offline_claim['state'] === 'done');
+        http_response_code($gestion_offline_done ? 200 : 409);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode([
+            'ok'           => $gestion_offline_done,
+            'already'      => true,
+            'state'        => $gestion_offline_claim['state'],
+            'documents_id' => (int)($gestion_offline_claim['row']['documents_id'] ?? 0),
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 // Ensure optional columns exist in surveys table
 try {
     $table = 'glpi_plugin_gestion_surveys';
@@ -817,8 +866,43 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         }
 
         gestion_message('Documents : '. $DOC_NAME.' signé', INFO);
+
+        /*
+         * Le travail est terminé : la signature ne repartira plus.
+         *
+         * Posé ICI, dans la branche de succès et à la toute fin : le bon est
+         * signé, déposé et enregistré. Une ligne marquée « faite » alors qu'il
+         * resterait du travail empêcherait le rejeu de le finir, et le client
+         * n'aurait jamais son document.
+         *
+         * `!$combined_mode` est INDISPENSABLE, pas une précaution.
+         *
+         * En mode combiné, ce fichier est INCLUS : il partage la portée de
+         * `traitement_combined.php` et voit donc SA variable `$gestion_offline_claim`.
+         * Sans cette condition, on déclarerait l'envoi terminé alors qu'il reste
+         * à fusionner le rapport et le bon — et un rejeu ne finirait jamais le
+         * travail interrompu.
+         */
+        if (!$combined_mode && !empty($gestion_offline_claim) && $gestion_offline_claim['go']
+            && class_exists('PluginGestionOfflinequeue')) {
+            PluginGestionOfflinequeue::complete(
+                (string)($_POST['sign_uid'] ?? ''),
+                (int)($NewDoc ?? 0)
+            );
+        }
     } catch (Exception $e) {
         gestion_message("Signé avec erreur, voir votre administrateur : " . $e->getMessage(), ERROR);
+        // Échec explicite : la ligne repasse en « échouée » et la file pourra
+        // rejouer, au lieu d'attendre l'expiration du délai de garde. Même
+        // réserve qu'au-dessus pour le mode combiné, dont le point d'entrée
+        // tient sa propre garde.
+        if (!$combined_mode && !empty($gestion_offline_claim) && $gestion_offline_claim['go']
+            && class_exists('PluginGestionOfflinequeue')) {
+            PluginGestionOfflinequeue::fail(
+                (string)($_POST['sign_uid'] ?? ''),
+                $e->getMessage()
+            );
+        }
     }
                 
 

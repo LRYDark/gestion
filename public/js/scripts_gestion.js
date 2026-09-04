@@ -399,10 +399,28 @@ function gestion_switchCombinedMode(radio) {
     // devicePoll() et deviceSubmit() supprimés (étaient appelés par device_sign.php — supprimé en v1.7.0_alpha1)
   };
 
+  /*
+   * Résolution dans la copie VISIBLE du formulaire.
+   *
+   * Le formulaire de signature peut exister EN DOUBLE dans la page (conteneur
+   * caché + fenêtre ajoutée en fin de body par glpi_html_dialog, mêmes
+   * identifiants partout). `getElementById` renvoie la PREMIÈRE copie — la
+   * cachée : le bouton « Demander la signature » réellement cliqué n'avait pas
+   * d'écouteur, et la signature reçue remplissait le champ d'un formulaire
+   * jamais soumis.
+   */
+  function visibleById(id) {
+    let found = null;
+    document.querySelectorAll('[id="' + CSS.escape(id) + '"]').forEach(function (el) {
+      if (el.offsetParent !== null) { found = el; }
+    });
+    return found || document.getElementById(id);
+  }
+
   function attachButtonHandler(remoteSignInstance) {
-    const btn  = document.getElementById('remote-start');
-    const sel  = document.getElementById('remote-device');
-    const stat = document.getElementById('remote-status');
+    const btn  = visibleById('remote-start');
+    const sel  = visibleById('remote-device');
+    const stat = visibleById('remote-status');
     if (!btn || !sel) return;
     
     // Vérifier si ce bouton a déjà un listener pour ce plugin
@@ -443,9 +461,11 @@ function gestion_switchCombinedMode(radio) {
             }
             
             if (ready && sig) {
-              const hiddenArea = document.getElementById("sig-dataUrl");
+              // Champ et aperçu du formulaire VISIBLE (cf. visibleById) :
+              // en double, ceux du document seraient la copie cachée.
+              const hiddenArea = visibleById("sig-dataUrl");
               if (hiddenArea) hiddenArea.value = sig.startsWith('data:') ? sig : ('data:image/png;base64,' + sig);
-              const prev = document.getElementById("signature-preview");
+              const prev = visibleById("signature-preview");
               if (prev){
                 prev.src = sig.startsWith('data:') ? sig : ('data:image/png;base64,' + sig);
                 prev.style.display="block";
@@ -528,8 +548,34 @@ function initializeSignatureGestion(uniqId) {
   // sont converties avec une échelle séparée par axe, mesurée au moment du
   // tracé : aucun décalage possible même si le CSS réduit le canvas.
   (function () {
-    const root = document.getElementById(uniqId);
+    /*
+     * La copie VISIBLE du formulaire, pas la première venue.
+     *
+     * Le formulaire existe souvent EN DOUBLE dans la page : le chargeur
+     * l'injecte d'abord dans son conteneur (caché sur la page mobile), puis
+     * `glpi_html_dialog` en AJOUTE une seconde copie en fin de <body> — avec
+     * les mêmes identifiants. `getElementById` renvoie la PREMIÈRE copie dans
+     * l'ordre du document : la cachée. Tout se câblait alors sur un canvas
+     * invisible, et celui que le client avait sous le doigt restait muet.
+     *
+     * On retient donc la DERNIÈRE copie affichée (`offsetParent` est nul pour
+     * tout élément sous un `display:none`), et à défaut la dernière tout court
+     * — celle de la fenêtre, ajoutée en dernier.
+     */
+    const copies = document.querySelectorAll('[id="' + CSS.escape(uniqId) + '"]');
+    let root = null;
+    copies.forEach(function (el) { if (el.offsetParent !== null) { root = el; } });
+    if (!root && copies.length) { root = copies[copies.length - 1]; }
     if (!root) return;
+
+    /*
+     * Les DEUX copies exécutent ce script (l'injection jQuery lance les
+     * <script> des deux). Sans ce témoin, la copie visible était initialisée
+     * deux fois : chaque trait était capté par deux jeux d'écouteurs et deux
+     * historiques concurrents.
+     */
+    if (root.dataset.sigBound === '1') return;
+    root.dataset.sigBound = '1';
 
     // Elements
     const originalCanvas = root.querySelector("#sig-canvas-" + uniqId);
@@ -616,10 +662,25 @@ function initializeSignatureGestion(uniqId) {
     }
 
     // ---------- Canvas de base ----------
+    /*
+     * Hauteur FIXE, jamais mesurée.
+     *
+     * Deux approches ont précédé : figer le ratio mesuré à l'initialisation
+     * (mesure prise au mauvais moment — formulaire caché, CSS pas encore
+     * appliqué — donc zone carrée gelée pour toujours), puis ne le figer que
+     * s'il était « vraisemblable ». Verdict : toute hauteur DÉDUITE d'une
+     * mesure finit par varier selon l'instant du chargement.
+     *
+     * La zone est une bande de 120 px, point — la même valeur que la feuille
+     * de style (`.signature-sub-card .sig-base`). Ses proportions sont celles
+     * de la case du PDF : la signature s'y adapte parce qu'elle a été TRACÉE
+     * dans la bonne forme, pas parce qu'on la réduirait après coup.
+     */
+    const FIXED_BASE_H = 120;
+
     const initRect = originalCanvas.getBoundingClientRect();
     const INITIAL_BASE_W = Math.max(200, Math.round(initRect.width  || originalCanvas.clientWidth  || 320));
-    const INITIAL_BASE_H = Math.max( 60, Math.round(initRect.height || originalCanvas.clientHeight ||  80));
-    const BASE_ASPECT = INITIAL_BASE_W / INITIAL_BASE_H || 4;
+    const INITIAL_BASE_H = FIXED_BASE_H;
 
     function adaptCanvasSize() {
       const container = originalCanvas.closest(".signature-container") || originalCanvas.parentElement;
@@ -627,7 +688,7 @@ function initializeSignatureGestion(uniqId) {
       const cs = getComputedStyle(container);
       const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
       const cssW = Math.max(200, Math.floor(container.clientWidth - padX));
-      const cssH = Math.max(60, Math.round(cssW / BASE_ASPECT));
+      const cssH = FIXED_BASE_H;
       if (parseInt(originalCanvas.style.width, 10) === cssW
           && parseInt(originalCanvas.style.height, 10) === cssH) {
         return;
@@ -669,8 +730,17 @@ function initializeSignatureGestion(uniqId) {
       const padY = (parseFloat(cs.paddingTop)  || 0) + (parseFloat(cs.paddingBottom) || 0);
       let w = Math.max(200, Math.floor(r.width  - padX));
       let h = Math.max(100, Math.floor(r.height - padY));
-      // même ratio que la base pour que l'historique normalisé ne soit pas déformé
-      if (w / h > BASE_ASPECT) w = Math.floor(h * BASE_ASPECT); else h = Math.floor(w / BASE_ASPECT);
+      /*
+       * Même ratio que la BANDE de base : ce qu'on trace dans la grande fenêtre
+       * a exactement la forme de ce qui sera reporté, puis imprimé. Le ratio
+       * est calculé sur le canvas réellement affiché (largeur courante sur
+       * hauteur fixe) — plus aucune mesure figée à l'initialisation.
+       */
+      const bandRatio = Math.max(
+        1.5,
+        (parseInt(originalCanvas.style.width, 10) || INITIAL_BASE_W) / FIXED_BASE_H
+      );
+      if (w / h > bandRatio) w = Math.floor(h * bandRatio); else h = Math.floor(w / bandRatio);
       setCanvasSize(modalCanvas, w, h);
       renderHistoryOn(modalCanvas, modalCtx, MODAL_LINE);
     }
@@ -753,7 +823,12 @@ function initializeSignatureGestion(uniqId) {
     if (btnClearBase) {
       btnClearBase.addEventListener("click", () => {
         wipeAll();
-        const hidden = document.getElementById("sig-dataUrl");
+        // Le champ de CE formulaire : en double dans la page, celui du document
+        // serait la copie cachée (cf. la résolution de `root` plus haut).
+        const clearForm = root.closest("form");
+        const hidden = clearForm
+          ? clearForm.querySelector("#sig-dataUrl")
+          : document.getElementById("sig-dataUrl");
         if (hidden) hidden.value = "";
       });
     }
@@ -825,8 +900,17 @@ function initializeSignatureGestion(uniqId) {
     }
 
     // Champ hidden
-    const submitBtn  = document.getElementById("sig-submitBtn");
-    const hiddenArea = document.getElementById("sig-dataUrl");
+    /*
+     * Bouton et champ cherchés dans LE FORMULAIRE de cette copie, jamais dans
+     * le document : `sig-submitBtn` et `sig-dataUrl` existent en double quand
+     * le formulaire l'est. `getElementById` accrochait alors le clic au bouton
+     * de la copie CACHÉE — jamais cliqué — et le formulaire visible partait
+     * avec un champ signature VIDE : bon signé sans la signature que le client
+     * venait pourtant de tracer.
+     */
+    const sigForm    = root.closest("form");
+    const submitBtn  = sigForm ? sigForm.querySelector("#sig-submitBtn") : document.getElementById("sig-submitBtn");
+    const hiddenArea = sigForm ? sigForm.querySelector("#sig-dataUrl")   : document.getElementById("sig-dataUrl");
     if (submitBtn && hiddenArea && !submitBtn.dataset.sigInit) {
       submitBtn.dataset.sigInit = "1";
       submitBtn.addEventListener("click", function () {
@@ -839,7 +923,26 @@ function initializeSignatureGestion(uniqId) {
       document.documentElement.dataset.sigNoDoubleTap = "1";
       document.addEventListener("touchend", (function () {
         let last = 0;
-        return function (e) { const now = Date.now(); if (now - last < 300) e.preventDefault(); last = now; };
+        return function (e) {
+          /*
+           * Les CONTRÔLES ne sont jamais avalés.
+           *
+           * Ce garde-fou vise le double-tap de zoom d'iOS sur la zone de
+           * tracé. Mais il neutralisait TOUT tap survenant moins de 300 ms
+           * après le précédent — donc le tap sur « Valider » qui suit
+           * immédiatement la fin du tracé, et chaque re-tap impatient qui
+           * suivait. D'où des boutons qu'il fallait presser trois fois avant
+           * qu'une pause suffisante ne laisse enfin passer le clic.
+           */
+          if (e.target && typeof e.target.closest === "function"
+              && e.target.closest("button, a, input, select, textarea, label, [role=button]")) {
+            last = Date.now();
+            return;
+          }
+          const now = Date.now();
+          if (now - last < 300) e.preventDefault();
+          last = now;
+        };
       })(), { passive: false });
     }
   })();

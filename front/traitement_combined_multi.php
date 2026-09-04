@@ -56,6 +56,40 @@ if ($ticket_id <= 0 || empty($bl_ids)) {
 }
 
 /*
+ * Signature différée : ne pas produire DEUX FOIS le même envoi.
+ *
+ * Ce fichier est un point d'ENTRÉE : il inclut le générateur du plugin RP, qui
+ * se tait alors (marqueur `PLUGIN_RP_PDF_EMBEDDED`). La garde est donc posée
+ * ici, une seule fois, pour tout le lot.
+ *
+ * Elle porte sur le LOT entier, pas sur chaque bon : c'est un seul envoi du
+ * technicien, un seul PDF fusionné, et donc une seule chose à ne pas refaire.
+ */
+$gestion_offline_claim = null;
+if (class_exists('PluginGestionOfflinequeue')) {
+   $gestion_offline_claim = PluginGestionOfflinequeue::claim(
+      (string)($_POST['sign_uid'] ?? ''),
+      $ticket_id,
+      (string)($_POST['sign_captured_at'] ?? '')
+   );
+
+   if (!$gestion_offline_claim['go']) {
+      // 200 « déjà produit » : la file peut retirer la signature.
+      // 409 « en cours » : une tentative travaille encore, l'issue est inconnue,
+      // la file doit GARDER l'élément et repasser plus tard.
+      $gestion_offline_done = ($gestion_offline_claim['state'] === 'done');
+      http_response_code($gestion_offline_done ? 200 : 409);
+      header('Content-Type: application/json; charset=UTF-8');
+      echo json_encode([
+         'ok'      => $gestion_offline_done,
+         'already' => true,
+         'state'   => $gestion_offline_claim['state'],
+      ], JSON_UNESCAPED_UNICODE);
+      exit;
+   }
+}
+
+/*
  * Deux parcours dans ce fichier, une seule chaine de traitement.
  *
  *  - defaut          : BL coches + UN rapport d'intervention => 1 PDF fusionne ;
@@ -577,6 +611,19 @@ if ($rp_repointed && !empty($rp_pdf) && file_exists($rp_pdf)) { @unlink($rp_pdf)
 if ($attachedPdfPath && file_exists($attachedPdfPath)) { @unlink($attachedPdfPath); }
 
 gestion_multi_message(count($valid_bls) . ($report_merged ? " BL + Rapport signes et fusionnes." : " BL signes et fusionnes."), INFO);
+
+/*
+ * Le travail est terminé : la signature ne repartira plus.
+ *
+ * Posé ICI, avant l'affichage et avant tout `exit` : tous les bons du lot sont
+ * signés, fusionnés et enregistrés. Une ligne marquée « faite » alors qu'il
+ * resterait du travail empêcherait le rejeu de le finir, et le client n'aurait
+ * jamais ses documents.
+ */
+if (!empty($gestion_offline_claim) && $gestion_offline_claim['go']
+    && class_exists('PluginGestionOfflinequeue')) {
+   PluginGestionOfflinequeue::complete((string)($_POST['sign_uid'] ?? ''));
+}
 
 /*
  * Affichage du document produit, comme les autres signatures.
