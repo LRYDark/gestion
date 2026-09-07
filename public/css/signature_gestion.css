@@ -710,10 +710,12 @@
    L'habillage utilise les composants natifs GLPI/Tabler : on ne définit
    ici que la position flottante, le cadre de visée et le panneau bas.
    ============================================================ */
+/* `bottom` laisse libre la barre collante du bas de GLPI (« Sauvegarder »,
+   barre de réponse mobile) : le bouton ne doit pas la masquer. */
 .gestion-fab {
    position: fixed;
    right: 20px;
-   bottom: 20px;
+   bottom: 80px;
    width: 56px;
    height: 56px;
    z-index: 1030;
@@ -721,7 +723,7 @@
    touch-action: none; /* le bouton est déplaçable au doigt */
 }
 .gestion-fab .ti { font-size: 24px; }
-.gestion-fab + .gestion-fab { bottom: 86px; }
+.gestion-fab + .gestion-fab { bottom: 146px; }
 
 .gestion-scan-video-wrap {
    position: relative;
