@@ -76,9 +76,8 @@ class PluginGestionProfile extends Profile {
             'rights'   => [READ    => __('Read'), UPDATE  => __('Update'), CREATE  => __('Create'), PURGE  => __('Purge')] // 1.5.5
          ],
          // Boutons flottants : relais quand RP est inactif ; RP actif, ce droit
-         // ouvre la part « bons de livraison » des boutons fournis par RP
-         // (PluginRpUserpref::hasGestionRight) — les deux droits, tout ; un
-         // seul, les fonctions de ce plugin-là.
+         // suffit aussi à afficher les boutons fournis par RP (leur contenu suit
+         // les droits des fonctionnalités, cf. PluginRpUserpref::hasAnyRight).
          ['itemtype' => 'PluginGestionConfig',
             'label'    => __('Boutons flottants', 'gestion'),
             'field'    => 'plugin_gestion_boutons',

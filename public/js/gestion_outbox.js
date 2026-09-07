@@ -580,6 +580,16 @@
    function onSubmit(event) {
       var form = event.target;
       if (!form || form.nodeName !== 'FORM' || form.getAttribute('name') !== 'formReport') {
+         /*
+          * Le rapport d'atelier de RP (`formPreparation`) n'est pas mis en
+          * file : il part nativement. Le témoin posé au chargement doit alors
+          * lui être rendu, sinon `scripts_rp.js` ne retire jamais son voile
+          * « Génération en cours » et ne recharge pas la page — le PDF
+          * s'ouvrait bien à côté, mais l'écran restait figé.
+          */
+         if (form && form.nodeName === 'FORM' && form.getAttribute('name') === 'formPreparation') {
+            releaseNativeSubmit();
+         }
          return;
       }
       if (form.dataset.outboxHandled === '1') {
@@ -642,6 +652,9 @@
 
       event.preventDefault();
       form.dataset.outboxHandled = '1';
+      // La file prend cet envoi : le rechargement différé des deux plugins
+      // reste neutralisé, même si un envoi natif précédent l'avait rendu.
+      window.__rpReloadScheduled = true;
 
       var btn = form.querySelector('input[type=submit]');
       if (btn && btn.tagName === 'INPUT' && !btn.dataset.outboxLabel) {
