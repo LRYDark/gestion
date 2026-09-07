@@ -62,10 +62,14 @@ if ($mode === 'rp' || $mode === 'both') {
     * l'utilisateur a bien droit. Le mode « Rapport » seul, lui, n'a pas de repli.
     */
    $rp_ticket  = new Ticket();
+   // canProduce (RP récent) : le droit de l'atelier ouvre aussi le rapport
+   // d'intervention qui le conclut. Repli sur canUse pour un RP plus ancien.
    $rp_allowed = class_exists('PluginRpAccess')
                  && $rp_ticket->getFromDB($ticket_id)
                  && $rp_ticket->canViewItem()
-                 && PluginRpAccess::canUse('rapport_tech');
+                 && (method_exists('PluginRpAccess', 'canProduce')
+                     ? PluginRpAccess::canProduce('rapport_tech')
+                     : PluginRpAccess::canUse('rapport_tech'));
 
    if (!$rp_allowed) {
       if ($mode === 'both' && $bl_id > 0) {

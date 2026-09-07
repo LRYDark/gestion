@@ -184,9 +184,14 @@ switch ($action) {
       $rp_allowed = false;
       if ($rp_active && $ticket_id > 0 && class_exists('PluginRpAccess')) {
          $rp_ticket  = new Ticket();
+         // canProduce (RP récent) : le droit de l'atelier ouvre aussi le
+         // rapport d'intervention qui le conclut. Repli sur canUse pour un
+         // RP plus ancien — Gestion doit tourner avec l'un comme avec l'autre.
          $rp_allowed = $rp_ticket->getFromDB($ticket_id)
                        && $rp_ticket->canViewItem()
-                       && PluginRpAccess::canUse('rapport_tech');
+                       && (method_exists('PluginRpAccess', 'canProduce')
+                           ? PluginRpAccess::canProduce('rapport_tech')
+                           : PluginRpAccess::canUse('rapport_tech'));
       }
 
       /*
