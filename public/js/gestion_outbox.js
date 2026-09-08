@@ -515,15 +515,53 @@
     * premier) et ont donc déjà programmé le rechargement quand nous prenons la
     * main. Trop tard pour les en empêcher après coup.
     *
-    * En contrepartie, les deux chemins où ce module RENONCE à intercepter le
-    * rendent : la soumission native y reprend son cours d'avant, minuterie
-    * comprise.
+    * Il n'est JAMAIS rendu. Une première version le remettait à `false` quand
+    * ce module renonçait à intercepter (rapport d'atelier, plugin inconnu,
+    * fichier joint), en comptant sur les deux plugins pour reprendre la main.
+    * Mais l'écouteur de `scripts_rp.js` est enregistré AVANT le nôtre dès que
+    * RP est chargé avant Gestion : il avait déjà lu le témoin à `true` et
+    * renoncé quand nous le rendions. Résultat : le PDF s'ouvrait bien à côté,
+    * mais le voile « Génération en cours » restait affiché sans fin et le
+    * ticket ne se rafraîchissait jamais.
+    *
+    * Quand ce module renonce, c'est donc LUI qui retire le voile et recharge
+    * la page (cf. nativeAfterSubmit) : le résultat ne dépend plus de l'ordre
+    * de chargement des plugins.
     */
    window.__rpReloadScheduled = true;
 
-   /** Rend le rechargement différé aux deux plugins : on n'intercepte pas. */
-   function releaseNativeSubmit() {
-      window.__rpReloadScheduled = false;
+   /**
+    * Envoi laissé au navigateur : retirer le voile, puis recharger la page.
+    *
+    * Reprend à l'identique ce que `scripts_rp.js` et `gestionAfterSubmit`
+    * font quand ce module n'est pas chargé. Le formulaire vise un nouvel
+    * onglet : la page courante ne navigue pas, rien ne retirerait le voile ni
+    * ne rafraîchirait le ticket. Le rechargement attend le retour sur cet
+    * onglet — le document est alors produit par construction, c'est le moment
+    * exact où l'état à jour intéresse le technicien. Filet à 30 s s'il ne
+    * quitte jamais la page.
+    *
+    * Sans `target`, la page navigue d'elle-même : il n'y a rien à faire.
+    */
+   function nativeAfterSubmit(form) {
+      if (!form || form.target !== '_blank') {
+         return;
+      }
+
+      // Le voile a fait son office : le laisser tourner indéfiniment donnerait
+      // l'impression d'une page bloquée.
+      window.setTimeout(hideLoaders, 2000);
+
+      var done = false;
+      function reloadOnce() {
+         if (done) { return; }
+         done = true;
+         window.location.reload();
+      }
+      window.addEventListener('focus', function () {
+         window.setTimeout(reloadOnce, 400);
+      }, { once: true });
+      window.setTimeout(reloadOnce, 30000);
    }
 
    function collectFields(form, submitter) {
@@ -582,13 +620,12 @@
       if (!form || form.nodeName !== 'FORM' || form.getAttribute('name') !== 'formReport') {
          /*
           * Le rapport d'atelier de RP (`formPreparation`) n'est pas mis en
-          * file : il part nativement. Le témoin posé au chargement doit alors
-          * lui être rendu, sinon `scripts_rp.js` ne retire jamais son voile
-          * « Génération en cours » et ne recharge pas la page — le PDF
-          * s'ouvrait bien à côté, mais l'écran restait figé.
+          * file : il part nativement, vers un nouvel onglet. `scripts_rp.js`
+          * a posé son voile « Génération en cours » mais, témoin oblige, ne le
+          * retirera pas : c'est à nous de le faire et de recharger le ticket.
           */
          if (form && form.nodeName === 'FORM' && form.getAttribute('name') === 'formPreparation') {
-            releaseNativeSubmit();
+            nativeAfterSubmit(form);
          }
          return;
       }
@@ -602,7 +639,7 @@
       if (!plugins[pluginKey]) {
          // Traitement d'un plugin qu'on ne connaît pas : on ne s'en mêle pas,
          // l'envoi natif suit son cours.
-         releaseNativeSubmit();
+         nativeAfterSubmit(form);
          return;
       }
 
@@ -613,7 +650,7 @@
          // Un fichier joint nommé, que la file ne saurait pas stocker. On laisse
          // partir nativement : mieux vaut le comportement d'avant ce module
          // qu'un envoi bloqué par lui.
-         releaseNativeSubmit();
+         nativeAfterSubmit(form);
          return;
       }
 
@@ -652,9 +689,6 @@
 
       event.preventDefault();
       form.dataset.outboxHandled = '1';
-      // La file prend cet envoi : le rechargement différé des deux plugins
-      // reste neutralisé, même si un envoi natif précédent l'avait rendu.
-      window.__rpReloadScheduled = true;
 
       var btn = form.querySelector('input[type=submit]');
       if (btn && btn.tagName === 'INPUT' && !btn.dataset.outboxLabel) {

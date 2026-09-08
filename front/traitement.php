@@ -4,6 +4,8 @@ require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de
 
 require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
 require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
+// Page de remplacement d'un bon dont le PDF a disparu (pluginGestionMissingBlPage).
+require_once PLUGIN_GESTION_DIR.'/front/sign_bl.core.php';
 
 global $DB, $CFG_GLPI;
 
@@ -32,7 +34,15 @@ $combined_mode = !empty($_POST['combined_mode']);
  * `traitement_combined.php`, qui a déjà posé la garde pour l'envoi entier. Deux
  * gardes pour une seule signature ouvriraient deux lignes.
  */
-$gestion_offline_claim = null;
+/*
+ * Initialisée SEULEMENT hors mode combiné : inclus par `traitement_combined.php`,
+ * ce fichier partage sa portée et doit lui laisser SA garde intacte — c'est
+ * elle qui est clôturée en fin de parcours. La remettre à null ici faisait
+ * passer l'envoi combiné pour « interrompu » à la fin du script.
+ */
+if (!$combined_mode) {
+    $gestion_offline_claim = null;
+}
 if (!$combined_mode && class_exists('PluginGestionOfflinequeue')) {
     $gestion_offline_claim = PluginGestionOfflinequeue::claim(
         (string)($_POST['sign_uid'] ?? ''),
@@ -284,20 +294,19 @@ if ($existingPdfPath === '' && $DOC->save == "SharePoint"){ //Récup BL depuis s
 
         // Étape 4 : Obtenir l'URL de téléchargement
         $downloadUrl = $sharepoint->getDownloadUrl($filePath);
-    } catch (Exception $e) {
-        gestion_message("Erreur : " . $e->getMessage(), ERROR);
-        Html::back();
-        exit;
-    }
 
-    try {
         // Étape 5 : Télécharger le fichier depuis l'URL
         $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
         $sharepoint->downloadFileFromUrl($downloadUrl, $destinationPath);
     } catch (Exception $e) {
-        gestion_message("Erreur : " . $e->getMessage(), ERROR);
-        Html::back();
-        exit;
+        /*
+         * Un bon supprimé de SharePoint (ou une source injoignable) est traité
+         * plus bas comme une source introuvable : une page de remplacement en
+         * tiendra lieu. La cause est journalisée ici.
+         */
+        if (class_exists('PluginGestionLogger')) {
+            PluginGestionLogger::warning('signature', 'BL ' . $DOC_NAME . ' (source SharePoint) : ' . $e->getMessage());
+        }
     }
 
     // Vérifiez que le PDF source existe
@@ -313,10 +322,40 @@ if ($existingPdfPath === '' && $DOC->save == "Sage"){ //Récup BL depuis Sage
     $existingPdfPath = downloadDocument($DOC->url_bl, GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/Sage_Temp_".$nombreAleatoire.".pdf");
 }
 
+/*
+ * Source introuvable : supprimée de Sage / SharePoint, ou fichier local disparu.
+ *
+ * S'arrêter ici perdait la signature que le client venait de donner, et en
+ * mode combiné laissait un rapport orphelin dans RP. Le bon est donc signé
+ * QUAND MÊME : une page de remplacement — numéro, nom, ticket, signature du
+ * client — tient lieu de PDF d'origine et suit exactement le chemin d'un vrai
+ * bon : photos et PDF joint à la suite, archivage, ligne marquée signée, mails.
+ * Elle porte déjà sa signature : rien n'est tamponné dessus.
+ */
+$bl_source_missing = false;
 if (!file_exists($existingPdfPath)) {
-    gestion_message("Le fichier PDF source n'existe pas.", ERROR);
-    Html::back();
-    exit;
+    if (class_exists('PluginGestionLogger')) {
+        PluginGestionLogger::warning('signature', sprintf(
+            'BL %s (source %s) : PDF source introuvable, page de remplacement generee (reference : %s)',
+            $DOC_NAME,
+            (string)($DOC->save ?? '?'),
+            (string)($DOC->url_bl ?? '')
+        ));
+    }
+    $existingPdfPath = pluginGestionMissingBlPage(
+        $DOC,
+        $signaturePath,
+        (string)$NAME,
+        ((int)$tech_id > 0 ? getUserName($tech_id) : (string)$TECHNICIAN_INPUT),
+        ['counter_invoice' => !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1,
+         'comment'         => trim((string)($_POST['comment'] ?? ''))]
+    );
+    if ($existingPdfPath === null) {
+        gestion_message("Le fichier PDF source n'existe pas et la page de remplacement n'a pas pu être générée.", ERROR);
+        Html::back();
+        exit;
+    }
+    $bl_source_missing = true;
 }
 
 ob_end_clean(); // Vide le tampon de sortie
@@ -334,7 +373,9 @@ try {
         $pdf->useTemplate($tplIdx, 0, 0);
 
         // --- Tampon "Facture payée en magasin" sur chaque page si réglée en comptoir ---
-        if (!empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1) { // NEW
+        // Jamais sur la page de remplacement : elle porte déjà sa mention de
+        // règlement, et ce tampon est calé sur la mise en page du vrai bon.
+        if (!$bl_source_missing && !empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1) { // NEW
             if (!empty($config->fields['CounterInvoicePdf']) && (int)$config->fields['CounterInvoicePdf'] === 1 && !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1) {
                 // Date/heure du règlement : utilise ta valeur si dispo, sinon l'instant
             $paymentDateTime = isset($paymentDateTime) && $paymentDateTime ? $paymentDateTime : date('d/m/Y H:i');
@@ -377,7 +418,8 @@ try {
         // --- fin tampon ---
 
         // Si c'est la page cible, ajoutez la signature
-        if ($i === $targetPage) {
+        // (pas sur la page de remplacement : elle porte déjà la sienne)
+        if ($i === $targetPage && !$bl_source_missing) {
             // Ajouter la signature en bas à gauche
             $pdf->Image($signaturePath, $config->fields['SignatureX'], $pdf->GetPageHeight() - $config->fields['SignatureY'], $config->fields['SignatureSize']); // Ajustez la position et la taille
 
@@ -681,6 +723,9 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         if ($hasComment) {
             $ValueForSigned .= " <br><br> Commentaire : " . $rawComment;
         }
+        if ($bl_source_missing) {
+            $ValueForSigned .= " <br><br> Le PDF d'origine du bon était introuvable à la signature : une page de remplacement (numéro, nom, signature) en tient lieu.";
+        }
             if (!$combined_mode) {
                 if (!empty($config->fields['ZenDocMail'])){ 
                     $sharepoint->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
@@ -706,7 +751,9 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     }
     // ENVOIE DES MAILS
     
-    if($config->ConfigModes() == 0){
+    // Source introuvable : rien à supprimer — `$existingPdfPath` désigne alors la
+    // page de remplacement temporaire, effacée en fin de traitement.
+    if($config->ConfigModes() == 0 && !$bl_source_missing){
         if($DOC->save == "SharePoint"){
             try {
                 $folderPathFile = ""; // Par défaut, $folderPath est vide
@@ -859,13 +906,23 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         if ($DB->update('glpi_plugin_gestion_surveys', $updateFinal, ['id' => $id_document])) {            //unlink($existingPdfPath);
             unlink($signaturePath);
             if ($combined_mode) {
-                $GLOBALS['GESTION_LAST_SIGNED_BL_PDF'] = $outputPathTemp;
+                $GLOBALS['GESTION_LAST_SIGNED_BL_PDF']            = $outputPathTemp;
+                $GLOBALS['GESTION_LAST_SIGNED_BL_SOURCE_MISSING'] = $bl_source_missing;
             } else {
                 unlink($outputPathTemp);
             }
         }
 
         gestion_message('Documents : '. $DOC_NAME.' signé', INFO);
+        // En mode combiné, c'est l'orchestrateur qui l'annonce, avec le rapport.
+        // (Message d'écran seul : la cause est déjà journalisée plus haut.)
+        if ($bl_source_missing && !$combined_mode) {
+            Session::addMessageAfterRedirect(
+                "PDF d'origine introuvable pour $DOC_NAME : une page de remplacement (numéro, nom, signature) a été signée à sa place.",
+                true,
+                WARNING
+            );
+        }
 
         /*
          * Le travail est terminé : la signature ne repartira plus.
@@ -905,6 +962,11 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         }
     }
                 
+
+// La page de remplacement est un temporaire : archivée plus haut, on l'efface.
+if ($bl_source_missing && is_file($existingPdfPath)) {
+    @unlink($existingPdfPath);
+}
 
 /*}else{
     gestion_message("Erreur lors de la signature et/ou de l'enregistrement du documents : ". $DOC_NAME, ERROR);

@@ -223,6 +223,13 @@ function gestionAfterSubmit(form) {
     * l'écouteur global voit lui aussi cet envoi (les deux formulaires portent
     * le nom `formReport`). Sans lui, deux rechargements concurrents seraient
     * programmés sur la même page.
+    *
+    * Le module de file hors-ligne (`gestion_outbox.js` / `rp_outbox.js`)
+    * pose ce témoin dès son chargement et ne le rend jamais : quand il est
+    * présent, c'est LUI qui retire le voile et recharge la page, que l'envoi
+    * soit intercepté ou laissé au navigateur (cf. `nativeAfterSubmit`). Cette
+    * suite ne sert donc que sans lui — navigateur trop ancien, ou file non
+    * déclarée.
     */
    if (window.__rpReloadScheduled) {
       return;

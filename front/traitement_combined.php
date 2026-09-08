@@ -155,11 +155,19 @@ $_POST['mailtoclient'] = $client_mail_enabled;
 
 // Signer le BL via le traitement standard (en mode combine)
 $_POST['combined_mode'] = 1;
+/*
+ * Si la source du bon a disparu (supprimé de Sage / SharePoint, fichier local
+ * absent), le traitement signe une page de remplacement à sa place et le
+ * signale en retour par GESTION_LAST_SIGNED_BL_SOURCE_MISSING : les libellés
+ * et les mails ci-dessous le disent.
+ */
+unset($GLOBALS['GESTION_LAST_SIGNED_BL_PDF'], $GLOBALS['GESTION_LAST_SIGNED_BL_SOURCE_MISSING']);
 ob_start();
 include PLUGIN_GESTION_DIR . '/front/traitement.php';
 ob_end_clean();
 
-$bl_signed_pdf = $GLOBALS['GESTION_LAST_SIGNED_BL_PDF'] ?? '';
+$bl_signed_pdf     = $GLOBALS['GESTION_LAST_SIGNED_BL_PDF'] ?? '';
+$bl_source_missing = !empty($GLOBALS['GESTION_LAST_SIGNED_BL_SOURCE_MISSING']);
 if (empty($bl_signed_pdf) || !file_exists($bl_signed_pdf)) {
    if (!empty($rp_pdf) && file_exists($rp_pdf)) {
       @unlink($rp_pdf);
@@ -249,7 +257,9 @@ if ($rp_doc_id > 0 && file_exists($mergedPath) && filesize($mergedPath) > 0) {
       // change : le fichier telecharge garde le nom du bon, sur lequel d'autres
       // traitements s'appuient.
       if ($doc_name !== '' && stripos($doc_name, 'rapport') === false) {
-         $DB->update('glpi_documents', ['name' => $doc_name . ' + Rapport'], ['id' => $bl_doc_id]);
+         // Le nom dit quand le bon est une page de remplacement.
+         $suffix = $bl_source_missing ? ' + Rapport (BL : page de remplacement)' : ' + Rapport';
+         $DB->update('glpi_documents', ['name' => $doc_name . $suffix], ['id' => $bl_doc_id]);
       }
 
       if ($DB->tableExists('glpi_plugin_rp_cridetails')) {
@@ -283,6 +293,9 @@ if (!empty($config->fields['ZenDocMail'])) {
    $doc_name = isset($_POST['DOC']) ? $_POST['DOC'] : '';
    $related  = $bl_row['relatedInvoiceToBL'] ?? '';
    $msg = "BL signé + Rapport d'intervention : $doc_name<br><br>Ticket ID : $ticket_id";
+   if ($bl_source_missing) {
+      $msg .= "<br><br>Le PDF d'origine du bon était introuvable à la signature : une page de remplacement (numéro, nom, signature) en tient lieu.";
+   }
    if (!empty($related)) {
       $msg .= "<br><br>Documents/Informations associé au bon de livraison : $related";
    }
@@ -300,7 +313,15 @@ if (!empty($config->fields['ZenDocMail'])) {
    );
 }
 
-gestion_combined_message("BL + Rapport signés et fusionnés.", INFO);
+if ($bl_source_missing) {
+   gestion_combined_message(
+      "BL + Rapport signés et fusionnés. Le PDF d'origine du bon " . (string)($_POST['DOC'] ?? '')
+      . " était introuvable (Sage / SharePoint / local) : une page de remplacement (numéro, nom, signature) en tient lieu.",
+      WARNING
+   );
+} else {
+   gestion_combined_message("BL + Rapport signés et fusionnés.", INFO);
+}
 
 /*
  * Le travail est terminé : la signature ne repartira plus.

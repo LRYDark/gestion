@@ -306,10 +306,12 @@ if (!$bl_only && (empty($rp_pdf) || !file_exists($rp_pdf))) {
 }
 
 // ---- 2. Signer chaque BL (photos/PDF joint sur le 1er seulement) ----
-$signed_bl_pdfs = [];
-$failed_bls     = [];
+$signed_bl_pdfs  = [];
+$failed_bls      = [];   // id => nom : aucun document n'a pu etre produit
+$substituted_bls = [];   // noms : PDF d'origine introuvable, page de remplacement signee
 $first = true;
 foreach ($valid_bls as $DOC) {
+   $meta   = [];
    $signed = pluginGestionRenderSignedBl(
       $DOC,
       $signaturePath,
@@ -317,29 +319,44 @@ foreach ($valid_bls as $DOC) {
       $tech_name,
       $first ? $photoPaths : [],
       $first ? $attachedPdfPath : null,
-      ['counter_invoice' => $counter_invoice]
+      ['counter_invoice' => $counter_invoice, 'comment' => trim((string)($_POST['comment'] ?? ''))],
+      $meta
    );
    if ($signed && file_exists($signed)) {
       $signed_bl_pdfs[(int)$DOC->id] = $signed;
+      if (!empty($meta['substituted'])) {
+         $substituted_bls[] = (string)$DOC->bl;
+      }
+      // Photos et PDF joint vont au premier bon RENDU, quel qu'il soit.
+      $first = false;
    } else {
-      // Le detail (source, reference, cause) est journalise par
-      // pluginGestionRenderSignedBl ; on retient ici le nom du bon.
-      $failed_bls[] = (string)$DOC->bl;
+      // Le detail est journalise par pluginGestionRenderSignedBl ; on retient
+      // ici le bon, pour l'exclure du marquage et le nommer a l'ecran.
+      $failed_bls[(int)$DOC->id] = (string)$DOC->bl;
    }
-   $first = false;
 }
 
+/*
+ * Le rapport a joindre vient soit du generateur (mode « Rapport + BL »), soit
+ * de l'archive (mode « BL seul »). Une seule variable ensuite : la fusion, le
+ * nom du fichier et les libelles n'ont pas a savoir d'ou il sort.
+ */
+$merged_report_pdf = $bl_only ? $archived_report_pdf : $rp_pdf;
+$report_merged     = (!empty($merged_report_pdf) && file_exists($merged_report_pdf));
+
+/*
+ * Un PDF d'origine introuvable n'est plus un echec : une page de remplacement
+ * a ete signee a sa place (cf. pluginGestionRenderSignedBl). On n'arrive donc
+ * ici que si AUCUN document n'a pu etre produit — PDF illisible, page de
+ * remplacement impossible — auquel cas il n'y a rien a fusionner.
+ */
 if (empty($signed_bl_pdfs)) {
    @unlink($signaturePath);
    if ($rp_repointed && !empty($rp_pdf) && file_exists($rp_pdf)) { @unlink($rp_pdf); }
-   /*
-    * Message nomme : « Signature des BL impossible » ne disait ni quel bon ni
-    * pourquoi. Sur un ticket a plusieurs bons, il fallait deviner.
-    */
    gestion_multi_message(
-      "Signature impossible : le document source est introuvable pour "
+      "Signature impossible : aucun document n'a pu etre produit pour "
       . implode(', ', $failed_bls)
-      . ". Il a probablement ete supprime de sa source (Sage / SharePoint / local).",
+      . ". Voir le journal plugin-gestion.log.",
       ERROR
    );
    Html::back();
@@ -347,10 +364,19 @@ if (empty($signed_bl_pdfs)) {
 }
 
 if (!empty($failed_bls)) {
-   // Echec PARTIEL : les autres bons sont signes, celui-ci ne l'est pas et
-   // reste donc en attente. Le dire, sinon il passe inapercu.
+   // Echec PARTIEL : ces bons restent non signes (exclus du marquage, etape 6).
    gestion_multi_message(
-      "Document source introuvable, ces bons n'ont pas ete signes : " . implode(', ', $failed_bls),
+      "Aucun document n'a pu etre produit, ces bons n'ont pas ete signes : " . implode(', ', $failed_bls),
+      WARNING
+   );
+}
+
+if (!empty($substituted_bls)) {
+   // Le lot continue ; le dire, pour que la page de remplacement ne passe pas
+   // pour le vrai bon.
+   gestion_multi_message(
+      "PDF d'origine introuvable, une page de remplacement (numero, nom, signature) a ete signee pour : "
+      . implode(', ', $substituted_bls),
       WARNING
    );
 }
@@ -364,14 +390,6 @@ if (!empty($failed_bls)) {
  * qui ment sur son contenu, et c'est ce que le technicien lit avant de
  * l'envoyer au client.
  */
-/*
- * Le rapport a joindre vient soit du generateur (mode « Rapport + BL »), soit
- * de l'archive (mode « BL seul »). Une seule variable ensuite : la fusion, le
- * nom du fichier et les libelles n'ont pas a savoir d'ou il sort.
- */
-$merged_report_pdf = $bl_only ? $archived_report_pdf : $rp_pdf;
-$report_merged     = (!empty($merged_report_pdf) && file_exists($merged_report_pdf));
-
 $merged_prefix = $report_merged ? 'BL_Rapport_T' : 'BL_T';
 $mergedPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/" . $merged_prefix . $ticket_id . "_" . date('Ymd_His') . ".pdf";
 try {
@@ -574,6 +592,10 @@ if ($report_merged && $rp_doc_id > 0 && $merged_doc_id > 0
 $now = date('Y-m-d H:i:s');
 $rawComment = trim($_POST['comment'] ?? '');
 foreach ($valid_bls as $DOC) {
+   // Aucun document produit pour ce bon : il reste non signe, a refaire.
+   if (isset($failed_bls[(int)$DOC->id])) {
+      continue;
+   }
    $update = [
       'signed'    => 1,
       'doc_date'  => $now,
@@ -599,8 +621,11 @@ if ($client_mail_enabled == 1 && !empty($config->fields['MailTo'])
    $sharepoint->MailSend($client_email, $config->fields['gabarit'], $mergedPath, "Mail envoye a " . $client_email, null, null, null, null);
 }
 if (!empty($config->fields['ZenDocMail'])) {
-   $bl_list = implode(', ', array_map(fn($d) => $d->bl, $valid_bls));
+   $bl_list = implode(', ', array_map(fn($d) => $d->bl, array_filter($valid_bls, fn($d) => !isset($failed_bls[(int)$d->id]))));
    $msg = ($report_merged ? "BL signes + Rapport d'intervention." : "BL signes.") . "<br><br>Ticket ID : $ticket_id<br><br>BL : $bl_list";
+   if (!empty($substituted_bls)) {
+      $msg .= "<br><br>PDF d'origine introuvable, page de remplacement signee pour : " . implode(', ', $substituted_bls);
+   }
    $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $mergedPath, "Envoye vers ZenDoc", null, null, null, null, ($report_merged ? "BL + Rapport signes" : "BL signes"), $msg);
 }
 
@@ -609,8 +634,7 @@ if (!empty($config->fields['ZenDocMail'])) {
 foreach ($signed_bl_pdfs as $p) { if (file_exists($p)) { @unlink($p); } }
 if ($rp_repointed && !empty($rp_pdf) && file_exists($rp_pdf)) { @unlink($rp_pdf); }
 if ($attachedPdfPath && file_exists($attachedPdfPath)) { @unlink($attachedPdfPath); }
-
-gestion_multi_message(count($valid_bls) . ($report_merged ? " BL + Rapport signes et fusionnes." : " BL signes et fusionnes."), INFO);
+gestion_multi_message(count($signed_bl_pdfs) . ($report_merged ? " BL + Rapport signes et fusionnes." : " BL signes et fusionnes."), INFO);
 
 /*
  * Le travail est terminé : la signature ne repartira plus.

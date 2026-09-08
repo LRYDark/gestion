@@ -28,7 +28,9 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
     * @param string               $techName      Nom du technicien a afficher.
     * @param array                $photoPaths    Chemins d'images JPG deja decodees (optionnel).
     * @param string|null          $attachedPdfPath Chemin d'un PDF joint deja decode (optionnel).
-    * @param array                $opts          ['counter_invoice'=>bool, 'payment_datetime'=>string]
+    * @param array                $opts          ['counter_invoice'=>bool, 'payment_datetime'=>string, 'comment'=>string]
+    * @param array|null           $meta          Rempli en retour : ['substituted' => true] quand le PDF
+    *                                            source manquait et qu'une page de remplacement en tient lieu.
     *
     * @return string|null Chemin du PDF signe temporaire, ou null si echec.
     */
@@ -39,7 +41,8 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
       string $techName,
       array $photoPaths = [],
       ?string $attachedPdfPath = null,
-      array $opts = []
+      array $opts = [],
+      ?array &$meta = null
    ): ?string {
       global $DB, $CFG_GLPI;
 
@@ -118,9 +121,12 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
                )
             );
          }
-         return null;
+         // Source injoignable : traitee comme absente, une page de
+         // remplacement en tiendra lieu (ci-dessous).
+         $existingPdfPath = '';
       }
 
+      $substituted = false;
       if (empty($existingPdfPath) || !file_exists($existingPdfPath)) {
          /*
           * On arrive ici APRES la seconde tentative : le document est donc bien
@@ -140,14 +146,28 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
             PluginGestionLogger::warning(
                'signature',
                sprintf(
-                  'BL %s (source %s) : PDF source introuvable, bon non signe (reference : %s)',
+                  'BL %s (source %s) : PDF source introuvable, page de remplacement generee (reference : %s)',
                   $DOC_NAME,
                   (string)($DOC->save ?? '?'),
                   (string)($DOC->url_bl ?? '')
                )
             );
          }
-         return null;
+         /*
+          * Le bon est signe QUAND MEME : une page generee ici — numero, nom,
+          * ticket, signature du client — tient lieu de PDF d'origine, puis suit
+          * exactement le chemin d'un vrai bon (photos, PDF joint, archivage).
+          * Le technicien garde une trace de la signature, au lieu d'un bon a
+          * resigner... contre la meme absence.
+          */
+         $existingPdfPath = pluginGestionMissingBlPage($DOC, $signaturePath, $clientName, $techName, $opts);
+         if ($existingPdfPath === null) {
+            return null;
+         }
+         $substituted = true;
+         if ($meta !== null) {
+            $meta['substituted'] = true;
+         }
       }
 
       // ---- 2. Tamponner signature / nom / date / technicien ----
@@ -163,7 +183,9 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
             $pdf->useTemplate($tplIdx, 0, 0);
 
             // Tampon "Facture payee en magasin" (optionnel, comme traitement.php)
-            if (!empty($opts['counter_invoice'])
+            // La page de remplacement porte deja sa signature et sa mention de
+            // reglement : rien n'est tamponne dessus.
+            if (!$substituted && !empty($opts['counter_invoice'])
                 && !empty($config->fields['CounterInvoice']) && (int)$config->fields['CounterInvoice'] === 1
                 && !empty($config->fields['CounterInvoicePdf']) && (int)$config->fields['CounterInvoicePdf'] === 1) {
                $paymentDateTime = !empty($opts['payment_datetime']) ? $opts['payment_datetime'] : date('d/m/Y H:i');
@@ -190,7 +212,7 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
                $pdf->SetLineWidth(0.2);
             }
 
-            if ($i === $targetPage) {
+            if ($i === $targetPage && !$substituted) {
                $pdf->Image($signaturePath, $config->fields['SignatureX'], $pdf->GetPageHeight() - $config->fields['SignatureY'], $config->fields['SignatureSize']);
 
                if (!empty($config->fields['SignataireX']) && !empty($config->fields['SignataireY'])) {
@@ -306,5 +328,170 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
       }
 
       return null;
+   }
+}
+
+if (!function_exists('pluginGestionMissingBlPage')) {
+   /**
+    * Page de remplacement d'un bon dont le PDF d'origine est introuvable.
+    *
+    * Une page A4 qui tient lieu de bon dans toute la chaine de signature :
+    * numero et nom du bon, ticket, entite, date de creation, puis la signature
+    * du client avec son nom, la date et le technicien. Elle porte DEJA sa
+    * signature : l'appelant ne la tamponne pas.
+    *
+    * @param object $DOC           Ligne glpi_plugin_gestion_surveys.
+    * @param string $signaturePath PNG de la signature deja decode.
+    * @param string $clientName    Nom du signataire.
+    * @param string $techName      Nom du technicien.
+    * @param array  $opts          ['counter_invoice'=>bool, 'comment'=>string]
+    *
+    * @return string|null Chemin du PDF temporaire, ou null si echec.
+    */
+   function pluginGestionMissingBlPage(
+      object $DOC,
+      string $signaturePath,
+      string $clientName,
+      string $techName,
+      array $opts = []
+   ): ?string {
+      global $DB;
+
+      $config  = PluginGestionConfig::getInstance();
+      $bl_name = trim((string)($DOC->bl ?? ''));
+      $bl_ref  = function_exists('pluginGestionBlNumber') ? pluginGestionBlNumber($bl_name) : '';
+      if ($bl_ref === '') {
+         $bl_ref = $bl_name;
+      }
+      $ticket_id = (int)($DOC->tickets_id ?? 0);
+      // Vide quand le bon n'a pas d'entite : la ligne n'apparait alors pas.
+      $entity    = '';
+      if ((int)($DOC->entities_id ?? 0) > 0) {
+         $row = $DB->request([
+            'SELECT' => ['name'],
+            'FROM'   => 'glpi_entities',
+            'WHERE'  => ['id' => (int)$DOC->entities_id],
+            'LIMIT'  => 1,
+         ])->current();
+         if ($row && trim((string)$row['name']) !== '') {
+            $entity = (string)$row['name'];
+         }
+      }
+      $source  = trim((string)($DOC->save ?? ''));
+      $source  = $source !== '' ? $source : 'inconnue';
+      $created = trim((string)($DOC->date_creation ?? ''));
+      $tracker = trim((string)($DOC->tracker ?? ''));
+      $comment = trim((string)($opts['comment'] ?? ''));
+      $now     = date('d/m/Y H:i');
+
+      // Polices de base FPDF : Windows-1252, d'ou la conversion des accents.
+      $enc = static function (string $s): string {
+         $out = @iconv('UTF-8', 'windows-1252//TRANSLIT', $s);
+         return $out === false ? $s : $out;
+      };
+
+      try {
+         $pdf = new Fpdi();
+         $pdf->SetMargins(15, 15, 15);
+         $pdf->AddPage();
+
+         $pdf->SetFont('Arial', 'B', 16);
+         $pdf->Cell(0, 10, $enc('Bon de livraison - page de remplacement'), 0, 1, 'C');
+         $pdf->SetFont('Arial', 'I', 10);
+         $pdf->SetTextColor(110, 110, 110);
+         $pdf->MultiCell(0, 5, $enc(
+            "Le PDF d'origine de ce bon était introuvable au moment de la signature (source : $source). "
+            . "Cette page en tient lieu et porte la signature recueillie."
+         ), 0, 'C');
+         $pdf->SetTextColor(0, 0, 0);
+         $pdf->Ln(6);
+
+         // Seules les informations connues figurent dans le tableau : un bon
+         // sans ticket, sans entite ou sans tracker n'a pas de ligne vide.
+         $rows = [
+            ['Numéro de BL', $bl_ref],
+            ['Document',     $bl_name],
+         ];
+         if ($ticket_id > 0) {
+            $rows[] = ['Ticket', '#' . $ticket_id];
+         }
+         if ($entity !== '') {
+            $rows[] = ['Entité', $entity];
+         }
+         if ($created !== '') {
+            $rows[] = ['Créé le', $created];
+         }
+         if ($tracker !== '') {
+            $rows[] = ['Tracker', $tracker];
+         }
+         foreach ($rows as [$label, $value]) {
+            $pdf->SetFont('Arial', 'B', 10);
+            $pdf->Cell(55, 8, $enc($label), 1, 0, 'L');
+            $pdf->SetFont('Arial', '', 10);
+            $pdf->Cell(0, 8, $enc($value), 1, 1, 'L');
+         }
+         $pdf->Ln(4);
+
+         if (!empty($opts['counter_invoice'])) {
+            $label = trim((string)($config->fields['CounterInvoiceText'] ?? ''));
+            $pdf->SetFont('Arial', 'B', 10);
+            $pdf->SetTextColor(46, 204, 113);
+            $pdf->Cell(0, 8, $enc(($label !== '' ? $label : 'Règlement effectué au comptoir') . ' - ' . $now), 0, 1);
+            $pdf->SetTextColor(0, 0, 0);
+            $pdf->Ln(2);
+         }
+
+         if ($comment !== '') {
+            $pdf->SetFont('Arial', 'B', 10);
+            $pdf->Cell(0, 8, $enc('Commentaire'), 0, 1);
+            $pdf->SetFont('Arial', '', 10);
+            $pdf->MultiCell(0, 6, $enc($comment), 1);
+            $pdf->Ln(4);
+         }
+
+         // Bloc signature : image a gauche, identite a droite, dans un cadre.
+         $pdf->SetFont('Arial', 'B', 11);
+         $pdf->Cell(0, 8, $enc('Signature du client'), 0, 1);
+         $top = $pdf->GetY();
+         $pdf->Rect(15, $top, 180, 55);
+         if (is_file($signaturePath)) {
+            $size = @getimagesize($signaturePath);
+            $w = 75;
+            $h = 0;
+            if ($size && $size[0] > 0 && $size[1] > 0) {
+               $h = $w * $size[1] / $size[0];
+               if ($h > 45) {
+                  $h = 45;
+                  $w = $h * $size[0] / $size[1];
+               }
+            }
+            $pdf->Image($signaturePath, 20, $top + 5, $w, $h);
+         }
+         $pdf->SetFont('Arial', '', 10);
+         $pdf->SetXY(105, $top + 8);
+         $pdf->Cell(0, 7, $enc('Nom : ' . $clientName), 0, 2);
+         $pdf->Cell(0, 7, $enc('Signé le : ' . $now), 0, 2);
+         $pdf->Cell(0, 7, $enc('Technicien : ' . $techName), 0, 2);
+
+         /*
+          * Pied de page SANS saut automatique : a 20 mm du bas, FPDF ouvre
+          * sinon une seconde page pour y poser cette seule ligne.
+          */
+         $pdf->SetAutoPageBreak(false);
+         $pdf->SetY(-20);
+         $pdf->SetFont('Arial', 'I', 8);
+         $pdf->SetTextColor(110, 110, 110);
+         $pdf->Cell(0, 5, $enc("Page générée automatiquement par GLPI (plugin Gestion) le $now, le PDF d'origine du bon n'étant pas disponible."), 0, 0, 'C');
+
+         $path = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/BL_remplacement_' . rand(1, 100000) . '_'
+               . preg_replace('/[^A-Za-z0-9_.-]/', '_', $bl_name) . '.pdf';
+         $pdf->Output('F', $path);
+         return is_file($path) ? $path : null;
+      } catch (Throwable $e) {
+         if (class_exists('PluginGestionLogger')) {
+            PluginGestionLogger::error('signature', 'BL ' . $bl_name . ' : page de remplacement impossible - ' . $e->getMessage());
+         }
+         return null;
+      }
    }
 }
