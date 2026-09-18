@@ -455,13 +455,30 @@ if (!function_exists('pluginGestionMissingBlPage')) {
          $top = $pdf->GetY();
          $pdf->Rect(15, $top, 180, 55);
          if (is_file($signaturePath)) {
+            /*
+             * Ajustée au bloc sans jamais le déborder, ratio conservé.
+             *
+             * Le cadre est un `Rect(15, $top, 180, 55)` et l'identité du
+             * signataire commence à x=105. La signature dispose donc de 20 à
+             * 100 mm (5 mm de respiration avant le texte), et de $top+5 à
+             * $top+53 (2 mm de garde avant le trait du bas).
+             *
+             * Ces bornes valaient 75 x 45 : cinq millimètres de large et huit
+             * de haut restaient inutilisés pour rien.
+             *
+             * À NE PAS CONFONDRE avec le tampon apposé sur le bon de livraison
+             * du client (plus haut dans ce fichier, et dans traitement.php) :
+             * celui-là n'a pas de cadre, sa largeur vient de la configuration
+             * `SignatureSize` et FPDF en déduit la hauteur. Ici, les deux
+             * dimensions sont bornées, rien ne peut recouvrir quoi que ce soit.
+             */
             $size = @getimagesize($signaturePath);
-            $w = 75;
+            $w = 80;
             $h = 0;
             if ($size && $size[0] > 0 && $size[1] > 0) {
                $h = $w * $size[1] / $size[0];
-               if ($h > 45) {
-                  $h = 45;
+               if ($h > 48) {
+                  $h = 48;
                   $w = $h * $size[0] / $size[1];
                }
             }

@@ -611,6 +611,18 @@ function initializeSignatureGestion(uniqId) {
     let paths = [];        // chaque trait = [{x,y} ...] en coordonnées normalisées 0..1
     let currentPath = null;
 
+    /*
+     * État du tracé en cours. Déclaré ICI et non près des gestionnaires de
+     * dessin : `adaptCanvasSize()` s'en sert pour ne pas redimensionner le
+     * canvas au milieu d'un trait, et il est appelé dès l'initialisation —
+     * bien avant le bloc « Dessin ». Une déclaration `let` plus bas le
+     * laisserait dans sa zone morte temporelle, et la première passe lèverait
+     * une ReferenceError.
+     */
+    let drawing = false;
+    let activeCanvas = null;
+    let lastNorm = null;
+
     // Événement -> coordonnées normalisées, échelle séparée par axe (anti-décalage)
     function getNorm(e, canvas) {
       const rect = canvas.getBoundingClientRect();
@@ -621,10 +633,29 @@ function initializeSignatureGestion(uniqId) {
       };
     }
 
+    /**
+     * Largeur d'AFFICHAGE du canvas, en px CSS.
+     *
+     * Le rect mesuré reste la référence pour un canvas posé dans la page : lui
+     * seul tient compte des limites du CSS, et c'est lui que `getNorm` utilise
+     * pour situer le doigt — les deux doivent parler de la même largeur.
+     *
+     * Mais le canvas d'EXPORT n'est jamais inséré dans le document : son rect
+     * vaut 0. Sans ce repli sur la largeur déclarée, `lineWidthFor` se
+     * rabattait sur `devicePixelRatio` et multipliait l'épaisseur une seconde
+     * fois — trait deux à trois fois trop gras dans le PDF sur un écran HiDPI.
+     */
+    function cssWidthOf(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width > 0) return rect.width;
+      const styled = parseFloat(canvas.style.width);
+      return styled > 0 ? styled : canvas.width;
+    }
+
     // Épaisseur en px bitmap équivalente à cssLine px CSS affichés
     function lineWidthFor(canvas, cssLine) {
-      const rect = canvas.getBoundingClientRect();
-      const s = rect.width > 0 ? canvas.width / rect.width : (window.devicePixelRatio || 1);
+      const cssWidth = cssWidthOf(canvas);
+      const s = cssWidth > 0 ? canvas.width / cssWidth : (window.devicePixelRatio || 1);
       return Math.max(1, cssLine * s);
     }
 
@@ -678,29 +709,95 @@ function initializeSignatureGestion(uniqId) {
      * s'il était « vraisemblable ». Verdict : toute hauteur DÉDUITE d'une
      * mesure finit par varier selon l'instant du chargement.
      *
-     * La zone est une bande de 120 px, point — la même valeur que la feuille
-     * de style (`.signature-sub-card .sig-base`). Ses proportions sont celles
-     * de la case du PDF : la signature s'y adapte parce qu'elle a été TRACÉE
-     * dans la bonne forme, pas parce qu'on la réduirait après coup.
+     * La zone est une bande de hauteur FIXE — les mêmes valeurs que la feuille
+     * de style (`.signature-sub-card .sig-base`), au même point de bascule.
+     *
+     * DEUX hauteurs, et c'est délibéré :
+     *
+     *   EXPORT_BASE_H — la géométrie du PNG qui part dans le PDF. Elle ne
+     *   bouge pas. Le tampon apposé sur le bon de livraison du client
+     *   (`Image($png, X, Y, SignatureSize)` dans sign_bl.core.php et
+     *   traitement.php) impose la LARGEUR et laisse FPDF déduire la hauteur du
+     *   ratio de l'image : grandir l'image, c'est la faire descendre sur le
+     *   texte du bon, qui n'a aucune place de réserve. Cette constante est
+     *   donc le contrat avec les PDF, pas un réglage d'écran.
+     *
+     *   DISPLAY_BASE_H_WIDE — la hauteur réellement affichée sur tablette et
+     *   ordinateur, où la bande de 120 px était trop plate pour signer. Le
+     *   téléphone garde 120 px : il n'a pas la place, et le rendu y convient.
+     *
+     * L'export n'est plus le canvas affiché mais un rendu hors écran à la
+     * géométrie d'export (cf. buildExportDataUrl) : la hauteur visible peut
+     * donc changer librement sans qu'aucun PDF ne bouge.
      */
-    const FIXED_BASE_H = 120;
+    const EXPORT_BASE_H = 120;
+    const DISPLAY_BASE_H_WIDE = 220;
+
+    /*
+     * Le point de bascule est interrogé, jamais mesuré sur l'élément : une
+     * hauteur déduite d'un `getBoundingClientRect` dépend de l'instant du
+     * chargement (formulaire encore caché, CSS pas encore appliqué), ce qui a
+     * déjà figé la zone dans une forme carrée par le passé. `matchMedia` donne
+     * la même réponse à tout moment, avant même le premier rendu.
+     */
+    const wideScreenMQ = window.matchMedia("(min-width: 768px)");
+    function displayBaseH() {
+      return wideScreenMQ.matches ? DISPLAY_BASE_H_WIDE : EXPORT_BASE_H;
+    }
 
     const initRect = originalCanvas.getBoundingClientRect();
     const INITIAL_BASE_W = Math.max(200, Math.round(initRect.width  || originalCanvas.clientWidth  || 320));
-    const INITIAL_BASE_H = FIXED_BASE_H;
+    const INITIAL_BASE_H = displayBaseH();
 
     function adaptCanvasSize() {
+      // Jamais au milieu d'un trait : le trait en cours n'est pas encore dans
+      // l'historique, un re-rendu l'effacerait sous le doigt.
+      if (drawing) return;
       const container = originalCanvas.closest(".signature-container") || originalCanvas.parentElement;
       if (!container) return;
       const cs = getComputedStyle(container);
       const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
       const cssW = Math.max(200, Math.floor(container.clientWidth - padX));
-      const cssH = FIXED_BASE_H;
+      const cssH = displayBaseH();
       if (parseInt(originalCanvas.style.width, 10) === cssW
           && parseInt(originalCanvas.style.height, 10) === cssH) {
         return;
       }
-      // Le bitmap est préservé : une signature déportée peut avoir été chargée en image
+
+      /*
+       * Le tracé VECTORIEL est rejoué, jamais étiré.
+       *
+       * L'ancienne reprise redessinait l'ancien bitmap aux nouvelles
+       * dimensions. Tant que seule la largeur variait, la déformation passait
+       * inaperçue ; maintenant que la HAUTEUR change aussi (bascule
+       * téléphone/ordinateur, fenêtre redimensionnée), la même opération
+       * écraserait la signature verticalement.
+       *
+       * Les coordonnées de ce moteur sont normalisées PAR AXE : les rejouer
+       * telles quelles sur une boîte d'un autre rapport les déformerait tout
+       * autant. On passe donc par le rendu ajusté, qui conserve les
+       * proportions du tracé quelle que soit la forme de la zone.
+       */
+      if (paths.length) {
+        const srcW = originalCanvas.width;
+        const srcH = originalCanvas.height;
+        setCanvasSize(originalCanvas, cssW, cssH);
+        /*
+         * L'historique est RÉÉCRIT dans le repère de la nouvelle boîte, pas
+         * seulement redessiné dedans. Les coordonnées de ce moteur n'ont de
+         * sens que rapportées à la zone qui les a reçues : les laisser dans
+         * l'ancien repère alors que les traits suivants seraient normalisés
+         * dans le nouveau mélangerait deux référentiels, et la signature se
+         * disloquerait au trait d'après.
+         */
+        refitPathsToBox(originalCanvas, srcW, srcH);
+        renderHistoryOn(originalCanvas, originalCtx, BASE_EXPORT_LINE);
+        return;
+      }
+
+      // Pas d'historique : la signature vient d'une IMAGE (rejeu hors-ligne,
+      // signature déportée). On la replace sans la déformer — à ses
+      // proportions, centrée — plutôt que de l'étirer sur la nouvelle boîte.
       const backup = document.createElement("canvas");
       backup.width  = originalCanvas.width;
       backup.height = originalCanvas.height;
@@ -708,12 +805,220 @@ function initializeSignatureGestion(uniqId) {
       if (hasBitmap) backup.getContext("2d").drawImage(originalCanvas, 0, 0);
       setCanvasSize(originalCanvas, cssW, cssH);
       if (hasBitmap) {
-        originalCtx.setTransform(1, 0, 0, 1, 0, 0);
-        originalCtx.imageSmoothingEnabled = true;
-        originalCtx.imageSmoothingQuality = "high";
-        originalCtx.drawImage(backup, 0, 0, backup.width, backup.height,
-                                      0, 0, originalCanvas.width, originalCanvas.height);
+        drawImageContained(originalCtx, backup, originalCanvas.width, originalCanvas.height);
       }
+    }
+
+    /**
+     * Dessine une source dans une boîte SANS la déformer : facteur unique,
+     * résultat centré. Le reste de la boîte demeure transparent.
+     */
+    function drawImageContained(ctx, source, boxW, boxH) {
+      const sw = source.width, sh = source.height;
+      if (!(sw > 0 && sh > 0 && boxW > 0 && boxH > 0)) return;
+      const factor = Math.min(boxW / sw, boxH / sh);
+      const dw = Math.max(1, Math.round(sw * factor));
+      const dh = Math.max(1, Math.round(sh * factor));
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(source, 0, 0, sw, sh,
+                    Math.round((boxW - dw) / 2), Math.round((boxH - dh) / 2), dw, dh);
+    }
+
+    /**
+     * Rejoue l'historique sur une zone d'un AUTRE rapport, sans déformer.
+     *
+     * Ce moteur normalise les coordonnées par axe (`x / largeur`,
+     * `y / hauteur`) : elles ne décrivent donc une forme qu'accompagnées des
+     * dimensions de la zone où elles ont été tracées. `renderHistoryOn()` les
+     * rejoue sur la boîte courante et convient tant que la zone garde son
+     * rapport — ce qui était le cas tant que la bande faisait toujours 120 px.
+     *
+     * Dès que la zone d'affichage et la zone d'export diffèrent, il faut
+     * repasser par l'espace en pixels de la SOURCE, mesurer l'encombrement
+     * réel du tracé, puis le ramener d'un SEUL facteur — jamais deux échelles
+     * distinctes, sinon la signature s'aplatit — et le centrer.
+     *
+     * Le facteur est plafonné au report direct : une signature qui tient déjà
+     * n'est pas agrandie (un simple point ne devient pas un pâté), on ne
+     * réduit que ce qui déborderait.
+     */
+    function fitTransform(canvas, srcW, srcH) {
+      if (!paths.length || !(srcW > 0) || !(srcH > 0)
+          || !(canvas.width > 0) || !(canvas.height > 0)) {
+        return null;
+      }
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const path of paths) {
+        for (const q of path) {
+          const px = q.x * srcW, py = q.y * srcH;
+          if (px < minX) minX = px;
+          if (px > maxX) maxX = px;
+          if (py < minY) minY = py;
+          if (py > maxY) maxY = py;
+        }
+      }
+      if (!isFinite(minX)) return null;
+
+      const padX = canvas.width  * 0.04;
+      const padY = canvas.height * 0.06;
+      const availW = Math.max(1, canvas.width  - 2 * padX);
+      const availH = Math.max(1, canvas.height - 2 * padY);
+      const bw = Math.max(maxX - minX, 1e-6);
+      const bh = Math.max(maxY - minY, 1e-6);
+
+      const naturalFactor = canvas.width / srcW; // report direct, sans retouche
+      const factor = Math.min(availW / bw, availH / bh, naturalFactor);
+
+      return {
+        factor: factor,
+        offX: (canvas.width  - bw * factor) / 2 - minX * factor,
+        offY: (canvas.height - bh * factor) / 2 - minY * factor
+      };
+    }
+
+    /**
+     * Réécrit l'historique dans le repère de `canvas`, à ses proportions.
+     *
+     * Destructif, et c'est le but : après l'appel, les coordonnées sont
+     * normalisées sur la NOUVELLE boîte, exactement comme le seraient des
+     * traits qu'on y dessinerait maintenant. Les deux se mélangent alors sans
+     * risque — ce qui n'est pas le cas d'un simple redessin ajusté.
+     */
+    function refitPathsToBox(canvas, srcW, srcH) {
+      const t = fitTransform(canvas, srcW, srcH);
+      if (!t) return;
+      const invW = 1 / canvas.width;
+      const invH = 1 / canvas.height;
+      for (const path of paths) {
+        for (const q of path) {
+          q.x = (q.x * srcW * t.factor + t.offX) * invW;
+          q.y = (q.y * srcH * t.factor + t.offY) * invH;
+        }
+      }
+    }
+
+    /* ------------------------------------------------------------------
+     * PNG destiné au PDF : recadré sur le TRACÉ, pas sur la zone de dessin.
+     *
+     * Le PDF ajuste l'image reçue dans une case en conservant son rapport.
+     * Tant qu'on lui envoyait la bande entière, la signature n'en occupait
+     * qu'un îlot central : le PDF réduisait aussi les MARGES BLANCHES, qui
+     * mangeaient la case. En n'envoyant que le tracé, c'est lui qui la remplit.
+     *
+     * Le résultat ne dépend alors plus du tout de la hauteur de la zone de
+     * dessin : 120 ou 220 px, le PDF est le même.
+     * ------------------------------------------------------------------ */
+
+    /*
+     * Le PNG n'est jamais plus « haut » que ce rapport : au besoin on ajoute
+     * des marges LATÉRALES (jamais verticales).
+     *
+     * C'est la protection du tampon apposé sur le bon de livraison du client
+     * (sign_bl.core.php, traitement.php). Là, FPDF reçoit une largeur et
+     * DÉDUIT la hauteur du rapport de l'image : une image plus haute descend
+     * sur le texte du bon, qui n'a aucune réserve. Avec ce plafond la hauteur
+     * du tampon ne dépasse jamais 0,313 fois la largeur configurée — soit
+     * MOINS que les 0,316 déjà produits aujourd'hui par une signature prise
+     * sur téléphone. Le gabarit encaisse donc déjà ce cas de figure.
+     */
+    const EXPORT_MIN_RATIO = 3.2;
+
+    /*
+     * Largeur du PNG produit. Le tracé étant revectorisé (et non
+     * ré-échantillonné), viser large ne coûte qu'un peu de mémoire.
+     */
+    const EXPORT_TARGET_W = 1200;
+
+    /*
+     * Largeur minimale du cadre, en fraction de la zone de dessin. Sans elle,
+     * un point posé par mégarde deviendrait sa propre image et le PDF
+     * l'agrandirait jusqu'à remplir la case. Une vraie signature, qui occupe
+     * 80 à 90 % de la zone, n'est pas concernée.
+     */
+    const EXPORT_MIN_SPAN = 0.45;
+
+    /**
+     * Encombrement du tracé, en PIXELS de la zone de dessin.
+     *
+     * Ce moteur normalise par axe : les coordonnées ne décrivent une forme
+     * qu'accompagnées des dimensions de leur zone. On repasse donc par les
+     * pixels avant toute mesure. Le demi-trait est inclus, sans quoi le
+     * recadrage couperait la moitié du trait de bord.
+     */
+    function inkBoundsPx() {
+      const srcW = originalCanvas.width, srcH = originalCanvas.height;
+      if (!paths.length || !(srcW > 0) || !(srcH > 0)) return null;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const path of paths) {
+        for (const q of path) {
+          const px = q.x * srcW, py = q.y * srcH;
+          if (px < minX) minX = px;
+          if (px > maxX) maxX = px;
+          if (py < minY) minY = py;
+          if (py > maxY) maxY = py;
+        }
+      }
+      if (!isFinite(minX)) return null;
+
+      const strokePx = lineWidthFor(originalCanvas, BASE_EXPORT_LINE);
+      const pad = strokePx / 2 + 0.008 * srcW;
+      minX -= pad; maxX += pad;
+      minY -= pad; maxY += pad;
+
+      const span = maxX - minX;
+      const minSpan = EXPORT_MIN_SPAN * srcW;
+      if (span < minSpan) {
+        const grow = (minSpan - span) / 2;
+        minX -= grow; maxX += grow;
+      }
+      return { minX: minX, minY: minY, maxX: maxX, maxY: maxY, strokePx: strokePx };
+    }
+
+    function buildExportDataUrl() {
+      // Signature reçue en IMAGE (rejeu hors-ligne) : aucun tracé à recadrer,
+      // on rend le canvas tel quel, comme auparavant.
+      if (!paths.length) {
+        return originalCanvas.toDataURL();
+      }
+
+      const b = inkBoundsPx();
+      if (!b) return originalCanvas.toDataURL();
+
+      const bw = b.maxX - b.minX;
+      const bh = b.maxY - b.minY;
+      if (!(bw > 0) || !(bh > 0)) return originalCanvas.toDataURL();
+
+      const pngRatio = Math.max(bw / bh, EXPORT_MIN_RATIO);
+      const outW = EXPORT_TARGET_W;
+      const outH = Math.max(1, Math.round(outW / pngRatio));
+
+      const out = document.createElement("canvas");
+      out.width = outW;
+      out.height = outH;
+      const ctx = out.getContext("2d");
+
+      // Le tracé remplit la HAUTEUR et se centre horizontalement : quand le
+      // plafond a élargi le cadre, ce sont bien deux marges latérales égales.
+      const scale = outH / bh;
+      const offX = (outW - bw * scale) / 2 - b.minX * scale;
+      const offY = -b.minY * scale;
+      const srcW = originalCanvas.width, srcH = originalCanvas.height;
+
+      setupStroke(ctx, Math.max(1, b.strokePx * scale));
+      for (const path of paths) {
+        if (path.length < 2) continue;
+        ctx.beginPath();
+        ctx.moveTo(path[0].x * srcW * scale + offX, path[0].y * srcH * scale + offY);
+        for (let i = 1; i < path.length; i++) {
+          ctx.lineTo(path[i].x * srcW * scale + offX, path[i].y * srcH * scale + offY);
+        }
+        ctx.stroke();
+      }
+      return out.toDataURL();
     }
 
     setCanvasSize(originalCanvas, INITIAL_BASE_W, INITIAL_BASE_H);
@@ -723,6 +1028,18 @@ function initializeSignatureGestion(uniqId) {
       new ResizeObserver(() => adaptCanvasSize()).observe(baseContainer);
     }
     window.addEventListener("load", adaptCanvasSize);
+
+    /*
+     * Bascule téléphone <-> ordinateur : la hauteur affichée change, le canvas
+     * doit suivre immédiatement. Le `ResizeObserver` ci-dessus ne voit que la
+     * LARGEUR du conteneur — inchangée quand seule la requête média bascule
+     * (fenêtre étirée en hauteur, écran externe, rotation d'une tablette).
+     */
+    if (typeof wideScreenMQ.addEventListener === "function") {
+      wideScreenMQ.addEventListener("change", adaptCanvasSize);
+    } else if (typeof wideScreenMQ.addListener === "function") {
+      wideScreenMQ.addListener(adaptCanvasSize); // Safari < 14
+    }
 
     // ---------- Modale : taille d'après le rect réel du wrapper ----------
     const isMobilePhone = () => Math.min(window.innerWidth, window.innerHeight) <= 768;
@@ -745,7 +1062,7 @@ function initializeSignatureGestion(uniqId) {
        */
       const bandRatio = Math.max(
         1.5,
-        (parseInt(originalCanvas.style.width, 10) || INITIAL_BASE_W) / FIXED_BASE_H
+        (parseInt(originalCanvas.style.width, 10) || INITIAL_BASE_W) / displayBaseH()
       );
       if (w / h > bandRatio) w = Math.floor(h * bandRatio); else h = Math.floor(w / bandRatio);
       setCanvasSize(modalCanvas, w, h);
@@ -770,9 +1087,9 @@ function initializeSignatureGestion(uniqId) {
     }
 
     // ---------- Dessin ----------
-    let drawing = false;
-    let activeCanvas = null;
-    let lastNorm = null;
+    // `drawing`, `activeCanvas` et `lastNorm` sont déclarés en tête du moteur
+    // (cf. le commentaire là-bas) : adaptCanvasSize() les lit dès la première
+    // passe, bien avant ce bloc.
 
     function start(e, canvas) {
       e.preventDefault();
@@ -921,7 +1238,9 @@ function initializeSignatureGestion(uniqId) {
     if (submitBtn && hiddenArea && !submitBtn.dataset.sigInit) {
       submitBtn.dataset.sigInit = "1";
       submitBtn.addEventListener("click", function () {
-        hiddenArea.value = originalCanvas.toDataURL();
+        // Jamais le canvas affiché : cf. buildExportDataUrl(). La zone visible
+        // est plus haute sur tablette et ordinateur, le PNG du PDF ne l'est pas.
+        hiddenArea.value = buildExportDataUrl();
       });
     }
 

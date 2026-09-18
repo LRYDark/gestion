@@ -482,12 +482,37 @@
     position: relative;
 }
 
+/*
+ * Bande a signer, hauteur FIXE.
+ *
+ * Ces valeurs DOIVENT rester identiques a celles du moteur JS
+ * (EXPORT_BASE_H et DISPLAY_BASE_H_WIDE dans scripts_gestion.js), au meme
+ * point de bascule : le JS dimensionne le bitmap du canvas, le CSS sa boite.
+ * Deux hauteurs differentes, et le navigateur etire le bitmap sur la boite —
+ * la signature apparait ecrasee.
+ *
+ * Telephone : 120 px, la hauteur historique. Pas la place de faire mieux, et
+ * le rendu y convient.
+ * Tablette et ordinateur : 220 px. La bande de 120 px y etait trop plate pour
+ * signer confortablement au stylet ou a la souris.
+ *
+ * Agrandir cette zone ne touche AUCUN PDF : l'export est un rendu hors ecran
+ * a la geometrie d'origine (cf. buildExportDataUrl). C'est ce qui protege le
+ * tampon appose sur le bon de livraison du client, dont FPDF deduit la
+ * hauteur du ratio de l'image.
+ */
 .signature-sub-card .sig-base {
     width: 100%;
-    height: 120px; /* bande a signer, hauteur FIXE — même valeur que FIXED_BASE_H du moteur JS. Les proportions du tracé sont celles de la case du PDF : la signature y rentre parce qu elle a été tracée dans la bonne forme. */
+    height: 120px;
     border: 2px solid #007bff;
     background: white;
     display: block;
+}
+
+@media (min-width: 768px) {
+    .signature-sub-card .sig-base {
+        height: 220px;
+    }
 }
 
 /* Bouton Agrandir - EN HAUT À DROITE DU CANVAS */
