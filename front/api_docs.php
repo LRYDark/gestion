@@ -281,6 +281,35 @@ curl -X GET "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/ticket
   -H "Authorization: Bearer &lt;token&gt;" -H "Accept: application/json"</code></pre>
   </div>
 
+  <div class="doc-card" data-doc-item data-search="bl_tracker tracker bl lecture seule read only refresh sage glpi source bl_not_found sage_error">
+    <div class="doc-meta">GET <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/bl_tracker.php', ENT_QUOTES); ?></div>
+    <h4>`bl_tracker.php`</h4>
+    <p><?php echo __('Retourne uniquement le tracker d’un BL. Lecture seule : contrairement à `bl_prepare.php`, rien n’est écrit en base.', 'gestion'); ?></p>
+    <div class="doc-note">
+      <span class="method method-get">GET</span>
+      <?php echo __('`bl` dans l’URL (`BL202852` ou `202852`). Le tracker déjà enregistré dans GLPI est renvoyé en priorité (`source: glpi`), sinon il est lu dans le PDF Sage (`source: sage`). `refresh=1` force la lecture Sage. `tracker: null` = le PDF ne contient pas de ligne « Tracker : ».', 'gestion'); ?>
+    </div>
+    <table class="doc-table">
+      <thead><tr><th><?php echo __('Code', 'gestion'); ?></th><th><?php echo __('Cas', 'gestion'); ?></th></tr></thead>
+      <tbody>
+        <tr><td><code>200</code></td><td><?php echo __('Tracker trouvé (ou `null` s’il est absent du PDF)', 'gestion'); ?></td></tr>
+        <tr><td><code>401</code></td><td><?php echo __('Authentification refusée', 'gestion'); ?></td></tr>
+        <tr><td><code>404</code></td><td><code>bl_not_found</code> — <?php echo __('BL inconnu dans Sage', 'gestion'); ?></td></tr>
+        <tr><td><code>422</code></td><td><code>missing_bl</code> / <code>invalid_bl_format</code></td></tr>
+        <tr><td><code>502</code></td><td><code>sage_error</code> — <?php echo __('Sage injoignable ou en erreur', 'gestion'); ?></td></tr>
+      </tbody>
+    </table>
+    <pre><code># Construction de l'URL
+<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/bl_tracker.php?bl=BL202852', ENT_QUOTES); ?>
+
+# curl
+curl -X GET "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/bl_tracker.php?bl=BL202852', ENT_QUOTES); ?>" \
+  -H "Authorization: Bearer &lt;token&gt;" -H "Accept: application/json"
+
+# Réponse
+{"ok":true,"bl":"BL202852","tracker":"PI + EC","source":"glpi"}</code></pre>
+  </div>
+
   <div class="doc-card" data-doc-item data-search="device_poll_v2 device_submit_v2 device_refuse_v2 device_checkin device_direct_sign device_send_invoice facture scan document mail envoi invoice kiosk borne x-device-serial">
     <div class="doc-meta">KIOSQUE (auth X-Device-Serial)</div>
     <h4>Endpoints borne</h4>

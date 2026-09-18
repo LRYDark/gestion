@@ -198,6 +198,7 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
       $api_pattern_sign         = '#^/api/bl_sign\.php(?:/.*)?$#';
       $api_pattern_combined     = '#^/api/combined_sign\.php(?:/.*)?$#';
       $api_pattern_ticket_bls   = '#^/api/ticket_bls\.php(?:/.*)?$#';
+      $api_pattern_bl_tracker   = '#^/api/bl_tracker\.php(?:/.*)?$#';
 
       // ── Endpoints device kiosque (app APPAPPLETAB) ────────────────────────
       $api_pattern_checkin      = '#^/api/device_checkin\.php(?:/.*)?$#';
@@ -212,6 +213,7 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
          $api_pattern_sign,
          $api_pattern_combined,
          $api_pattern_ticket_bls,
+         $api_pattern_bl_tracker,
          $api_pattern_checkin,
          $api_pattern_poll_v2,
          $api_pattern_submit_v2,
