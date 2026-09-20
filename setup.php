@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.8.1'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.8.2'); // version du plugin
 
 /**
  * Révision des fichiers JS/CSS.
@@ -199,6 +199,7 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
       $api_pattern_combined     = '#^/api/combined_sign\.php(?:/.*)?$#';
       $api_pattern_ticket_bls   = '#^/api/ticket_bls\.php(?:/.*)?$#';
       $api_pattern_bl_tracker   = '#^/api/bl_tracker\.php(?:/.*)?$#';
+      $api_pattern_transport    = '#^/api/bl_transport_dispatch\.php(?:/.*)?$#';
 
       // ── Endpoints device kiosque (app APPAPPLETAB) ────────────────────────
       $api_pattern_checkin      = '#^/api/device_checkin\.php(?:/.*)?$#';
@@ -214,6 +215,7 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
          $api_pattern_combined,
          $api_pattern_ticket_bls,
          $api_pattern_bl_tracker,
+         $api_pattern_transport,
          $api_pattern_checkin,
          $api_pattern_poll_v2,
          $api_pattern_submit_v2,

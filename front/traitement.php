@@ -17,6 +17,19 @@ $sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 $doc = new Document();
 $combined_mode = !empty($_POST['combined_mode']);
+$is_transport_dispatch = false;
+if (!empty($_POST['transport_dispatch'])) {
+    $provided = (string)($_POST['transport_dispatch_token'] ?? '');
+    $expected = (string)($_SESSION['gestion_transport_dispatch_token'] ?? '');
+    unset($_SESSION['gestion_transport_dispatch_token']);
+    if ($provided === '' || $expected === '' || !hash_equals($expected, $provided)) {
+        http_response_code(403);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['ok' => false, 'error' => 'invalid_transport_dispatch_token']);
+        exit;
+    }
+    $is_transport_dispatch = true;
+}
 
 /*
  * Signature différée : ne pas signer DEUX FOIS le même bon.
@@ -78,6 +91,13 @@ if (!$combined_mode && class_exists('PluginGestionOfflinequeue')) {
 // Ensure optional columns exist in surveys table
 try {
     $table = 'glpi_plugin_gestion_surveys';
+    $migration182 = PLUGIN_GESTION_DIR . '/install/update_181_182.php';
+    if (is_file($migration182)) {
+        require_once $migration182;
+        if (function_exists('update_181_182')) {
+            update_181_182();
+        }
+    }
     $chk = $DB->doQuery("SHOW COLUMNS FROM `$table` LIKE 'tech_ext'");
     if ($chk && $DB->numrows($chk) === 0) {
         @$DB->doQuery("ALTER TABLE `$table` ADD COLUMN `tech_ext` VARCHAR(255) NULL AFTER `users_ext`");
@@ -180,6 +200,17 @@ $NAME = $_POST['name'];
 $TECHNICIAN_INPUT = isset($_POST['technician']) ? trim($_POST['technician']) : '';
 $REPORT_ID = isset($_POST['REPORT_ID']) ? (int)$_POST['REPORT_ID'] : 0; // 0 = quick-sign depuis tablette
 $is_quick = ($REPORT_ID === 0);
+$transport_departed_at = trim((string)($_POST['transport_departed_at'] ?? ''));
+$transport_carrier = mb_substr(trim((string)($_POST['transport_carrier'] ?? '')), 0, 100);
+$transport_tracking = mb_substr(trim((string)($_POST['transport_tracking'] ?? '')), 0, 190);
+$transport_request_id = mb_substr(trim((string)($_POST['transport_request_id'] ?? '')), 0, 190);
+if ($is_transport_dispatch) {
+    $transport_ts = strtotime($transport_departed_at);
+    $transport_departed_at = $transport_ts !== false ? date('Y-m-d H:i:s', $transport_ts) : date('Y-m-d H:i:s');
+    if ($transport_carrier === '') {
+        $transport_carrier = 'Transporteur';
+    }
+}
 
 $tech_id = 0;
 if ($TECHNICIAN_INPUT !== '') {
@@ -348,7 +379,11 @@ if (!file_exists($existingPdfPath)) {
         (string)$NAME,
         ((int)$tech_id > 0 ? getUserName($tech_id) : (string)$TECHNICIAN_INPUT),
         ['counter_invoice' => !empty($_POST['CounterInvoiceClient']) && (int)$_POST['CounterInvoiceClient'] === 1,
-         'comment'         => trim((string)($_POST['comment'] ?? ''))]
+         'comment'         => trim((string)($_POST['comment'] ?? '')),
+         'transport_dispatch' => $is_transport_dispatch,
+         'transport_departed_at' => $transport_departed_at,
+         'transport_carrier' => $transport_carrier,
+         'transport_tracking' => $transport_tracking]
     );
     if ($existingPdfPath === null) {
         gestion_message("Le fichier PDF source n'existe pas et la page de remplacement n'a pas pu être générée.", ERROR);
@@ -420,36 +455,75 @@ try {
         // Si c'est la page cible, ajoutez la signature
         // (pas sur la page de remplacement : elle porte déjà la sienne)
         if ($i === $targetPage && !$bl_source_missing) {
-            // Ajouter la signature en bas à gauche
-            $pdf->Image($signaturePath, $config->fields['SignatureX'], $pdf->GetPageHeight() - $config->fields['SignatureY'], $config->fields['SignatureSize']); // Ajustez la position et la taille
-
-            // Ajouter le nom et la date et tech
-            if(!empty($config->fields['SignataireX']) && !empty($config->fields['SignataireY'])){
-                $pdf->SetFont('Arial', '', 10);
-                $pdf->SetXY($config->fields['SignataireX'], $pdf->GetPageHeight() - $config->fields['SignataireY']); // Position pour "Nom"
-                $pdf->Cell(40, 10, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $NAME));
-            }
-
-            if(!empty($config->fields['DateX']) && !empty($config->fields['DateY'])){
-                $pdf->SetXY($config->fields['DateX'], $pdf->GetPageHeight() - $config->fields['DateY']); // Position pour "Date"
-                $pdf->Cell(40, 10, date('d/m/Y'));
-            }
-
-            if(!empty($config->fields['TechX']) && !empty($config->fields['TechY'])){
-                // Afficher le nom du technicien
-                // - En signature rapide: si saisie libre et aucun utilisateur trouvé, afficher la saisie
-                // - Sinon: afficher l'utilisateur (trouvé ou session)
-                $tech_name = '';
-                if ($is_quick && $TECHNICIAN_INPUT !== '') {
-                    $tech_name = $TECHNICIAN_INPUT;
-                } else if ((int)$tech_id > 0) {
-                    $tech_name = getUserName($tech_id);
-                } else {
-                    $tech_name = getUserName(Session::getLoginUserID());
+            if ($is_transport_dispatch) {
+                // Un tampon métier explicite, jamais une imitation de signature client.
+                $enc = static function (string $text): string {
+                    $converted = @iconv('UTF-8', 'windows-1252//TRANSLIT', $text);
+                    return $converted === false ? $text : $converted;
+                };
+                $stamp_date = date('d/m/Y H:i', strtotime($transport_departed_at) ?: time());
+                $line1 = $enc('ENVOYÉ PAR TRANSPORTEUR');
+                $line2 = $enc($transport_carrier . ' — ' . $stamp_date);
+                $line3 = $transport_tracking !== '' ? $enc('Suivi : ' . $transport_tracking) : '';
+                $x = max(5.0, (float)($config->fields['SignatureX'] ?? 15));
+                $y = max(5.0, $pdf->GetPageHeight() - (float)($config->fields['SignatureY'] ?? 55));
+                $w = max(62.0, min(105.0, (float)($config->fields['SignatureSize'] ?? 55) * 1.8));
+                $h = $line3 !== '' ? 22.0 : 17.0;
+                if ($x + $w > $pdf->GetPageWidth() - 5) {
+                    $x = max(5.0, $pdf->GetPageWidth() - $w - 5);
                 }
-                $pdf->SetFont('Arial', '', 9);
-                $pdf->SetXY($config->fields['TechX'], $pdf->GetPageHeight() - $config->fields['TechY']); // Position pour "Nom"
-                $pdf->Cell(40, 10, $tech_name);
+                if ($y + $h > $pdf->GetPageHeight() - 5) {
+                    $y = max(5.0, $pdf->GetPageHeight() - $h - 5);
+                }
+                $pdf->SetDrawColor(47, 63, 100);
+                $pdf->SetFillColor(248, 250, 252);
+                $pdf->SetTextColor(47, 63, 100);
+                $pdf->SetLineWidth(.5);
+                $pdf->Rect($x, $y, $w, $h, 'DF');
+                $pdf->SetXY($x + 2, $y + 2);
+                $pdf->SetFont('Arial', 'B', 9);
+                $pdf->Cell($w - 4, 5, $line1, 0, 2, 'C');
+                $pdf->SetFont('Arial', '', 8);
+                $pdf->Cell($w - 4, 4.5, $line2, 0, 2, 'C');
+                if ($line3 !== '') {
+                    $pdf->Cell($w - 4, 4.5, $line3, 0, 2, 'C');
+                }
+                $pdf->SetTextColor(0, 0, 0);
+                $pdf->SetDrawColor(0, 0, 0);
+                $pdf->SetFillColor(255, 255, 255);
+                $pdf->SetLineWidth(.2);
+            } else {
+                // Ajouter la signature en bas à gauche
+                $pdf->Image($signaturePath, $config->fields['SignatureX'], $pdf->GetPageHeight() - $config->fields['SignatureY'], $config->fields['SignatureSize']); // Ajustez la position et la taille
+
+                // Ajouter le nom et la date et tech
+                if(!empty($config->fields['SignataireX']) && !empty($config->fields['SignataireY'])){
+                    $pdf->SetFont('Arial', '', 10);
+                    $pdf->SetXY($config->fields['SignataireX'], $pdf->GetPageHeight() - $config->fields['SignataireY']); // Position pour "Nom"
+                    $pdf->Cell(40, 10, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $NAME));
+                }
+
+                if(!empty($config->fields['DateX']) && !empty($config->fields['DateY'])){
+                    $pdf->SetXY($config->fields['DateX'], $pdf->GetPageHeight() - $config->fields['DateY']); // Position pour "Date"
+                    $pdf->Cell(40, 10, date('d/m/Y'));
+                }
+
+                if(!empty($config->fields['TechX']) && !empty($config->fields['TechY'])){
+                    // Afficher le nom du technicien
+                    // - En signature rapide: si saisie libre et aucun utilisateur trouvé, afficher la saisie
+                    // - Sinon: afficher l'utilisateur (trouvé ou session)
+                    $tech_name = '';
+                    if ($is_quick && $TECHNICIAN_INPUT !== '') {
+                        $tech_name = $TECHNICIAN_INPUT;
+                    } else if ((int)$tech_id > 0) {
+                        $tech_name = getUserName($tech_id);
+                    } else {
+                        $tech_name = getUserName(Session::getLoginUserID());
+                    }
+                    $pdf->SetFont('Arial', '', 9);
+                    $pdf->SetXY($config->fields['TechX'], $pdf->GetPageHeight() - $config->fields['TechY']); // Position pour "Nom"
+                    $pdf->Cell(40, 10, $tech_name);
+                }
             }
         }
     }
@@ -690,7 +764,14 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         'users_ext'          => $NAME,
         'relatedInvoiceToBL' => $relatedInvoiceToBL,
         'comment'            => $hasComment ? $rawComment : null,
+        'completion_type'    => $is_transport_dispatch ? 'transport_dispatch' : 'client_signature',
     ];
+    if ($is_transport_dispatch) {
+        $updateData['transport_dispatched_at'] = $transport_departed_at;
+        $updateData['transport_carrier'] = $transport_carrier;
+        $updateData['transport_tracking'] = $transport_tracking !== '' ? $transport_tracking : null;
+        $updateData['transport_request_id'] = $transport_request_id;
+    }
     if ($isCounterInvoicePaid) {
         $updateData['paid'] = 1;
     }
@@ -701,10 +782,22 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     $ok = $DB->update(
         'glpi_plugin_gestion_surveys',
         $updateData,
-        [ 'BL' => $DOC_NAME ]
+        $is_transport_dispatch ? ['id' => $id_document] : ['BL' => $DOC_NAME]
     );
     if ($ok === false) {
         gestion_message("Erreur lors de la mise a jours en Base de donnée.", ERROR);
+    }
+
+    // Print Gestion : un BL signé vaut preuve de livraison. L'expédition qui porte ce BL passe « livrée » tout
+    // de suite, sans attendre le passage horaire de sa tâche automatique. Plugin absent, inactif, ou liaison
+    // coupée dans sa configuration : il ne se passe rien. Une erreur de son côté ne doit jamais faire échouer
+    // une signature — elle est journalisée, et son rattrapage la reprendra.
+    if (class_exists('PluginPrintgestionTracking')) {
+        try {
+            PluginPrintgestionTracking::onGestionBlSigned();
+        } catch (Throwable $e) {
+            Toolbox::logError('Print Gestion : passage en livrée après signature impossible, à reprendre par sa tâche automatique : ' . $e->getMessage());
+        }
     }
 
     // ENVOIE DES MAILS #GLPI11#
@@ -739,14 +832,50 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             }
     }else{
         if (!$combined_mode && !empty($config->fields['ZenDocMail'])){ 
-            $ValueForSigned = "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
+            if ($is_transport_dispatch) {
+                $ValueForSigned = "Bon de Livraison envoyé par transporteur : $DOC_NAME"
+                    . " <br><br> Transporteur : $transport_carrier"
+                    . ($transport_tracking !== '' ? " <br><br> Suivi : $transport_tracking" : '')
+                    . " <br><br> Départ : " . date('d/m/Y H:i', strtotime($transport_departed_at) ?: time())
+                    . " <br><br> Ticket ID : $IdTicket";
+            } else {
+                $ValueForSigned = "Bon de Livraison signé : $DOC_NAME <br><br> Mail client : $EMAIL <br><br> Ticket ID : $IdTicket";
+            }
             if (!empty($relatedInvoiceToBL)) {
                 $ValueForSigned .= " <br><br> Documents/Informations associé au bon de livraison : $relatedInvoiceToBL";
             }
             if ($hasComment) {
                 $ValueForSigned .= " <br><br> Commentaire : " . $rawComment;
             }
-            $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $outputPathTemp, "Envoyé vers ZenDoc", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé", $ValueForSigned);
+            if ($is_transport_dispatch) {
+                if (!is_file($outputPathTemp) || ($transport_pdf_size = filesize($outputPathTemp)) === false || $transport_pdf_size <= 0) {
+                    throw new RuntimeException("Le PDF du BL est introuvable ou vide : envoi ZenDoc annulé.");
+                }
+                // MailSend expédie volontairement les pièces jointes > 15 Mo sans le PDF.
+                // Ce comportement est acceptable pour une notification, mais jamais pour
+                // ZenDoc : sans le BL joint, la facturation ne doit pas être déclarée faite.
+                if ($transport_pdf_size > 15 * 1024 * 1024) {
+                    throw new RuntimeException("Le PDF du BL dépasse 15 Mo : envoi ZenDoc annulé pour éviter un mail sans pièce jointe.");
+                }
+            }
+            $zendoc_ok = $sharepoint->MailSend(
+                $config->fields['ZenDocMail'],
+                0,
+                $outputPathTemp,
+                "Envoyé vers ZenDoc",
+                $id_survey = NULL,
+                $tracker = NULL,
+                $webUrl = NULL,
+                $fileName = NULL,
+                $is_transport_dispatch ? "Bon de Livraison envoyé par transporteur" : "Bon de Livraison signé",
+                $ValueForSigned
+            );
+            if ($zendoc_ok && $is_transport_dispatch) {
+                $DB->update('glpi_plugin_gestion_surveys', ['zendoc_sent_at' => date('Y-m-d H:i:s')], ['id' => $id_document]);
+            }
+            if (!$zendoc_ok && $is_transport_dispatch) {
+                throw new RuntimeException("Échec de l'envoi du BL vers ZenDoc.");
+            }
         }
     }
     // ENVOIE DES MAILS
@@ -899,7 +1028,14 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             'doc_date' => date('Y-m-d H:i:s'),
             'users_id' => (int)$tech_id,
             'users_ext'=> (string)$NAME,
+            'completion_type' => $is_transport_dispatch ? 'transport_dispatch' : 'client_signature',
         ];
+        if ($is_transport_dispatch) {
+            $updateFinal['transport_dispatched_at'] = $transport_departed_at;
+            $updateFinal['transport_carrier'] = $transport_carrier;
+            $updateFinal['transport_tracking'] = $transport_tracking !== '' ? $transport_tracking : null;
+            $updateFinal['transport_request_id'] = $transport_request_id;
+        }
         if ($is_quick && $TECHNICIAN_INPUT !== '') {
             $updateFinal['tech_ext'] = $TECHNICIAN_INPUT;
         }
@@ -913,7 +1049,23 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
             }
         }
 
-        gestion_message('Documents : '. $DOC_NAME.' signé', INFO);
+        gestion_message(
+            'Documents : ' . $DOC_NAME . ($is_transport_dispatch ? ' envoyé par transporteur' : ' signé'),
+            INFO
+        );
+
+        // Print Gestion : un BL signé vaut preuve de livraison. L'expédition qui porte ce BL passe « livrée » tout
+        // de suite, sans attendre le passage horaire de sa tâche automatique. Plugin absent, inactif, ou liaison
+        // coupée dans sa configuration : il ne se passe rien. Une erreur de son côté ne doit jamais faire échouer
+        // une signature — elle est journalisée, et son rattrapage la reprendra.
+        if (class_exists('PluginPrintgestionTracking')) {
+            try {
+                PluginPrintgestionTracking::onGestionBlSigned();
+            } catch (Throwable $e) {
+                Toolbox::logError('Print Gestion : passage en livrée après signature impossible, à reprendre par sa tâche automatique : ' . $e->getMessage());
+            }
+        }
+
         // En mode combiné, c'est l'orchestrateur qui l'annonce, avec le rapport.
         // (Message d'écran seul : la cause est déjà journalisée plus haut.)
         if ($bl_source_missing && !$combined_mode) {

@@ -613,6 +613,18 @@ foreach ($valid_bls as $DOC) {
    $DB->update('glpi_plugin_gestion_surveys', $update, ['id' => (int)$DOC->id]);
 }
 
+// Print Gestion : un BL signé vaut preuve de livraison. L'expédition qui porte ce BL passe « livrée » tout
+// de suite, sans attendre le passage horaire de sa tâche automatique. Plugin absent, inactif, ou liaison
+// coupée dans sa configuration : il ne se passe rien. Une erreur de son côté ne doit jamais faire échouer
+// une signature — elle est journalisée, et son rattrapage la reprendra.
+if (class_exists('PluginPrintgestionTracking')) {
+   try {
+      PluginPrintgestionTracking::onGestionBlSigned();
+   } catch (Throwable $e) {
+      Toolbox::logError('Print Gestion : passage en livrée après signature impossible, à reprendre par sa tâche automatique : ' . $e->getMessage());
+   }
+}
+
 // ---- 7. Mails (PDF fusionne) ----
 // Le groupe produit toujours UN PDF fusionne et supprime le mail separe du rapport :
 // on envoie donc le fusionne une seule fois (independamment de CombinedMailMode).

@@ -416,6 +416,7 @@ groupée de tous les bons reste le parcours combiné de RP.
 
 - `public/api/bl_prepare.php` : prépare un ticket/BL pour signature (recherche, métadonnées, options disponibles).
 - `public/api/bl_sign.php` : enregistre la signature BL et finalise le traitement.
+- `public/api/bl_transport_dispatch.php` : appose le tampon « Envoyé par transporteur », archive le BL et l'envoie à `ZenDocMail`. Un BL déjà signé par le client est ignoré et `request_id` protège les rejeux contre les doublons.
 - `public/api/ticket_bls.php` : liste / expose les BL liés à un ticket pour une application externe.
 
 ### API combinée BL + RP

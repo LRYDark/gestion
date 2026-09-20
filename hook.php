@@ -20,6 +20,12 @@ function plugin_gestion_install() { // fonction installation du plugin
                      `url_bl` VARCHAR(255) NULL,
                      `bl` VARCHAR(255) NULL,
                      `signed` int NOT NULL DEFAULT '0',
+                     `completion_type` VARCHAR(40) NULL,
+                     `transport_dispatched_at` TIMESTAMP NULL,
+                     `transport_carrier` VARCHAR(100) NULL,
+                     `transport_tracking` VARCHAR(190) NULL,
+                     `transport_request_id` VARCHAR(190) NULL,
+                     `zendoc_sent_at` TIMESTAMP NULL,
                      `date_creation` TIMESTAMP NULL,
                      `doc_id` int {$default_key_sign} NULL,
                      `doc_url` TEXT NULL,
@@ -126,6 +132,16 @@ function plugin_gestion_install() { // fonction installation du plugin
       require_once $update181;
       if (function_exists('update_180_181')) {
          update_180_181();
+      }
+   }
+
+   // update_181_182 : validation automatique d'un BL remis au transporteur,
+   // avec traçabilité et envoi idempotent vers ZenDoc.
+   $update182 = dirname(__FILE__) . '/install/update_181_182.php';
+   if (file_exists($update182)) {
+      require_once $update182;
+      if (function_exists('update_181_182')) {
+         update_181_182();
       }
    }
 

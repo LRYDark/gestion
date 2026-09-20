@@ -382,7 +382,13 @@ if (!function_exists('pluginGestionMissingBlPage')) {
       $created = trim((string)($DOC->date_creation ?? ''));
       $tracker = trim((string)($DOC->tracker ?? ''));
       $comment = trim((string)($opts['comment'] ?? ''));
+      $is_transport = !empty($opts['transport_dispatch']);
+      $transport_carrier = trim((string)($opts['transport_carrier'] ?? 'Transporteur')) ?: 'Transporteur';
+      $transport_tracking = trim((string)($opts['transport_tracking'] ?? ''));
+      $transport_raw_date = trim((string)($opts['transport_departed_at'] ?? ''));
+      $transport_time = strtotime($transport_raw_date);
       $now     = date('d/m/Y H:i');
+      $action_time = $is_transport && $transport_time !== false ? date('d/m/Y H:i', $transport_time) : $now;
 
       // Polices de base FPDF : Windows-1252, d'ou la conversion des accents.
       $enc = static function (string $s): string {
@@ -400,8 +406,11 @@ if (!function_exists('pluginGestionMissingBlPage')) {
          $pdf->SetFont('Arial', 'I', 10);
          $pdf->SetTextColor(110, 110, 110);
          $pdf->MultiCell(0, 5, $enc(
-            "Le PDF d'origine de ce bon était introuvable au moment de la signature (source : $source). "
-            . "Cette page en tient lieu et porte la signature recueillie."
+            $is_transport
+               ? "Le PDF d'origine de ce bon était introuvable au moment de son départ transporteur (source : $source). "
+                 . "Cette page en tient lieu et trace sa remise au transporteur."
+               : "Le PDF d'origine de ce bon était introuvable au moment de la signature (source : $source). "
+                 . "Cette page en tient lieu et porte la signature recueillie."
          ), 0, 'C');
          $pdf->SetTextColor(0, 0, 0);
          $pdf->Ln(6);
@@ -449,12 +458,33 @@ if (!function_exists('pluginGestionMissingBlPage')) {
             $pdf->Ln(4);
          }
 
-         // Bloc signature : image a gauche, identite a droite, dans un cadre.
-         $pdf->SetFont('Arial', 'B', 11);
-         $pdf->Cell(0, 8, $enc('Signature du client'), 0, 1);
-         $top = $pdf->GetY();
-         $pdf->Rect(15, $top, 180, 55);
-         if (is_file($signaturePath)) {
+         if ($is_transport) {
+            // Le départ est une validation logistique, pas une signature client.
+            $pdf->SetFont('Arial', 'B', 11);
+            $pdf->Cell(0, 8, $enc('Validation logistique'), 0, 1);
+            $top = $pdf->GetY();
+            $pdf->SetDrawColor(47, 63, 100);
+            $pdf->SetFillColor(248, 250, 252);
+            $pdf->SetTextColor(47, 63, 100);
+            $pdf->Rect(15, $top, 180, 38, 'DF');
+            $pdf->SetXY(20, $top + 6);
+            $pdf->SetFont('Arial', 'B', 13);
+            $pdf->Cell(170, 7, $enc('ENVOYÉ PAR TRANSPORTEUR'), 0, 2, 'C');
+            $pdf->SetFont('Arial', '', 10);
+            $pdf->Cell(170, 6, $enc($transport_carrier . ' — ' . $action_time), 0, 2, 'C');
+            if ($transport_tracking !== '') {
+               $pdf->Cell(170, 6, $enc('Suivi : ' . $transport_tracking), 0, 2, 'C');
+            }
+            $pdf->SetTextColor(0, 0, 0);
+            $pdf->SetDrawColor(0, 0, 0);
+            $pdf->SetFillColor(255, 255, 255);
+         } else {
+            // Bloc signature : image a gauche, identite a droite, dans un cadre.
+            $pdf->SetFont('Arial', 'B', 11);
+            $pdf->Cell(0, 8, $enc('Signature du client'), 0, 1);
+            $top = $pdf->GetY();
+            $pdf->Rect(15, $top, 180, 55);
+            if (is_file($signaturePath)) {
             /*
              * Ajustée au bloc sans jamais le déborder, ratio conservé.
              *
@@ -472,23 +502,24 @@ if (!function_exists('pluginGestionMissingBlPage')) {
              * `SignatureSize` et FPDF en déduit la hauteur. Ici, les deux
              * dimensions sont bornées, rien ne peut recouvrir quoi que ce soit.
              */
-            $size = @getimagesize($signaturePath);
-            $w = 80;
-            $h = 0;
-            if ($size && $size[0] > 0 && $size[1] > 0) {
-               $h = $w * $size[1] / $size[0];
-               if ($h > 48) {
-                  $h = 48;
-                  $w = $h * $size[0] / $size[1];
+               $size = @getimagesize($signaturePath);
+               $w = 80;
+               $h = 0;
+               if ($size && $size[0] > 0 && $size[1] > 0) {
+                  $h = $w * $size[1] / $size[0];
+                  if ($h > 48) {
+                     $h = 48;
+                     $w = $h * $size[0] / $size[1];
+                  }
                }
+               $pdf->Image($signaturePath, 20, $top + 5, $w, $h);
             }
-            $pdf->Image($signaturePath, 20, $top + 5, $w, $h);
+            $pdf->SetFont('Arial', '', 10);
+            $pdf->SetXY(105, $top + 8);
+            $pdf->Cell(0, 7, $enc('Nom : ' . $clientName), 0, 2);
+            $pdf->Cell(0, 7, $enc('Signé le : ' . $now), 0, 2);
+            $pdf->Cell(0, 7, $enc('Technicien : ' . $techName), 0, 2);
          }
-         $pdf->SetFont('Arial', '', 10);
-         $pdf->SetXY(105, $top + 8);
-         $pdf->Cell(0, 7, $enc('Nom : ' . $clientName), 0, 2);
-         $pdf->Cell(0, 7, $enc('Signé le : ' . $now), 0, 2);
-         $pdf->Cell(0, 7, $enc('Technicien : ' . $techName), 0, 2);
 
          /*
           * Pied de page SANS saut automatique : a 20 mm du bas, FPDF ouvre
@@ -498,7 +529,9 @@ if (!function_exists('pluginGestionMissingBlPage')) {
          $pdf->SetY(-20);
          $pdf->SetFont('Arial', 'I', 8);
          $pdf->SetTextColor(110, 110, 110);
-         $pdf->Cell(0, 5, $enc("Page générée automatiquement par GLPI (plugin Gestion) le $now, le PDF d'origine du bon n'étant pas disponible."), 0, 0, 'C');
+         $pdf->Cell(0, 5, $enc(
+            "Page générée automatiquement par GLPI (plugin Gestion) le $now, le PDF d'origine du bon n'étant pas disponible."
+         ), 0, 0, 'C');
 
          $path = GLPI_PLUGIN_DOC_DIR . '/gestion/FilesTempSharePoint/BL_remplacement_' . rand(1, 100000) . '_'
                . preg_replace('/[^A-Za-z0-9_.-]/', '_', $bl_name) . '.pdf';

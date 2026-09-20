@@ -24,6 +24,19 @@ define('NOTOKENRENEWAL', 1);
 require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 
+// Compatibilité immédiate avec les serveurs dont la liste des routes du plugin
+// est encore en cache : le mode transport passe par l'endpoint déjà autorisé.
+// L'implémentation et ses contrôles restent centralisés dans le fichier dédié.
+$api_sign_raw = PluginGestionApiAuth::getRawInputBody();
+$api_sign_probe = $api_sign_raw !== '' ? json_decode($api_sign_raw, true) : null;
+$api_sign_action = is_array($api_sign_probe)
+   ? strtolower(trim((string)($api_sign_probe['action'] ?? $api_sign_probe['mode'] ?? '')))
+   : strtolower(trim((string)($_POST['action'] ?? $_POST['mode'] ?? '')));
+if ($api_sign_action === 'transport_dispatch') {
+   require PLUGIN_GESTION_DIR . '/public/api/bl_transport_dispatch.php';
+   exit;
+}
+
 global $DB, $CFG_GLPI;
 $config = PluginGestionConfig::getInstance();
 $rootdoc = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/');

@@ -416,18 +416,38 @@ class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSear
 
          $signed = '';
          if ($this->fields['signed'] == 1){
-            $modalId = 'gestionResendMailModal'.$ID;
+            $isTransportDispatch = (($this->fields['completion_type'] ?? '') === 'transport_dispatch');
+            if (!$isTransportDispatch) {
+               $modalId = 'gestionResendMailModal'.$ID;
+            }
             echo "<tr class='tab_bg_1'>";
-               echo "<td>" . __('Informations sur le document <strong>Signé</strong> :') ."</td>";
+               echo "<td>" . ($isTransportDispatch
+                  ? __('Informations sur le document <strong>Envoyé par transporteur</strong> :', 'gestion')
+                  : __('Informations sur le document <strong>Signé</strong> :')) ."</td>";
                echo "<td>";
                   echo Html::submit($this->fields['bl'], [
                      'name'    => 'showCriForm',
                      'class'   => 'btn btn-secondary',
                      'onclick' => "gestion_loadCriForm('showCriForm', '$ID', " . json_encode($params) . "); return false;"
                ]);
-               echo "&nbsp;";
-               echo '<button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#'.$modalId.'">Renvoyer par mail</button>';
+               if (!$isTransportDispatch) {
+                  echo "&nbsp;";
+                  echo '<button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#'.$modalId.'">Renvoyer par mail</button>';
+               }
             echo "</td></tr>";
+            if ($isTransportDispatch) {
+               $transportDetails = array_filter([
+                  trim((string)($this->fields['transport_carrier'] ?? '')),
+                  trim((string)($this->fields['transport_tracking'] ?? '')) !== ''
+                     ? 'Suivi : ' . trim((string)$this->fields['transport_tracking']) : '',
+                  trim((string)($this->fields['transport_dispatched_at'] ?? '')) !== ''
+                     ? 'Départ : ' . trim((string)$this->fields['transport_dispatched_at']) : '',
+                  trim((string)($this->fields['zendoc_sent_at'] ?? '')) !== ''
+                     ? 'ZenDoc : ' . trim((string)$this->fields['zendoc_sent_at']) : '',
+               ]);
+               echo "<tr class='tab_bg_1'><td>" . __('Traçabilité transport', 'gestion') . "</td><td>"
+                  . Html::entities_deep(implode(' · ', $transportDetails)) . "</td></tr>";
+            }
          }else{
             echo "<tr class='tab_bg_1'>";
                echo "<td>" . __('Informations sur le document <strong>Non signé</strong> ')."</td>";

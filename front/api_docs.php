@@ -310,6 +310,30 @@ curl -X GET "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/bl_tra
 {"ok":true,"bl":"BL202852","tracker":"PI + EC","source":"glpi"}</code></pre>
   </div>
 
+  <div class="doc-card" data-doc-item data-search="bl_transport_dispatch transporteur zendoc facturation tampon idempotent request_id">
+    <div class="doc-meta">POST <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/bl_transport_dispatch.php', ENT_QUOTES); ?></div>
+    <h4>`bl_transport_dispatch.php` <span class="doc-tag">1.8.2</span></h4>
+    <p><?php echo __('Valide le départ transporteur d’un BL, appose un tampon logistique sur son PDF puis l’envoie à l’adresse `ZenDocMail` configurée.', 'gestion'); ?></p>
+    <div class="doc-note">
+      <span class="method method-post">POST</span>
+      <?php echo __('Un BL déjà signé par le client est ignoré. `request_id` doit être stable : un rejeu retourne le résultat existant sans produire un second document.', 'gestion'); ?>
+    </div>
+    <pre><code>curl -X POST "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/bl_transport_dispatch.php', ENT_QUOTES); ?>" \
+  -H "Authorization: Bearer &lt;token&gt;" -H "Content-Type: application/json" \
+  -d '{"bl":"BL209061","request_id":"hub-departure-123-BL209061","carrier":"GLS","tracking":"00LAWEO4","departed_at":"2026-09-18 14:36:00"}'</code></pre>
+    <table class="doc-table">
+      <thead><tr><th><?php echo __('Code', 'gestion'); ?></th><th><?php echo __('Résultat', 'gestion'); ?></th></tr></thead>
+      <tbody>
+        <tr><td><code>200</code></td><td><?php echo __('BL envoyé, déjà envoyé, ou ignoré avec `reason: already_client_signed`.', 'gestion'); ?></td></tr>
+        <tr><td><code>401 / 403</code></td><td><?php echo __('Authentification refusée ou signature distante désactivée.', 'gestion'); ?></td></tr>
+        <tr><td><code>404</code></td><td><?php echo __('BL absent de la table des signatures Gestion.', 'gestion'); ?></td></tr>
+        <tr><td><code>409</code></td><td><?php echo __('Un traitement du même BL est déjà en cours ; l’appel peut être rejoué.', 'gestion'); ?></td></tr>
+        <tr><td><code>422</code></td><td><?php echo __('Paramètre invalide ou adresse `ZenDocMail` non configurée.', 'gestion'); ?></td></tr>
+        <tr><td><code>502 / 503</code></td><td><?php echo __('Envoi ZenDoc non confirmé ou verrou de traitement indisponible. Aucun succès n’est enregistré et l’appel doit être retenté.', 'gestion'); ?></td></tr>
+      </tbody>
+    </table>
+  </div>
+
   <div class="doc-card" data-doc-item data-search="device_poll_v2 device_submit_v2 device_refuse_v2 device_checkin device_direct_sign device_send_invoice facture scan document mail envoi invoice kiosk borne x-device-serial">
     <div class="doc-meta">KIOSQUE (auth X-Device-Serial)</div>
     <h4>Endpoints borne</h4>
