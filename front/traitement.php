@@ -457,41 +457,9 @@ try {
         if ($i === $targetPage && !$bl_source_missing) {
             if ($is_transport_dispatch) {
                 // Un tampon métier explicite, jamais une imitation de signature client.
-                $enc = static function (string $text): string {
-                    $converted = @iconv('UTF-8', 'windows-1252//TRANSLIT', $text);
-                    return $converted === false ? $text : $converted;
-                };
-                $stamp_date = date('d/m/Y H:i', strtotime($transport_departed_at) ?: time());
-                $line1 = $enc('ENVOYÉ PAR TRANSPORTEUR');
-                $line2 = $enc($transport_carrier . ' — ' . $stamp_date);
-                $line3 = $transport_tracking !== '' ? $enc('Suivi : ' . $transport_tracking) : '';
-                $x = max(5.0, (float)($config->fields['SignatureX'] ?? 15));
-                $y = max(5.0, $pdf->GetPageHeight() - (float)($config->fields['SignatureY'] ?? 55));
-                $w = max(62.0, min(105.0, (float)($config->fields['SignatureSize'] ?? 55) * 1.8));
-                $h = $line3 !== '' ? 22.0 : 17.0;
-                if ($x + $w > $pdf->GetPageWidth() - 5) {
-                    $x = max(5.0, $pdf->GetPageWidth() - $w - 5);
-                }
-                if ($y + $h > $pdf->GetPageHeight() - 5) {
-                    $y = max(5.0, $pdf->GetPageHeight() - $h - 5);
-                }
-                $pdf->SetDrawColor(47, 63, 100);
-                $pdf->SetFillColor(248, 250, 252);
-                $pdf->SetTextColor(47, 63, 100);
-                $pdf->SetLineWidth(.5);
-                $pdf->Rect($x, $y, $w, $h, 'DF');
-                $pdf->SetXY($x + 2, $y + 2);
-                $pdf->SetFont('Arial', 'B', 9);
-                $pdf->Cell($w - 4, 5, $line1, 0, 2, 'C');
-                $pdf->SetFont('Arial', '', 8);
-                $pdf->Cell($w - 4, 4.5, $line2, 0, 2, 'C');
-                if ($line3 !== '') {
-                    $pdf->Cell($w - 4, 4.5, $line3, 0, 2, 'C');
-                }
-                $pdf->SetTextColor(0, 0, 0);
-                $pdf->SetDrawColor(0, 0, 0);
-                $pdf->SetFillColor(255, 255, 255);
-                $pdf->SetLineWidth(.2);
+                // Il tient dans la case de la signature, dont il lit les réglages
+                // sans les modifier : cf. pluginGestionDrawTransportStamp().
+                pluginGestionDrawTransportStamp($pdf, $config->fields, $transport_carrier, $transport_departed_at, $transport_tracking);
             } else {
                 // Ajouter la signature en bas à gauche
                 $pdf->Image($signaturePath, $config->fields['SignatureX'], $pdf->GetPageHeight() - $config->fields['SignatureY'], $config->fields['SignatureSize']); // Ajustez la position et la taille

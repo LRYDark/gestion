@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.8.2'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.8.3'); // version du plugin
 
 /**
  * Révision des fichiers JS/CSS.

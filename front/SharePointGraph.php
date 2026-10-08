@@ -1213,10 +1213,6 @@ class PluginGestionSharepoint extends CommonDBTM {
             $footerValue = html_entity_decode((string)$rowCfg['value'], ENT_QUOTES, 'UTF-8');
         }
 
-        // --- Mailer (GLPI 11 / Symfony Mailer) ---
-        $mmail = new GLPIMailer();
-        $mmail->addCustomHeader("X-Auto-Response-Suppress: OOF, DR, NDR, RN, NRN");
-
         // From (sécurisé: nom non nul)
         $fromEmail = !empty($CFG_GLPI['from_email'])
             ? (string)$CFG_GLPI['from_email']
@@ -1225,17 +1221,10 @@ class PluginGestionSharepoint extends CommonDBTM {
         $fromName = $CFG_GLPI['from_email_name'] ?? $CFG_GLPI['admin_email_name'] ?? null;
         $fromName = (is_string($fromName) && $fromName !== '') ? $fromName : 'GLPI';
 
-    // Affectation dans le mail #GLPI11#
-    $emailObj = $mmail->getEmail();
-    $emailObj->from(new \Symfony\Component\Mime\Address($fromEmail, $fromName));
-    $emailObj->to($to);
-    if (!empty($cc)) {
-        $emailObj->cc(...$cc);
-    }
-
         // Pièce jointe optionnelle (vérif + taille)
         $pdfTooLarge = false;
         $pdfSizeMB = 0;
+        $attachPath = null;
         if (!empty($outputPath) && is_string($outputPath) && file_exists($outputPath)) {
             $size = filesize($outputPath);
             if ($size !== false && $size > 15 * 1024 * 1024) {
@@ -1243,7 +1232,7 @@ class PluginGestionSharepoint extends CommonDBTM {
                 $pdfSizeMB = round($size / 1024 / 1024, 1);
                 $Subject = "⚠️ " . ($Subject ?: "Notification GLPI");
             } else {
-                $emailObj->attachFromPath($outputPath);
+                $attachPath = $outputPath;
             }
         }
 
@@ -1263,31 +1252,77 @@ class PluginGestionSharepoint extends CommonDBTM {
             $BodyText .= "\r\n\r\n⚠️ Le fichier PDF n'a pas pu être joint (taille : {$pdfSizeMB} Mo, limite : 15 Mo). Veuillez le récupérer depuis GLPI ou SharePoint.";
         }
 
-        if ($Subject !== '') {
-            $mmail->Subject = balise($Subject, $Balises);
+        $mailSubject = $Subject !== '' ? balise($Subject, $Balises) : '';
+        $mailHtml    = normalize_eols(balise($BodyHtml, $Balises)) . ($footerStr ? "<br>".$footerStr : "");
+        $mailText    = normalize_eols(balise($BodyText, $Balises)) . ($footerStr ? "\r\n".strip_tags($footerStr) : "");
+
+        /*
+         * Sans pièce jointe : file d'attente des notifications de GLPI, envoi immédiat comme avant ; en cas d'échec le
+         * mail reste en file et GLPI le renvoie (tâche « queuednotification »). Une ligne de file par destinataire :
+         * les copies (cc) reçoivent le même mail, chacune en destinataire principal.
+         * Avec pièce jointe (BL signé, facture de la tablette, PDF fusionné, ZenDoc) : envoi direct inchangé — la file
+         * de GLPI ne sait joindre que des documents GLPI, et ces fichiers n'en sont pas.
+         */
+        $errorInfo = '';
+        $queued    = 0;
+        if ($attachPath === null) {
+            $result = PluginGestionMailqueue::send([
+                'itemtype'    => Entity::class,
+                'items_id'    => 0,
+                'entities_id' => 0,
+                'event'       => 'plugin_gestion_mail',
+                'subject'     => $mailSubject,
+                'text'        => $mailText,
+                'html'        => $mailHtml,
+                'to'          => array_map(static fn(string $address): array => [$address, ''], array_merge([$to], $cc)),
+                'from'        => [$fromEmail, $fromName],
+            ], true);
+            // Parti pour tous les destinataires (file ou repli direct) ; $queued = mails restés en file, que GLPI renverra.
+            $queued    = count($result['pending']);
+            $ok        = $result['sent'] === count(array_merge([$to], $cc));
+            $errorInfo = implode(' ; ', array_unique($result['errors']));
+        } else {
+            $mmail = new GLPIMailer();
+            $mmail->addCustomHeader("X-Auto-Response-Suppress: OOF, DR, NDR, RN, NRN");
+            $emailObj = $mmail->getEmail();
+            $emailObj->from(new \Symfony\Component\Mime\Address($fromEmail, $fromName));
+            $emailObj->to($to);
+            if (!empty($cc)) {
+                $emailObj->cc(...$cc);
+            }
+            $emailObj->attachFromPath($attachPath);
+            if ($mailSubject !== '') {
+                $mmail->Subject = $mailSubject;
+            }
+            $mmail->Body    = $mailHtml;
+            $mmail->AltBody = $mailText;
+            $ok        = $mmail->send();
+            $errorInfo = $ok ? '' : (string) $mmail->ErrorInfo;
+            // Nettoyage adresses (facultatif ici)
+            $mmail->ClearAddresses();
         }
 
-        $mmail->Body    = normalize_eols(balise($BodyHtml, $Balises)) . ($footerStr ? "<br>".$footerStr : "");
-        $mmail->AltBody = normalize_eols(balise($BodyText, $Balises)) . ($footerStr ? "\r\n".strip_tags($footerStr) : "");
-
-        // Envoi + messages
-        $ok = $mmail->send();
+        // Messages
         if (class_exists('PluginGestionLogger')) {
             $dest = $to . (!empty($cc) ? ' (cc: ' . implode(', ', $cc) . ')' : '');
             if ($ok) {
                 $pj = '';
                 if ($pdfTooLarge) {
                     $pj = ' SANS PJ (PDF ' . $pdfSizeMB . ' Mo > 15 Mo)';
-                } elseif (!empty($outputPath) && is_string($outputPath) && file_exists($outputPath)) {
-                    $pj = ' avec PJ ' . basename($outputPath);
+                } elseif ($attachPath !== null) {
+                    $pj = ' avec PJ ' . basename($attachPath);
                 }
-                PluginGestionLogger::info('mail', 'Mail envoye a ' . $dest . $pj);
+                PluginGestionLogger::info('mail', 'Mail envoye a ' . $dest . $pj . ($attachPath === null ? ' (file d\'attente GLPI)' : ''));
+            } elseif ($queued > 0) {
+                PluginGestionLogger::warning('mail', 'Mail a ' . $dest . ' pas encore parti, reste en file d\'attente GLPI (nouvel essai automatique) : ' . $errorInfo);
             } else {
-                PluginGestionLogger::error('mail', 'Echec envoi mail a ' . $dest . ' : ' . $mmail->ErrorInfo);
+                PluginGestionLogger::error('mail', 'Echec envoi mail a ' . $dest . ' : ' . $errorInfo);
             }
         }
-        if (!$ok) {
-            Session::addMessageAfterRedirect(__("Erreur lors de l'envoi du mail : ", 'gestion') . $mmail->ErrorInfo, true, ERROR);
+        if (!$ok && $queued > 0) {
+            Session::addMessageAfterRedirect(__("Le mail n'est pas encore parti : il reste en file d'attente et GLPI le renverra automatiquement. ", 'gestion') . htmlescape($errorInfo), true, WARNING);
+        } elseif (!$ok) {
+            Session::addMessageAfterRedirect(__("Erreur lors de l'envoi du mail : ", 'gestion') . $errorInfo, true, ERROR);
         } else {
             // Message conditionnel comme avant
             $config = PluginGestionConfig::getInstance();
@@ -1296,11 +1331,8 @@ class PluginGestionSharepoint extends CommonDBTM {
             }
         }
 
-        // Nettoyage adresses (facultatif ici)
-        $mmail->ClearAddresses();
-
-        // Retourne l'état réel d'envoi (true = remis au transport). Ajout additif :
-        // tous les appelants existants ignorent la valeur de retour (aucune régression).
+        // Retourne l'état réel d'envoi (true = remis au transport, ou envoyé depuis la file). Seuls les envois avec
+        // pièce jointe (envoi direct, inchangé) en font usage : ZenDoc (traitement.php), facture de la tablette.
         return $ok;
     }
 

@@ -545,3 +545,157 @@ if (!function_exists('pluginGestionMissingBlPage')) {
       }
    }
 }
+
+if (!function_exists('pluginGestionTransportStampBox')) {
+   /**
+    * Emprise du tampon « Envoyé par transporteur » sur la page qui le reçoit.
+    *
+    * Elle part du MÊME coin que la signature client (`SignatureX`, hauteur de
+    * page - `SignatureY`) et reste dans la case que la signature peut occuper :
+    * `SignatureSize` de large et, au plus, `SignatureSize` / 3,2 de haut — le
+    * plafond que le navigateur impose au PNG (`EXPORT_MIN_RATIO` dans
+    * scripts_gestion.js).
+    *
+    * Un cadre ne peut pas occuper toute cette case, une signature si. Relevé
+    * sur le BL Sage avec X 36, Y 44, taille 50 : la case va de 36 à 86 mm et de
+    * 253 à 268,6 mm, mais le bord de la case « Signature client » du bon passe
+    * à 86 mm et la ligne « reçu les marchandises désignées conformes » commence
+    * à 266,3 mm. Une signature, transparente, les frôle sans gêne ; un trait de
+    * cadre les barrerait. Le tampon garde donc 1 mm à droite et s'arrête à
+    * 0,24 fois la largeur : 49 x 12 mm, soit 1,3 mm au-dessus de ce texte.
+    *
+    * Les réglages sont LUS, jamais modifiés : la signature client garde sa
+    * position au millimètre.
+    *
+    * @param array $cfg        champs de PluginGestionConfig
+    * @param float $pageHeight hauteur de la page, en mm
+    *
+    * @return array{x: float, y: float, w: float, h: float} en mm
+    */
+   function pluginGestionTransportStampBox(array $cfg, float $pageHeight): array
+   {
+      $size = (float)($cfg['SignatureSize'] ?? 0);
+      if ($size <= 0) {
+         $size = 50.0; // valeur par défaut de la configuration
+      }
+      return [
+         'x' => (float)($cfg['SignatureX'] ?? 36),
+         'y' => $pageHeight - (float)($cfg['SignatureY'] ?? 44),
+         'w' => $size - 1.0,
+         'h' => $size * 0.24,
+      ];
+   }
+}
+
+if (!function_exists('pluginGestionDrawTransportStamp')) {
+   /**
+    * Tampon « Envoyé par transporteur » dans la case de la signature client.
+    *
+    * Un tampon métier explicite, jamais une imitation de signature client. Il
+    * tient dans l'emprise de la signature (pluginGestionTransportStampBox).
+    * L'ancien cadre, 1,8 fois plus large et haut de 22 mm sur fond plein,
+    * masquait le texte du bon et mordait sur la case « Total » voisine.
+    *
+    * Le texte s'adapte à la case : le titre prend la plus grande taille qui
+    * tient (9 pt au plus), les détails un même corps, 85 % du titre au plus,
+    * réduit si l'un d'eux est trop long ; à 5 pt, la fin d'une ligne qui
+    * déborde encore est coupée. Le bloc est centré verticalement. Sans fond :
+    * comme la signature, le tampon ne masque rien.
+    *
+    * `Text()` plutôt que `Cell()` : il n'ouvre jamais de page, quelle que soit
+    * la hauteur configurée.
+    *
+    * @param \FPDF  $pdf        sa page courante reçoit le tampon
+    * @param array  $cfg        champs de PluginGestionConfig
+    * @param string $carrier    transporteur (UTF-8)
+    * @param string $departedAt date de départ, tout format lu par strtotime()
+    * @param string $tracking   numéro de suivi, '' s'il n'y en a pas
+    *
+    * @return array emprise utilisée, cf. pluginGestionTransportStampBox()
+    */
+   function pluginGestionDrawTransportStamp(\FPDF $pdf, array $cfg, string $carrier, string $departedAt, string $tracking): array
+   {
+      // Polices de base FPDF : Windows-1252, d'où la conversion des accents.
+      $enc = static function (string $text): string {
+         $converted = @iconv('UTF-8', 'windows-1252//TRANSLIT', $text);
+         return $converted === false ? $text : $converted;
+      };
+
+      $box      = pluginGestionTransportStampBox($cfg, $pdf->GetPageHeight());
+      $carrier  = trim($carrier) !== '' ? trim($carrier) : 'Transporteur';
+      $tracking = trim($tracking);
+      $lines    = [
+         ['text' => $enc('ENVOYÉ PAR TRANSPORTEUR'), 'style' => 'B'],
+         ['text' => $enc($carrier . ' — ' . date('d/m/Y H:i', strtotime($departedAt) ?: time())), 'style' => ''],
+      ];
+      if ($tracking !== '') {
+         $lines[] = ['text' => $enc('Suivi : ' . $tracking), 'style' => ''];
+      }
+
+      $pt       = 25.4 / 72; // 1 point, en mm
+      $leading  = 1.15;      // interligne, en multiple du corps
+      $detail   = 0.85;      // corps des détails, en fraction du titre
+      $min_size = 5.0;
+      $inner_w  = max(1.0, $box['w'] - 3.0); // 1,5 mm de marge de chaque côté
+      $inner_h  = max(1.0, $box['h'] - 2.0); // 1 mm en haut et en bas
+
+      // Plus grand corps de titre qui laisse tenir toutes les lignes en hauteur.
+      $height_units = 1 + $detail * (count($lines) - 1);
+      $title_max    = min(9.0, $inner_h / ($height_units * $leading * $pt));
+
+      // GetStringWidth() est proportionnel au corps : une mesure à 10 pt suffit.
+      $fit = static function (array $line, float $max) use ($pdf, $inner_w, $min_size): float {
+         $pdf->SetFont('Arial', $line['style'], 10);
+         $width_at_10 = $pdf->GetStringWidth($line['text']);
+         return $width_at_10 > 0 ? max($min_size, min($max, 10 * $inner_w / $width_at_10)) : $max;
+      };
+      // Les détails partagent un même corps : celui de la ligne la plus longue.
+      $title_size  = $fit($lines[0], $title_max);
+      $detail_size = $title_size * $detail;
+      foreach (array_slice($lines, 1) as $line) {
+         $detail_size = min($detail_size, $fit($line, $title_size * $detail));
+      }
+      foreach ($lines as $i => &$line) {
+         $line['size'] = $i === 0 ? $title_size : $detail_size;
+         $pdf->SetFont('Arial', $line['style'], $line['size']);
+         if ($pdf->GetStringWidth($line['text']) > $inner_w) {
+            // Même au plus petit corps, la ligne déborde : on coupe sa fin.
+            $text = $line['text'];
+            while ($text !== '' && $pdf->GetStringWidth($text . "\x85") > $inner_w) {
+               $text = substr($text, 0, -1);
+            }
+            $line['text'] = rtrim($text) . "\x85"; // « … » en Windows-1252
+         }
+      }
+      unset($line);
+
+      $block_h = 0.0;
+      foreach ($lines as $line) {
+         $block_h += $line['size'] * $leading * $pt;
+      }
+
+      $pdf->SetDrawColor(47, 63, 100);
+      $pdf->SetTextColor(47, 63, 100);
+      $pdf->SetLineWidth(.3);
+      $pdf->Rect($box['x'], $box['y'], $box['w'], $box['h'], 'D');
+
+      $top = $box['y'] + ($box['h'] - $block_h) / 2;
+      foreach ($lines as $line) {
+         $line_h = $line['size'] * $leading * $pt;
+         $pdf->SetFont('Arial', $line['style'], $line['size']);
+         // Ligne de base placée pour centrer la hauteur des capitales (0,72 em).
+         $pdf->Text(
+            $box['x'] + ($box['w'] - $pdf->GetStringWidth($line['text'])) / 2,
+            $top + $line_h / 2 + 0.36 * $line['size'] * $pt,
+            $line['text']
+         );
+         $top += $line_h;
+      }
+
+      $pdf->SetTextColor(0, 0, 0);
+      $pdf->SetDrawColor(0, 0, 0);
+      $pdf->SetLineWidth(.2);
+
+      return $box;
+   }
+}
