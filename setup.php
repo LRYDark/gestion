@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.8.3'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.9.0'); // version du plugin
 
 /**
  * Révision des fichiers JS/CSS.
@@ -11,7 +11,7 @@ define('PLUGIN_GESTION_VERSION', '1.8.3'); // version du plugin
  *
  * À incrémenter à chaque modification d'un fichier de public/js ou public/css.
  */
-define('PLUGIN_GESTION_ASSETS_REV', '46');
+define('PLUGIN_GESTION_ASSETS_REV', '47');
 $_SESSION['PLUGIN_GESTION_VERSION'] = PLUGIN_GESTION_VERSION;
 
 /**
@@ -120,78 +120,33 @@ if (!function_exists('pluginGestionFixDocumentFile')) {
          return false;
       }
       $sha1 = @sha1_file($fullpath);
+      $size = @filesize($fullpath);
       return (bool)$DB->update('glpi_documents', [
          'filepath' => $relative_path,
          'sha1sum'  => ($sha1 !== false ? $sha1 : null),
+         // GLPI 12 : taille du fichier, affichee dans la liste des documents (colonne nouvelle).
+         'filesize' => ($size !== false ? $size : null),
       ], ['id' => $doc_id]);
    }
 }
 
 // Minimal GLPI version,
-define("PLUGIN_GESTION_MIN_GLPI", "11.0.0");
+define("PLUGIN_GESTION_MIN_GLPI", "12.0.0");
 // Maximum GLPI version,
-define("PLUGIN_GESTION_MAX_GLPI", "11.1.0");
+define("PLUGIN_GESTION_MAX_GLPI", "12.0.99");
 
-define("PLUGIN_GESTION_WEBDIR", Plugin::getWebDir("gestion"));
+define("PLUGIN_GESTION_WEBDIR", ($GLOBALS['CFG_GLPI']['root_doc'] ?? '') . '/plugins/gestion');
 define("PLUGIN_GESTION_DIR", Plugin::getPhpDir("gestion"));
 define("PLUGIN_GESTION_NOTFULL_DIR", Plugin::getPhpDir("gestion",false));
-define("PLUGIN_GESTION_NOTFULL_WEBDIR", Plugin::getWebDir("gestion",false));
+define("PLUGIN_GESTION_NOTFULL_WEBDIR", 'plugins/gestion');
 
 function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
    global $PLUGIN_HOOKS, $CFG_GLPI;
 
-   $PLUGIN_HOOKS['csrf_compliant']['gestion'] = true;
    $PLUGIN_HOOKS['change_profile']['gestion'] = [PluginGestionProfile::class, 'initProfile'];
 
    $plugin = new Plugin();
    if ($plugin->isInstalled('gestion') && $plugin->isActivated('gestion')){  // verification si le plugin gestion est installé et activé
-
-      // ── DIAGNOSTIC CSRF (temporaire) ────────────────────────────────────────
-      // plugin_init s'execute AVANT le CheckCsrfListener du kernel : on trace ici
-      // l'etat du token des POST vers traitement*.php pour comprendre les rejets.
-      // On ne journalise jamais le token lui-meme (seulement un hash tronque).
-      /*
-       * Le rejeu d'une signature hors-ligne n'est PAS une anomalie.
-       *
-       * Il porte son jeton dans l'en-tete `X-Glpi-Csrf-Token` — c'est la branche
-       * AJAX du CheckCsrfListener, celle qui conserve le jeton pour que la file
-       * entiere parte avec un seul. Le corps n'en contient donc aucun, tout a
-       * fait normalement : sans cette exception, chaque signature differee
-       * remplirait le journal d'un avertissement « token ABSENT » alarmant et
-       * faux.
-       */
-      $diag_header_tok = (string)($_SERVER['HTTP_X_GLPI_CSRF_TOKEN'] ?? '');
-
-      if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
-          && $diag_header_tok === ''
-          && strpos((string)($_SERVER['REQUEST_URI'] ?? ''), '/plugins/gestion/front/traitement') !== false
-          && class_exists('PluginGestionLogger')) {
-         $diag_tok   = array_key_exists('_glpi_csrf_token', $_POST) ? (string)$_POST['_glpi_csrf_token'] : null;
-         $diag_known = ($diag_tok !== null && $diag_tok !== '' && isset($_SESSION['glpicsrftokens'][$diag_tok]));
-         // On ne journalise QUE les anomalies (token absent/vide/inconnu) : un POST
-         // sain n'apporte aucune information et polluerait le log.
-         if (!$diag_known) {
-            if ($diag_tok === null) {
-               $diag_tok_txt = 'ABSENT';
-            } elseif ($diag_tok === '') {
-               $diag_tok_txt = 'VIDE';
-            } else {
-               $diag_tok_txt = substr(sha1($diag_tok), 0, 8) . ' (inconnu en session)';
-            }
-            PluginGestionLogger::warning('csrf-diag', sprintf(
-               'POST %s : token %s, %d tokens en session, user #%s, ajax=%s, content-length=%s octets, %d champs POST [%s]',
-               basename((string)parse_url((string)$_SERVER['REQUEST_URI'], PHP_URL_PATH)),
-               $diag_tok_txt,
-               is_array($_SESSION['glpicsrftokens'] ?? null) ? count($_SESSION['glpicsrftokens']) : 0,
-               (string)(Session::getLoginUserID() ?: 'anonyme'),
-               !empty($_SERVER['HTTP_X_REQUESTED_WITH']) ? 'oui' : 'non',
-               (string)($_SERVER['CONTENT_LENGTH'] ?? '?'),
-               count($_POST),
-               implode(',', array_keys($_POST))
-            ));
-         }
-      }
-      // ── FIN DIAGNOSTIC CSRF ────────────────────────────────────────────────
 
       // ── Endpoints BL (app technicien APPAPPLE) ─────────────────────────────
       $api_pattern_prepare      = '#^/api/bl_prepare\.php(?:/.*)?$#';

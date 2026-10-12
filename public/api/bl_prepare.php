@@ -21,7 +21,6 @@ define('NOLOGIN', 1);
 define('NOHEADER', 1);
 define('NOTOKENRENEWAL', 1);
 
-require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 require_once PLUGIN_GESTION_DIR . '/front/SageApi.php';
 
@@ -560,7 +559,7 @@ if (empty($config->fields) || (int)$config->fields['RemoteSignatureOn'] !== 1) {
    api_prepare_end(403, ['ok' => false, 'error' => 'remote_signature_off']);
 }
 
-$auth = PluginGestionApiAuth::authenticateRequest(false);
+$auth = PluginGestionApiAuth::authenticateRequest(false, true); // session temporaire : rien n'est rejoue vers GLPI
 if (empty($auth['ok'])) {
    api_prepare_end((int)($auth['code'] ?? 401), [
       'ok'      => false,

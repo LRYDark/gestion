@@ -1,5 +1,4 @@
 <?php
-include('../../../inc/includes.php');
 // Le chargeur GLPI ne connait pas la classe definie dans front/SharePointGraph.php, on l'inclut explicitement.
 require_once dirname(__DIR__) . '/front/SharePointGraph.php';
 
@@ -520,14 +519,6 @@ switch ($action) {
             http_response_code(403);
             echo json_encode(['ok' => false, 'message' => "Acces refuse."]);
             break;
-         }
-
-         // CSRF : on journalise mais on n'empêche pas l'envoi (sinon GLPI renvoie du HTML Accès refusé)
-         $incomingToken = $_POST['_glpi_csrf_token'] ?? ($_SERVER['HTTP_X_GLPI_CSRF_TOKEN'] ?? '');
-         $sessionToken  = $_SESSION['glpicsrftoken'] ?? '';
-         if (!$sessionToken || !$incomingToken || !hash_equals((string)$sessionToken, (string)$incomingToken)) {
-            // Ne pas journaliser les tokens eux-memes (secrets).
-            PluginGestionLogger::warning('resend-mail', 'CSRF mismatch (non bloquant), user #' . (int)Session::getLoginUserID());
          }
 
          $survey_id = isset($_POST['survey_id']) ? (int)$_POST['survey_id'] : 0;

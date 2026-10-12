@@ -17,7 +17,6 @@
  */
 
 ob_start();
-include('../../../inc/includes.php');
 while (ob_get_level() > 0) {
    ob_end_clean();
 }
@@ -73,22 +72,10 @@ if (!$is_write) {
 }
 
 /*
- * Le jeton est cherche dans l'EN-TETE avant le corps.
- *
- * Sous GLPI 11, `CheckCsrfListener` controle le jeton avant que ce script ne
- * s'execute. Pour une requete signalee AJAX il lit `X-Glpi-Csrf-Token` et le
- * CONSERVE ; sinon il lit le corps et le CONSOMME — et le controle ci-dessous
- * echouait alors sur un jeton que GLPI venait lui-meme de retirer. Lire les
- * deux sources rend ce fichier indifferent a la façon dont il est appele.
- *
- * `validateCSRF` et non `checkCSRF` : ce dernier leve une exception que GLPI
- * rend en PAGE HTML « Accès refusé », la ou le panneau attend du JSON — il
- * afficherait « erreur de communication » au lieu de la vraie cause.
+ * Pas de controle de jeton ici : depuis GLPI 12, `CheckCsrfListener` verifie
+ * l'origine de la requete (en-tetes Sec-Fetch-Site / Origin) avant que ce
+ * script ne s'execute, et il n'existe plus de jeton CSRF.
  */
-$csrf_token = (string)($_SERVER['HTTP_X_GLPI_CSRF_TOKEN'] ?? ($_POST['_glpi_csrf_token'] ?? ''));
-if (!Session::validateCSRF(['_glpi_csrf_token' => $csrf_token], true)) {
-   gestion_claim_bl_end(['ok' => false, 'error' => 'invalid_csrf'], 403);
-}
 
 if (!Session::haveRight('plugin_gestion_survey', UPDATE) || !$ticket->canUpdateItem()) {
    gestion_claim_bl_end(['ok' => false, 'error' => 'forbidden'], 403);

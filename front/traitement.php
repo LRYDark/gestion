@@ -1,5 +1,4 @@
 <?php
-include ('../../../inc/includes.php'); // Inclure les fichiers nécessaires de GLPI
 require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
 
 require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';

@@ -349,47 +349,16 @@
       return a.pathname + (a.search || '');
    }
 
-   /* ══════════════════════════════════════════════════════════════════════
-    *  Jeton CSRF
-    * ══════════════════════════════════════════════════════════════════════ */
-
-   var tokenCache = {};
-
    /*
-    * GLPI 11 contrôle le jeton dans un écouteur du noyau, AVANT le script
-    * (CheckCsrfListener). Signalée AJAX, la requête voit son jeton lu dans
-    * l'en-tête `X-Glpi-Csrf-Token` et CONSERVÉ : un seul jeton suffit donc à
-    * vider toute la file. Le jeton du `<meta>` de la page convient, sauf si la
-    * page traîne ouverte depuis des heures et qu'il a été évincé — d'où le
-    * point d'entrée `ajax/csrf.php` du plugin.
+    * Pas de jeton CSRF.
+    *
+    * Depuis GLPI 12, le noyau (CheckCsrfListener) contrôle l'ORIGINE de la
+    * requête — les en-têtes `Sec-Fetch-Site` / `Origin`, que le navigateur pose
+    * lui-même et qu'une page tierce ne peut pas falsifier. Un envoi parti de
+    * cette page est donc accepté tel quel, à la première tentative comme au
+    * rejeu des heures plus tard : il n'y a plus rien à joindre, à renouveler ni
+    * à voir expirer.
     */
-   function metaToken() {
-      var el = document.querySelector('meta[property="glpi:csrf_token"]');
-      return el ? (el.getAttribute('content') || '') : '';
-   }
-
-   function freshToken(pluginKey, force) {
-      if (!force && tokenCache[pluginKey]) {
-         return Promise.resolve(tokenCache[pluginKey]);
-      }
-      var decl = plugins[pluginKey];
-      if (!decl) {
-         return Promise.resolve(metaToken());
-      }
-      return fetch(decl.webdir + '/ajax/csrf.php', {
-         method: 'GET',
-         credentials: 'same-origin',
-         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
-      }).then(function (res) {
-         if (!res.ok) { throw new Error('csrf ' + res.status); }
-         return res.json();
-      }).then(function (json) {
-         tokenCache[pluginKey] = (json && json.token) || metaToken();
-         return tokenCache[pluginKey];
-      }).catch(function () {
-         return metaToken();
-      });
-   }
 
    /* ══════════════════════════════════════════════════════════════════════
     *  Envoi
@@ -577,14 +546,6 @@
 
       var fields = [];
       data.forEach(function (value, key) {
-         /*
-          * Le jeton CSRF n'est PAS mis en file : GLPI le consomme dès qu'il a
-          * servi et ne le conserve que le temps de la session. Rejoué des
-          * heures plus tard, il serait refusé. Le rejeu en demande un neuf.
-          */
-         if (key === '_glpi_csrf_token') {
-            return;
-         }
          // Les fichiers ne sont jamais nommés dans ces formulaires : photos et
          // PDF y voyagent déjà en base64 dans des `<textarea>`. Si l'un
          // apparaissait un jour, on refuserait la mise en file plutôt que de
@@ -712,19 +673,16 @@
          }
       }
 
-      var token = metaToken();
       var headers = { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' };
 
       /*
        * PREMIER envoi : volontairement NON signalé AJAX.
        *
-       * Le noyau lit alors le jeton dans le corps et le consomme, exactement
-       * comme pour la soumission native qu'on remplace. Le serveur voit une
-       * requête en tout point identique à celle d'avant ce module — c'est ce
-       * qui rend le chemin nominal sans surprise. Seul le REJEU, qui n'a plus
-       * de jeton valide en réserve, passe par la branche AJAX.
+       * Le serveur voit une requête en tout point identique à la soumission
+       * native qu'on remplace — c'est ce qui rend le chemin nominal sans
+       * surprise. Seul le REJEU se signale AJAX.
        */
-      var body = encodeFields(fields) + '&_glpi_csrf_token=' + encodeURIComponent(token);
+      var body = encodeFields(fields);
 
       postWithTimeout(action, body, headers, SEND_TIMEOUT_MS)
          .then(function (res) {
@@ -915,20 +873,17 @@
             });
          }
 
-         function attempt(tok, isRetry) {
+         function attempt() {
                /*
                 * REJEU : signalé AJAX.
                 *
-                * Le noyau lit alors le jeton dans l'en-tête et le CONSERVE
-                * (preserve_token), si bien qu'un seul jeton suffit à vider
-                * toute la file. Aucune des cibles ne revérifie le jeton
-                * elle-même : le contrôle du noyau est le seul, et il est
-                * satisfait.
+                * Une session expirée ressort ainsi en 401 plutôt qu'en
+                * redirection vers la page de connexion : la file sait qu'il
+                * faut se reconnecter, et ne supprime rien.
                 */
                var headers = {
                   'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                  'X-Requested-With': 'XMLHttpRequest',
-                  'X-Glpi-Csrf-Token': tok
+                  'X-Requested-With': 'XMLHttpRequest'
                };
                /*
                 * `sign_replayed` : le rejeu se PRÉSENTE comme tel.
@@ -944,13 +899,6 @@
                      if (res.status === 401) {
                         sessionExpired = true;
                         return { uid: meta.uid, outcome: 'expired' };
-                     }
-                     if (res.status === 403 && !isRetry) {
-                        // Jeton évincé plutôt que droits manquants : on en
-                        // demande un neuf et on retente UNE fois.
-                        return freshToken(meta.plugin, true).then(function (t2) {
-                           return attempt(t2, true);
-                        });
                      }
                      if (res.status === 409) {
                         /*
@@ -1020,9 +968,7 @@
                   });
          }
 
-         return freshToken(meta.plugin, false).then(function (token) {
-            return attempt(token, false);
-         });
+         return attempt();
       });
    }
 
@@ -1040,7 +986,6 @@
          return Promise.resolve();
       }
       draining = true;
-      tokenCache = {};
 
       var summary = { sent: 0, recovered: 0, failed: 0, offline: 0, orphan: 0, tickets: [] };
 

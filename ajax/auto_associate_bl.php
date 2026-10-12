@@ -7,7 +7,6 @@
  * associe/insere deux fois.
  */
 
-include('../../../inc/includes.php');
 
 Session::checkLoginUser();
 header('Content-Type: application/json; charset=UTF-8');

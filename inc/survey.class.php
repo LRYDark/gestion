@@ -37,7 +37,7 @@ if (!defined('GLPI_ROOT')) {
  */
 class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSearchRequestInterface {
 
-   static $rightname = "plugin_gestion_survey";
+   static string $rightname = "plugin_gestion_survey";
 
    static function getTypeName($nb = 0) {
       return _n('Gestion', 'Gestion', $nb, 'gestion');
@@ -334,7 +334,7 @@ class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSear
                if (function_exists('plugin_gestion_ensure_pdf_token')) {
                   $docUrl = plugin_gestion_ensure_pdf_token($docUrl);
                }
-               echo '<a href="' . Html::entities_deep($docUrl) . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
+               echo '<a href="' . htmlescape($docUrl) . '" target="_blank"><strong>Voir le Document</strong></a>'; // Bouton pour voir le PDF en plein écran
             echo "</td></tr>";
 
          $this->Formulaire();
@@ -446,7 +446,7 @@ class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSear
                      ? 'ZenDoc : ' . trim((string)$this->fields['zendoc_sent_at']) : '',
                ]);
                echo "<tr class='tab_bg_1'><td>" . __('Traçabilité transport', 'gestion') . "</td><td>"
-                  . Html::entities_deep(implode(' · ', $transportDetails)) . "</td></tr>";
+                  . htmlescape(implode(' · ', $transportDetails)) . "</td></tr>";
             }
          }else{
             echo "<tr class='tab_bg_1'>";
@@ -471,7 +471,6 @@ class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSear
             echo "</tr>";
          }
          if ($this->fields['signed'] == 1 && isset($modalId)) {
-            $csrfToken = Session::getNewCSRFToken(true);
             $ajaxUrl   = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/') . '/plugins/gestion/ajax/cri.php';
             ?>
             <div class="modal fade" id="<?php echo $modalId; ?>" tabindex="-1" aria-labelledby="<?php echo $modalId; ?>Label" aria-hidden="true">
@@ -483,17 +482,16 @@ class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSear
                      </div>
                      <div class="modal-body">
                         <div id="gestion-resend-mail-form-<?php echo $ID; ?>">
-                           <input type="hidden" name="_glpi_csrf_token" value="<?php echo $csrfToken; ?>">
                            <input type="hidden" name="survey_id" value="<?php echo $ID; ?>">
                            <div class="mb-3">
                               <label class="form-label">Déstinataire principal</label>
-                              <input type="text" name="to" class="form-control" value="<?php echo Html::entities_deep($defaultEmail); ?>" placeholder="email1@example.com, email2@example.com">
+                              <input type="text" name="to" class="form-control" value="<?php echo htmlescape($defaultEmail); ?>" placeholder="email1@example.com, email2@example.com">
                               <?php if (!empty($availableEmails)) { ?>
                                  <div class="mt-2">
                                     <small class="text-muted">Suggestions :</small>
                                     <div class="mt-1" style="display:flex;flex-wrap:wrap;gap:6px;">
                                        <?php foreach ($availableEmails as $email) { ?>
-                                          <button type="button" class="btn btn-light btn-sm gestion-mail-suggestion" data-target="<?php echo $modalId; ?>" data-value="<?php echo Html::entities_deep($email); ?>"><?php echo Html::entities_deep($email); ?></button>
+                                          <button type="button" class="btn btn-light btn-sm gestion-mail-suggestion" data-target="<?php echo $modalId; ?>" data-value="<?php echo htmlescape($email); ?>"><?php echo htmlescape($email); ?></button>
                                        <?php } ?>
                                     </div>
                                  </div>
@@ -516,7 +514,7 @@ class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSear
             <?php
 
             $script = <<<JAVASCRIPT
-               function gestionSendMail(modalId, ajaxUrl, surveyId, csrfToken) {
+               function gestionSendMail(modalId, ajaxUrl, surveyId) {
                   var modalEl = document.getElementById(modalId);
                   var feedback = modalEl ? modalEl.querySelector('.gestion-send-mail-feedback') : null;
                   var toInput = modalEl ? modalEl.querySelector('input[name="to"]') : null;
@@ -548,14 +546,12 @@ class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSear
                   payload.append('survey_id', surveyId);
                   payload.append('to', toInput.value);
                   payload.append('cc', ccInput.value);
-                  payload.append('_glpi_csrf_token', csrfToken);
 
                   fetch(ajaxUrl, {
                      method: 'POST',
                      credentials: 'same-origin',
                      headers: {
                         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                        'X-GLPI-CSRF-Token': csrfToken,
                         'X-Requested-With': 'XMLHttpRequest'
                      },
                      body: payload.toString()
@@ -597,14 +593,13 @@ class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSear
                   var ajaxUrl   = "{$ajaxUrl}";
                   var modalId   = "{$modalId}";
                   var surveyId  = "{$ID}";
-                  var csrfToken = "{$csrfToken}";
                   var btnId     = "gestion-send-mail-btn-{$ID}";
                   var btn       = document.getElementById(btnId);
 
                   if (btn) {
                      btn.addEventListener('click', function(ev){
                         ev.preventDefault();
-                        gestionSendMail(modalId, ajaxUrl, surveyId, csrfToken);
+                        gestionSendMail(modalId, ajaxUrl, surveyId);
                      });
                   } else {
                   }
@@ -761,7 +756,6 @@ class PluginGestionSurvey extends CommonDBTM implements \Glpi\Search\DefaultSear
          echo "</td><td colspan='2'></td></tr>";
       }
          
-      echo Html::hidden('plugin_gestion_survey_csrf_token', ['value' => Session::getNewCSRFToken(true)]);
 
       if (Session::haveRightsOr('plugin_gestion_survey', [CREATE, UPDATE])) {
          $this->showFormButtons($options);

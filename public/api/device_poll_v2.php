@@ -6,7 +6,7 @@
  * Returns the latest pending signature request for this device, if any.
  *
  * Identification : serial (header X-Device-Serial) + IP validation.
- * Authentification : Token GLPI v1 (App-Token + User-Token) ou v2 (Bearer OAuth).
+ * Authentification : Token GLPI v1 (App-Token + User-Token) ou v3 (Bearer OAuth).
  *
  * Response (no pending) :
  *   200 { ok:true, pending:false }
@@ -40,7 +40,6 @@ define('NOLOGIN',        1);
 define('NOHEADER',       1);
 define('NOTOKENRENEWAL', 1);
 
-require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -85,8 +84,8 @@ if (!in_array($_SERVER['REQUEST_METHOD'] ?? '', ['GET', 'HEAD'], true)) {
     dp_jexit(405, ['ok' => false, 'error' => 'method_not_allowed']);
 }
 
-// ─── Authentification GLPI (Token v1/v2) ─────────────────────────────────────
-$auth = PluginGestionApiAuth::authenticateRequest(false);
+// ─── Authentification GLPI (Token v1/v3) ─────────────────────────────────────
+$auth = PluginGestionApiAuth::authenticateRequest(false, true); // session temporaire : rien n'est rejoue vers GLPI
 if (empty($auth['ok'])) {
     dp_jexit(
         (int)($auth['code'] ?? 401),

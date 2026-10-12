@@ -310,12 +310,6 @@ function gestion_switchCombinedMode(radio) {
     return;
   }
 
-  function getCSRF() {
-    return document.querySelector('meta[property="glpi:csrf_token"]')?.content
-        || document.querySelector('input[name="_glpi_csrf_token"]')?.value
-        || '';
-  }
-
   function getTicketId() {
     const hid2 = document.getElementById('remote-ticket-id');
     if (hid2 && hid2.value) return parseInt(hid2.value, 10);
@@ -329,19 +323,18 @@ function gestion_switchCombinedMode(radio) {
     return 0;
   }
 
+  // GLPI 12 : aucun jeton à joindre, le noyau contrôle l'origine de la requête.
   async function postForm(url, data) {
-    const csrf = getCSRF();
     const form = new URLSearchParams();
     Object.entries(data || {}).forEach(([k, v]) => form.append(k, v == null ? '' : String(v)));
-    if (csrf) form.append('_glpi_csrf_token', csrf);
 
     const res = await fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: Object.assign({
+      headers: {
         'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
         'X-Requested-With': 'XMLHttpRequest'
-      }, csrf ? { 'X-Glpi-Csrf-Token': csrf } : {}),
+      },
       body: form.toString()
     });
     const text = await res.text();
@@ -350,15 +343,14 @@ function gestion_switchCombinedMode(radio) {
   }
 
   async function postJSON(url, obj) {
-    const csrf = getCSRF();
     const res = await fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
-      headers: Object.assign({
+      headers: {
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest'
-      }, csrf ? { 'X-Glpi-Csrf-Token': csrf } : {}),
-      body: JSON.stringify(Object.assign({}, obj, csrf ? { _glpi_csrf_token: csrf } : {}))
+      },
+      body: JSON.stringify(Object.assign({}, obj))
     });
     const text = await res.text();
     if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + text);
@@ -1558,13 +1550,6 @@ function initializeSignatureGestion(uniqId) {
   let scanQueued = false;
   let formRefreshTimer = null;
 
-  function getCsrf() {
-    const meta = document.querySelector('meta[property="glpi:csrf_token"]');
-    if (meta && meta.content) return meta.content;
-    const input = document.querySelector('input[name="_glpi_csrf_token"]');
-    return input ? input.value : '';
-  }
-
   function normalizeBL(raw) {
     if (!raw) return '';
     const compact = String(raw).toUpperCase().replace(/[\s-]/g, '');
@@ -1655,7 +1640,6 @@ function initializeSignatureGestion(uniqId) {
       throw new Error('candidate_incomplete');
     }
 
-    const csrf = getCsrf();
     const payload = new URLSearchParams();
     payload.append('save', save);
     payload.append('filename', filename);
@@ -1664,18 +1648,14 @@ function initializeSignatureGestion(uniqId) {
     payload.append('search_pdf', searchPdf);
     payload.append('tickets_id', '0');
     payload.append('entities_id', '0');
-    if (csrf) payload.append('_glpi_csrf_token', csrf);
 
     const response = await fetch(root + '/ajax/quick_add_survey_form.php', {
       method: 'POST',
       credentials: 'same-origin',
-      headers: Object.assign(
-        {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        csrf ? { 'X-Glpi-Csrf-Token': csrf } : {}
-      ),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
       body: payload.toString()
     });
 
@@ -2257,9 +2237,6 @@ function initializeSignatureGestion(uniqId) {
 
   function run(){
     try {
-      // $.ajax (jQuery) pour beneficier du token CSRF injecte globalement par GLPI
-      // (ajaxSetup), comme les autres endpoints du plugin. fetch() natif ne recoit
-      // PAS ce token => le CheckCsrfListener de GLPI 11 rejette la requete.
       $.ajax({
         url: root + '/ajax/auto_associate_bl.php',
         method: 'POST',

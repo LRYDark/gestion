@@ -13,7 +13,6 @@
 // Le chargement des plugins peut émettre du HTML : on le neutralise pour
 // garantir une réponse JSON valide.
 ob_start();
-include('../../../inc/includes.php');
 while (ob_get_level() > 0) {
    ob_end_clean();
 }
@@ -25,7 +24,7 @@ Session::checkLoginUser();
 global $DB, $CFG_GLPI;
 
 $rootdoc = rtrim((string)($CFG_GLPI['root_doc'] ?? ''), '/');
-$webdir  = defined('PLUGIN_GESTION_WEBDIR') ? PLUGIN_GESTION_WEBDIR : Plugin::getWebDir('gestion');
+$webdir  = defined('PLUGIN_GESTION_WEBDIR') ? PLUGIN_GESTION_WEBDIR : (($GLOBALS['CFG_GLPI']['root_doc'] ?? '') . '/plugins/gestion');
 
 function gestion_scan_end(array $payload, int $status = 200): void {
    while (ob_get_level() > 0) {

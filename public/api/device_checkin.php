@@ -4,10 +4,10 @@
  *
  * Enregistre ou met à jour un appareil kiosque dans glpi_plugin_gestion_devices.
  * Identification : serial (header X-Device-Serial) + IP client.
- * Authentification : Token GLPI v1 (App-Token + User-Token) ou v2 (Bearer OAuth).
+ * Authentification : Token GLPI v1 (App-Token + User-Token) ou v3 (Bearer OAuth).
  *
  * Request Headers :
- *   Authorization: Bearer <token>           (v2) OU App-Token + User-Token (v1) (obligatoire)
+ *   Authorization: Bearer <token>           (v3) OU App-Token + User-Token (v1) (obligatoire)
  *   X-Device-Serial: <serial_ipad>          (obligatoire)
  *
  * Request Body (JSON) :
@@ -29,7 +29,6 @@ define('NOLOGIN',          1);
 define('NOHEADER',         1);
 define('NOTOKENRENEWAL',   1);
 
-require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -75,8 +74,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     dc_jexit(405, ['ok' => false, 'error' => 'method_not_allowed']);
 }
 
-// ─── Authentification GLPI (Token v1/v2) ─────────────────────────────────────
-$auth = PluginGestionApiAuth::authenticateRequest(false);
+// ─── Authentification GLPI (Token v1/v3) ─────────────────────────────────────
+$auth = PluginGestionApiAuth::authenticateRequest(false, true); // session temporaire : rien n'est rejoue vers GLPI
 if (empty($auth['ok'])) {
     dc_jexit(
         (int)($auth['code'] ?? 401),

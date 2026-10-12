@@ -2,7 +2,6 @@
 // plugins/gestion/ajax/quick_add_survey_form.php
 // Create a survey entry from the BL quick-selection modal (logged-in users only).
 
-include('../../../inc/includes.php');
 header('Content-Type: application/json; charset=UTF-8');
 
 require_once PLUGIN_GESTION_DIR . '/front/SageApi.php';
@@ -20,7 +19,6 @@ function json_end(int $status, array $payload): void {
 
 try {
    Session::checkLoginUser();
-   Session::checkCSRF($_POST, true);
 
    if (!Session::haveRightsOr('plugin_gestion_survey', [CREATE, UPDATE])) {
       json_end(403, ['ok' => false, 'error' => 'access_denied']);

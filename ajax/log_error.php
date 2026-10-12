@@ -4,7 +4,6 @@
  * Logger les erreurs JavaScript côté signature déportée
  */
 
-require_once dirname(__DIR__, 3) . '/inc/includes.php';
 @ini_set('display_errors', '0');
 
 header('Content-Type: application/json; charset=UTF-8');

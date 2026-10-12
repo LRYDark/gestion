@@ -82,7 +82,7 @@ function update120to130() {
       $content_html2 = $ContentHtml2;
 
       // Échapper le contenu HTML
-      $content_html2_escaped = Toolbox::addslashes_deep($content_html2);
+      $content_html2_escaped = $DB->escape(str_replace(['&#039;', '&#39;', '&#x27;', '&apos;', '&quot;'], ["'", "'", "'", "'", '"'], $content_html2));
 
       // Construire la requête d'insertion
       $insertQuery1 = "INSERT INTO `glpi_notificationtemplates` (`name`, `itemtype`, `date_mod`, `comment`, `css`, `date_creation`) VALUES ('Gestion Mail PDF (Tracker)', 'Ticket', NULL, 'Created by the plugin gestion (Tracker)', '', NULL);";

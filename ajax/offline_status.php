@@ -28,7 +28,6 @@
  */
 $rp_ob_base = ob_get_level();
 ob_start();
-include('../../../inc/includes.php');
 while (ob_get_level() > $rp_ob_base) {
    ob_end_clean();
 }

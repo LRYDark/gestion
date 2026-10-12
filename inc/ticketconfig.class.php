@@ -12,7 +12,7 @@ if (!defined('GLPI_ROOT')) {
 
 class PluginGestionTicketConfig extends CommonDBTM
 {
-    public static $rightname = 'plugin_gestion_ticketconfig';
+    public static string $rightname = 'plugin_gestion_ticketconfig';
 
     public static function getTypeName($nb = 0)
     {
@@ -130,7 +130,7 @@ class PluginGestionTicketConfig extends CommonDBTM
                   #AddGestionModal .select2-container { width:100%!important; max-width:100%; }
                 </style>
                 <div class="modal fade" id="AddGestionModal"
-                    data-root-doc="<?= Html::cleanInputText($CFG_GLPI['root_doc']) ?>"
+                    data-root-doc="<?= htmlescape($CFG_GLPI['root_doc']) ?>"
                     tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
                   <div class="modal-dialog modal-lg">
                     <div class="modal-content">
@@ -155,8 +155,7 @@ class PluginGestionTicketConfig extends CommonDBTM
                           </div>
                         </div>
                         <?php if ($connexion) { ?>
-                          <!-- tokens/infos à lire côté JS -->
-                          <input type="hidden" id="gestion_csrf" value="<?= Html::cleanInputText(Session::getNewCSRFToken(true)) ?>">
+                          <!-- infos à lire côté JS -->
                           <input type="hidden" id="gestion_ticket_id" value="<?= (int)$ticketId ?>">
 
                           <!-- aide au-dessus du select -->
@@ -351,7 +350,6 @@ class PluginGestionTicketConfig extends CommonDBTM
 
                     // --- Construire et soumettre le formulaire dédié plugin ---
                     var root  = $('#AddGestionModal').data('root-doc') || '';
-                    var token = $('#gestion_csrf').val() || '';
                     var tid   = $('#gestion_ticket_id').val() || '';
                     var values = $sel.val() || [];
 
@@ -367,7 +365,6 @@ class PluginGestionTicketConfig extends CommonDBTM
                       form.appendChild(input);
                     }
 
-                    add('_glpi_csrf_token', token);
                     add('tickets_id', tid);
                     add('save_selection', '1');
                     values.forEach(function(v){ add('groups_id[]', v); });

@@ -21,7 +21,6 @@ define('NOLOGIN', 1);
 define('NOHEADER', 1);
 define('NOTOKENRENEWAL', 1);
 
-require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 
 // Compatibilité immédiate avec les serveurs dont la liste des routes du plugin
@@ -155,9 +154,6 @@ function api_sign_call_traitement(array $payload, string $rootdoc, array $cfg): 
          'Content-Type: application/x-www-form-urlencoded; charset=UTF-8',
          'X-Requested-With: XMLHttpRequest',
       ];
-      if (!empty($payload['_glpi_csrf_token'])) {
-         $headers[] = 'X-Glpi-Csrf-Token: ' . (string)$payload['_glpi_csrf_token'];
-      }
 
       $cookie = '';
       $sid = session_id();
@@ -361,9 +357,6 @@ if ($technician_login === '') {
    api_sign_end(500, ['ok' => false, 'error' => 'missing_technician_login']);
 }
 
-$csrf = Session::getNewCSRFToken();
-$_SESSION['glpicsrftoken'] = $csrf;
-
 $doc_name = preg_replace('/\.pdf$/i', '', (string)$survey['bl']);
 $payload = [
    'REPORT_ID'         => '0',
@@ -375,7 +368,6 @@ $payload = [
    'mailtoclient'      => ($mail_to_client && $signer_email !== '') ? '1' : '0',
    'technician'        => $technician_login,
    'CounterInvoiceClient' => $counter_invoice_client ? '1' : '0',
-   '_glpi_csrf_token'  => $csrf,
 ];
 
 if ($comment !== '') {

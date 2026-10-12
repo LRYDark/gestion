@@ -28,7 +28,6 @@
  */
 
 
-include('../../../inc/includes.php');
 
 // Force menu refresh once if custom action link is missing (menu is cached in session)
 if (isset($_SESSION['glpimenu'])) {
@@ -190,13 +189,6 @@ if ($gestion->canView()) {
             let barcodeDetectorReady = false;
             let jsQrLoadPromise = null;
 
-            function getCsrf() {
-               const meta = document.querySelector('meta[property="glpi:csrf_token"]');
-               if (meta && meta.content) return meta.content;
-               const input = document.querySelector('input[name="_glpi_csrf_token"]');
-               return input ? input.value : '';
-            }
-
             function showError(msg) {
                const errEl = document.getElementById(errId);
                if (!errEl) return;
@@ -342,17 +334,12 @@ if ($gestion->canView()) {
                payload.append('search_pdf', (item.text || item.id || '').trim());
                payload.append('tickets_id', '0');
                payload.append('entities_id', '0');
-               const csrf = getCsrf();
-               if (csrf) payload.append('_glpi_csrf_token', csrf);
 
                try {
                   const headers = {
                      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                      'X-Requested-With': 'XMLHttpRequest'
                   };
-                  if (csrf) {
-                     headers['X-Glpi-Csrf-Token'] = csrf;
-                  }
                   const res = await fetch(base + '/ajax/quick_add_survey_form.php', {
                      method: 'POST',
                      headers,
@@ -1031,7 +1018,7 @@ if ($gestion->canView()) {
    }
 
 } else {
-   Html::displayRightError();
+   throw new \Glpi\Exception\Http\AccessDeniedHttpException();
 }
 
 Html::footer();

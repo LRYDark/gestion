@@ -7,7 +7,7 @@ if (!defined('GLPI_ROOT')) {
 //------------------------------------------------------------------------------------------
 class PluginGestionTicket extends CommonDBTM {
 
-   public static $rightname = 'plugin_gestion_sign';
+   public static string $rightname = 'plugin_gestion_sign';
    public  static  $gestion = 0 ;
 
    public static function getTable($classname = null) {
@@ -462,7 +462,7 @@ class PluginGestionTicket extends CommonDBTM {
                $out .= "        </div>";
                $out .= "        <div class='text-secondary small mt-1'>";
                $out .= __('ID', 'gestion') . ' ' . $blId;
-               $tech = getUserName($data['users_id'], $showuserlink);
+               $tech = getUserName((int)$data['users_id'], $showuserlink);
                if (trim(strip_tags((string)$tech)) !== '') {
                   $out .= ' &middot; ' . __('Technicien', 'gestion') . ' : ' . $tech;
                }
@@ -745,7 +745,7 @@ class PluginGestionTicket extends CommonDBTM {
             $values,
             ['id' => $row['id'], 'tickets_id' => $row['tickets_id']]
          );
-         if (!$ok || $DB->affectedRows() < 1) {
+         if (!$ok || $DB->getAffectedRows() < 1) {
             $result['skipped'][] = $row;
             continue;
          }

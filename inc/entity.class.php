@@ -34,7 +34,7 @@ use Glpi\DBAL\QueryExpression;
 
 class PluginRtEntity extends CommonDBTM
 {
-    public static $rightname = 'rt';
+    public static string $rightname = 'rt';
 
     public static function getTypeName($nb = 0)
     {

@@ -10,7 +10,6 @@
  */
 
 ob_start();
-include('../../../inc/includes.php');
 while (ob_get_level() > 0) {
    ob_end_clean();
 }
@@ -40,7 +39,7 @@ if (!$ticket->getFromDB($ticket_id) || !$ticket->canViewItem()) {
    gestion_ticket_actions_end(['ok' => false, 'error' => 'forbidden'], 403);
 }
 
-$webdir      = defined('PLUGIN_GESTION_WEBDIR') ? PLUGIN_GESTION_WEBDIR : Plugin::getWebDir('gestion');
+$webdir      = defined('PLUGIN_GESTION_WEBDIR') ? PLUGIN_GESTION_WEBDIR : (($GLOBALS['CFG_GLPI']['root_doc'] ?? '') . '/plugins/gestion');
 $can_sign_bl = Session::haveRight('plugin_gestion_survey', READ);
 
 $actions = [];

@@ -7,15 +7,36 @@ final class PluginGestionApiAuth
 {
    private static ?string $cached_raw_input = null;
 
-   public static function authenticateRequest(bool $allow_session = false): array
+   /** Session de la requete en cours : temporaire (non enregistree) ou non. */
+   private static bool $temporary_session = false;
+
+   /**
+    * @param bool $temporary_session Session TEMPORAIRE, comme le fait l'API v3 de GLPI pour ses propres appels.
+    *
+    * Depuis GLPI 12, Session::init() enregistre une connexion a chaque appel
+    * (table glpi_users_sessions + historique des connexions de l'utilisateur).
+    * Un endpoint interroge toutes les quelques secondes par une tablette y
+    * ecrirait des milliers de lignes par jour. Une session temporaire donne les
+    * memes droits, profil et entite pour la duree de la requete, sans rien
+    * enregistrer.
+    *
+    * A reserver aux endpoints qui repondent eux-memes. Ceux qui rejouent la
+    * requete vers une page de GLPI (traitement*.php, cripdf.form.php) avec le
+    * cookie de session doivent garder une session ENREGISTREE : la page
+    * appelee la verifie (Session::checkLoginUser) et refuserait une session
+    * que GLPI ne connait pas.
+    */
+   public static function authenticateRequest(bool $allow_session = false, bool $temporary_session = false): array
    {
       global $CFG_GLPI;
+
+      self::$temporary_session = $temporary_session;
 
       $hl_enabled = Config::isHlApiEnabled();
       $legacy_enabled = !empty($CFG_GLPI['enable_api']);
 
       if (!$hl_enabled && !$legacy_enabled) {
-         return self::error(403, 'api_disabled', 'Aucune API GLPI active (ni v2 HL, ni legacy)');
+         return self::error(403, 'api_disabled', 'Aucune API GLPI active (ni High-Level, ni legacy)');
       }
 
       $headers_norm = self::getHeadersNormalized();
@@ -23,13 +44,13 @@ final class PluginGestionApiAuth
 
       if ($authorization !== '' && preg_match('/^bearer\s+(.+)$/i', $authorization)) {
          if (!$hl_enabled) {
-            return self::error(403, 'hl_api_disabled', 'API High-Level (v2) desactivee');
+            return self::error(403, 'hl_api_disabled', 'API High-Level desactivee');
          }
          return self::authenticateOAuth($headers_norm);
       }
 
       if (!$legacy_enabled) {
-         return self::error(401, 'missing_bearer_token', 'Authorization: Bearer <token> requis (API v2 active uniquement)');
+         return self::error(401, 'missing_bearer_token', 'Authorization: Bearer <token> requis (API High-Level active uniquement)');
       }
 
       return self::authenticateLegacy($headers_norm);
@@ -174,7 +195,7 @@ final class PluginGestionApiAuth
       $auth->auth_succeded = true;
       $auth->user = new User();
       $auth->user->getFromDB((int)$user->fields['id']);
-      Session::init($auth);
+      Session::init($auth, self::$temporary_session);
 
       self::applyContextHeaders($headers_norm);
    }
@@ -225,7 +246,7 @@ final class PluginGestionApiAuth
 
    private static function validateLegacyAppToken(string $app_token): array
    {
-      $ip_txt = (string)Toolbox::getRemoteIpAddress();
+      $ip_txt = (string)\Glpi\Toolbox\IPUtilities::getClientIP();
       $is_ipv4 = !str_contains($ip_txt, ':');
       $ip_num = $is_ipv4 ? ip2long($ip_txt) : false;
 

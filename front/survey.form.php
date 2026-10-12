@@ -26,7 +26,6 @@
  along with gestion. If not, see <http://www.gnu.org/licenses/>.
  --------------------------------------------------------------------------
  */
-include('../../../inc/includes.php');
 require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
 
 global $DB, $CFG_GLPI;
@@ -54,16 +53,7 @@ function message($msg, $msgtype){
 }
 }
 
-function pluginGestionSurveyCheckCSRF(array $data): void {
-    if (!empty($data['plugin_gestion_survey_csrf_token'])) {
-        Session::checkCSRF(['_glpi_csrf_token' => (string)$data['plugin_gestion_survey_csrf_token']], true);
-        return;
-    }
-    Session::checkCSRF($data, true);
-}
-
 if (isset($_POST["add"])) {
-   pluginGestionSurveyCheckCSRF($_POST);
    $valid = false;
    $NewDoc = 0;
    $tickets_id = (int)($_POST['tickets_id'] ?? 0);
@@ -153,13 +143,11 @@ if (isset($_POST["add"])) {
    Html::back();
 
 }else if (isset($_POST["purge"])) {
-   pluginGestionSurveyCheckCSRF($_POST);
    $survey->check((int)$_POST['id'], PURGE);
    $survey->delete($_POST);
    $survey->redirectToList();
 
 } else if (isset($_POST["update"])) {
-   pluginGestionSurveyCheckCSRF($_POST);
    $survey->check((int)$_POST['id'], UPDATE);
    $survey->update($_POST);
 

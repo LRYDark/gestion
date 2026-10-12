@@ -1,10 +1,9 @@
 <?php
-include('../../../inc/includes.php');
 global $DB;
 
 $plugin = new Plugin();
 if (!$plugin->isInstalled('gestion') || !$plugin->isActivated('gestion')) {
-   Html::displayNotFoundError();
+   throw new \Glpi\Exception\Http\NotFoundHttpException();
 }
 
 Session::checkRight('config', UPDATE);
@@ -30,22 +29,12 @@ function encryptArray($array) {
    return $encrypted_array;
 }
 
-function pluginGestionCheckCSRF(array $data): void {
-   if (!empty($data['plugin_gestion_csrf_token'])) {
-      Session::checkCSRF([
-         '_glpi_csrf_token' => (string)$data['plugin_gestion_csrf_token']
-      ], true);
-      return;
-   }
-
-   Session::checkCSRF($data, true);
-}
+// GLPI 12 : la protection CSRF est assurée par le noyau (en-têtes Sec-Fetch-Site / Origin), sans jeton.
 
 // ── Actions device kiosque (ban / unban / delete) — traitement avant le formulaire principal ──
 $deviceActionPayload = (string)($_POST['device_action_submit'] ?? '');
 if ($deviceActionPayload !== '' || (isset($_POST['action_device']) && isset($_POST['device_row_id']))) {
    Session::checkRight('config', UPDATE);
-   pluginGestionCheckCSRF($_POST);
 
    $devId     = 0;
    $devAction = '';
@@ -78,7 +67,6 @@ if ($deviceActionPayload !== '' || (isset($_POST['action_device']) && isset($_PO
 }
 
 if (isset($_POST["update"])) {
-   pluginGestionCheckCSRF($_POST);
    $encrypted_post = encryptArray($_POST);
 
    // ===== AJOUTS POUR SIGNATURE FACTURE COMPTOIR =====
@@ -149,4 +137,6 @@ if (isset($_POST["update"])) {
    Html::back();
 }
 
+// Fichier charge depuis une methode de GLPI : $CFG_GLPI n'y est visible qu'avec « global ».
+global $CFG_GLPI;
 Html::redirect($CFG_GLPI["root_doc"] . "/front/config.form.php?forcetab=" . urlencode('PluginGestionConfig$1'));

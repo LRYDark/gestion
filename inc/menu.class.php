@@ -32,7 +32,7 @@
  */
 class PluginGestionMenu extends CommonGLPI
 {
-   static $rightname = 'plugin_gestion_survey';
+   static string $rightname = 'plugin_gestion_survey';
 
    /**
     * @return translated

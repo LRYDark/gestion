@@ -1,9 +1,8 @@
 <?php
-include('../../../inc/includes.php');
 
 $plugin = new Plugin();
 if (!$plugin->isInstalled('gestion') || !$plugin->isActivated('gestion')) {
-   Html::displayNotFoundError();
+   throw new \Glpi\Exception\Http\NotFoundHttpException();
 }
 
 Session::checkRight('config', READ);
@@ -40,16 +39,16 @@ Html::header(__('Documentation API Gestion', 'gestion'), $_SERVER['PHP_SELF'], '
     <div class="card-header"><h3 class="card-title mb-0"><?php echo __('Documentation API Gestion', 'gestion'); ?></h3></div>
     <div class="card-body">
       <p class="mb-2"><?php echo __('Endpoints publics (URL) : /plugins/gestion/api/*.php. Fichiers physiques : /plugins/gestion/public/api/*.php', 'gestion'); ?></p>
-      <p class="mb-2"><?php echo __('Auth supportée : OAuth v2 (Bearer token utilisateur) et legacy (App-Token + user_token / Session-Token).', 'gestion'); ?></p>
+      <p class="mb-2"><?php echo __('Auth supportée : API v3 en OAuth 2 (Bearer token utilisateur) et legacy (App-Token + user_token / Session-Token).', 'gestion'); ?></p>
       <input id="gestionApiSearch" class="form-control" type="search" placeholder="<?php echo __('Rechercher endpoint, paramètre, GET/POST, curl, body JSON, erreur…', 'gestion'); ?>">
       <div class="form-text"><?php echo __('Astuce : essayez "bl prepare", "combined_sign", "ticket_bls", "GET", "POST JSON", "curl", "technician", "counter invoice".', 'gestion'); ?></div>
     </div>
   </div>
 
-  <div class="doc-card" data-doc-item data-search="auth oauth bearer legacy app-token user_token session-token v2 v1">
+  <div class="doc-card" data-doc-item data-search="auth oauth bearer legacy app-token user_token session-token v3 v2 v1">
     <div class="doc-meta">AUTH</div>
     <h4>Authentification</h4>
-    <pre><code>OAuth v2 (recommandé)
+    <pre><code>API v3 - OAuth 2 (recommandé)
 Authorization: Bearer &lt;access_token_utilisateur&gt;
 
 Legacy v1
@@ -59,7 +58,7 @@ Authorization: user_token &lt;user_token_preferences&gt;
 Alternative legacy session
 App-Token: &lt;app_token_glpi&gt;
 Session-Token: &lt;session_token_v1&gt;</code></pre>
-    <pre><code>POST <?php echo htmlspecialchars($rootdoc . '/api.php/v2.2/token', ENT_QUOTES); ?>
+    <pre><code>POST <?php echo htmlspecialchars($rootdoc . '/api.php/v3.0/token', ENT_QUOTES); ?>
 grant_type=password
 client_id=...
 client_secret=...
@@ -355,7 +354,7 @@ POST <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/api/device_
     <p><?php echo __('Reçoit un document scanné depuis la tablette (borne) et le transfère PAR MAIL aux destinataires configurés. Aucun stockage GLPI : le fichier temporaire est supprimé après l’envoi.', 'gestion'); ?></p>
     <div class="doc-note">
       <span class="method method-post">POST</span>
-      <?php echo __('Auth Token v1/v2 + header `X-Device-Serial` (même mécanisme que `device_submit_v2`). Destinataires = config plugin « Envoi facture par mail » (`InvoiceMail`), 1ʳᵉ adresse en To, suivantes en Cc.', 'gestion'); ?>
+      <?php echo __('Auth Token v1/v3 + header `X-Device-Serial` (même mécanisme que `device_submit_v2`). Destinataires = config plugin « Envoi facture par mail » (`InvoiceMail`), 1ʳᵉ adresse en To, suivantes en Cc.', 'gestion'); ?>
     </div>
     <table class="doc-table">
       <thead><tr><th><?php echo __('Champ', 'gestion'); ?></th><th><?php echo __('Type', 'gestion'); ?></th><th><?php echo __('Obligatoire', 'gestion'); ?></th><th><?php echo __('Notes', 'gestion'); ?></th></tr></thead>
@@ -416,7 +415,7 @@ curl -X POST "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/ap
   <div class="doc-card" data-doc-item data-search="test authentification api oauth bearer legacy app-token user_token modal config">
     <div class="doc-meta">OUTILS</div>
     <h4><?php echo __('Test API / Authentification', 'gestion'); ?></h4>
-    <p class="mb-2"><?php echo __('Ouvre le testeur interactif (OAuth v2 / legacy) directement sur cette page de documentation.', 'gestion'); ?></p>
+    <p class="mb-2"><?php echo __('Ouvre le testeur interactif (API v3 / legacy) directement sur cette page de documentation.', 'gestion'); ?></p>
     <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#gestionApiTesterModal">
       <?php echo __('Test', 'gestion'); ?>
     </button>
@@ -435,7 +434,7 @@ curl -X POST "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/ap
           <div class="col-md-4">
             <label for="gestionApiTestMode" class="form-label"><?php echo __('Mode de test', 'gestion'); ?></label>
             <select id="gestionApiTestMode" class="form-select">
-              <option value="v2_password"><?php echo __('OAuth v2.2 (grant password)', 'gestion'); ?></option>
+              <option value="v2_password"><?php echo __('OAuth 2 (grant password)', 'gestion'); ?></option>
               <option value="v1_user_token"><?php echo __('Legacy v1 (App-Token + user_token)', 'gestion'); ?></option>
             </select>
           </div>
@@ -602,7 +601,7 @@ curl -X POST "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/ap
         "$Username = '" + escPs(fields.username.value) + "'",
         "$Password = '" + escPs(fields.password.value) + "'",
         "",
-        "$token = Invoke-RestMethod -Method POST -Uri \"$BaseUrl/api.php/v2.2/token\" -ContentType \"application/x-www-form-urlencoded\" -Body @{",
+        "$token = Invoke-RestMethod -Method POST -Uri \"$BaseUrl/api.php/v3.0/token\" -ContentType \"application/x-www-form-urlencoded\" -Body @{",
         "    grant_type    = 'password'",
         "    client_id     = $ClientId",
         "    client_secret = $ClientSecret",
@@ -660,7 +659,7 @@ curl -X POST "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/ap
         tokenForm.set('password', fields.password.value);
         tokenForm.set('scope', 'api user');
 
-        const tokenRes = await fetch(base + '/api.php/v2.2/token', {
+        const tokenRes = await fetch(base + '/api.php/v3.0/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: tokenForm
@@ -673,7 +672,7 @@ curl -X POST "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/public/ap
           tokenBody = {};
         }
         if (!tokenRes.ok || !tokenBody.access_token) {
-          setResult("OAuth v2.2 token KO (HTTP " + tokenRes.status + ")\n" + tokenBodyRaw);
+          setResult("OAuth token KO (HTTP " + tokenRes.status + ")\n" + tokenBodyRaw);
           return;
         }
 

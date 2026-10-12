@@ -12,7 +12,6 @@
  * PDF fusionne (doc_url).
  */
 
-include('../../../inc/includes.php');
 require_once(__DIR__ . '/../vendor/autoload.php');
 
 require_once PLUGIN_GESTION_DIR . '/front/SharePointGraph.php';

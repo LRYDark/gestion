@@ -40,8 +40,8 @@ if (!defined('GLPI_ROOT')) {
  */
 class PluginGestionReminder extends CommonDBTM {
 
-   static $rightname = "plugin_gestion_survey";
-   public $dohistory = true;
+   static string $rightname = "plugin_gestion_survey";
+   public bool $dohistory = true;
 
    const CRON_TASK_NAME = 'GestionPdf';
 

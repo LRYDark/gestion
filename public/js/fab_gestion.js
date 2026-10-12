@@ -57,15 +57,6 @@
          .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
    }
 
-   function csrf() {
-      var meta = document.querySelector('meta[property="glpi:csrf_token"]');
-      if (meta && meta.content) {
-         return meta.content;
-      }
-      var input = document.querySelector('input[name="_glpi_csrf_token"]');
-      return input ? input.value : '';
-   }
-
    /**
     * Le script capable d'ouvrir ce formulaire est-il chargé ?
     * Sans ce test, on afficherait un bouton inerte quand le plugin concerné
@@ -610,24 +601,14 @@
 
          var body = new URLSearchParams();
          body.append('q', q);
-         // Conservé pour compatibilité, mais c'est l'en-tête ci-dessous que
-         // GLPI 11 utilise réellement.
-         body.append('_glpi_csrf_token', csrf());
 
          fetch(scanUrl, {
             method: 'POST',
             credentials: 'same-origin',
-            /*
-             * GLPI 11 contrôle le jeton CSRF dans un écouteur du noyau, AVANT
-             * d'atteindre le script. Signalée AJAX, la requête voit son jeton
-             * lu dans l'en-tête `X-Glpi-Csrf-Token` et CONSERVÉ, donc
-             * réutilisable ; sinon il est lu dans le corps et CONSOMMÉ, et
-             * toute recherche suivante échoue.
-             */
+            // GLPI 12 : aucun jeton à joindre, le noyau contrôle l'origine de la requête.
             headers: {
                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-               'X-Requested-With': 'XMLHttpRequest',
-               'X-Glpi-Csrf-Token': csrf()
+               'X-Requested-With': 'XMLHttpRequest'
             },
             body: body.toString()
          })
@@ -762,15 +743,13 @@
          body.append('mode', 'deep');
          body.append('scope', deepScope());
          body.append('q', q);
-         body.append('_glpi_csrf_token', csrf());
 
          fetch(scanUrl, {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-               'X-Requested-With': 'XMLHttpRequest',
-               'X-Glpi-Csrf-Token': csrf()
+               'X-Requested-With': 'XMLHttpRequest'
             },
             body: body.toString()
          })
@@ -1374,9 +1353,6 @@
        */
       function claimErrorText(res) {
          var code = (res && res.error) || '';
-         if (code === 'invalid_csrf') {
-            return 'Session expirée : rechargez la page, puis réessayez.';
-         }
          if (code === 'forbidden') {
             return 'Droits insuffisants pour déplacer un bon sur ce ticket.';
          }
@@ -1404,23 +1380,15 @@
 
          var body = new URLSearchParams();
          body.append('ticket_id', String(ticketId));
-         body.append('_glpi_csrf_token', csrf());
          pending.ids.forEach(function (id) { body.append('ids[]', String(id)); });
 
          fetch(claimUrl, {
             method: 'POST',
             credentials: 'same-origin',
-            /*
-             * GLPI 11 contrôle le jeton CSRF dans un écouteur du noyau, AVANT
-             * d'atteindre le script (CheckCsrfListener). Signalée AJAX, la
-             * requête voit son jeton lu dans `X-Glpi-Csrf-Token` et CONSERVÉ ;
-             * sinon il est lu dans le corps et CONSOMMÉ — le contrôle du script
-             * échouait alors sur un jeton que GLPI venait lui-même de retirer.
-             */
+            // GLPI 12 : aucun jeton à joindre, le noyau contrôle l'origine de la requête.
             headers: {
                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-               'X-Requested-With': 'XMLHttpRequest',
-               'X-Glpi-Csrf-Token': csrf()
+               'X-Requested-With': 'XMLHttpRequest'
             },
             body: body.toString()
          })

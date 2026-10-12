@@ -19,7 +19,6 @@ define('NOLOGIN', 1);
 define('NOHEADER', 1);
 define('NOTOKENRENEWAL', 1);
 
-require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 
 global $DB, $CFG_GLPI;
@@ -100,7 +99,7 @@ if (!in_array($method, ['GET', 'POST'], true)) {
    api_ticket_bls_end(405, ['ok' => false, 'error' => 'method_not_allowed']);
 }
 
-$auth = PluginGestionApiAuth::authenticateRequest(false);
+$auth = PluginGestionApiAuth::authenticateRequest(false, true); // session temporaire : rien n'est rejoue vers GLPI
 if (empty($auth['ok'])) {
    api_ticket_bls_end((int)($auth['code'] ?? 401), [
       'ok'      => false,

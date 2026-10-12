@@ -1,5 +1,4 @@
 <?php
-include ('../../../inc/includes.php');
 
 use Glpi\Event;
 

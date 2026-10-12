@@ -9,7 +9,6 @@
 
 declare(strict_types=1);
 
-require_once dirname(__DIR__, 3) . '/inc/includes.php';
 @ini_set('display_errors', '0');
 
 global $DB, $CFG_GLPI;

@@ -9,7 +9,6 @@
  * @since 1.7.0_alpha1 — Suppression device_id / device_token.
  */
 
-include ('../../../inc/includes.php');
 header('Content-Type: application/json; charset=UTF-8');
 
 global $DB, $CFG_GLPI;
@@ -24,11 +23,8 @@ if (empty($config->fields['RemoteSignatureOn'])) {
 
 try {
     Session::checkLoginUser();
-    // NOTE: Ne pas appeler Session::checkCSRF($_POST) ici.
-    // En GLPI 11, le CheckCsrfListener valide déjà le token avec preserve_token=true
-    // (token conservé en session pour les appels AJAX multiples).
-    // Un appel manuel checkCSRF() avec preserve_token=false (défaut) consommerait
-    // le token et casserait tous les appels AJAX suivants (ex: polling du statut).
+    // CSRF : contrôlé par le CheckCsrfListener du noyau avant ce fichier
+    // (depuis GLPI 12, par l'origine de la requête ; il n'y a plus de jeton).
 
     // ── Paramètres ──────────────────────────────────────────────────────────
     $ticket_id     = (int)($_POST['ticket_id'] ?? 0);

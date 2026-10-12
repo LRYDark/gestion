@@ -1166,7 +1166,7 @@ class PluginGestionSharepoint extends CommonDBTM {
         $BodyHtml = $BodyText = $Subject = '';
         $curLang  = $_SESSION['glpilanguage'] ?? ($CFG_GLPI['language'] ?? 'fr_FR');
         $langs    = array_values(array_unique([$curLang, substr($curLang, 0, 2), '']));
-        $order    = new \QueryExpression("FIELD(language,'" . implode("','", array_map('addslashes', $langs)) . "')");
+        $order    = new \Glpi\DBAL\QueryExpression("FIELD(language,'" . implode("','", array_map('addslashes', $langs)) . "')");
 
         if ((int)$gabarit_id > 0) {
             $itTpl = $DB->request([

@@ -3,7 +3,7 @@
  * plugins/gestion/public/api/device_direct_sign.php
  * Signature directe depuis la borne kiosque (sans demande PC préalable).
  *
- * Auth   : Token GLPI v1 (App-Token + User-Token) ou v2 (Bearer OAuth) + X-Device-Serial.
+ * Auth   : Token GLPI v1 (App-Token + User-Token) ou v3 (Bearer OAuth) + X-Device-Serial.
  * Méthode: POST
  * Params : type (bl|ticket), reference, signer_name, signer_email, signature_base64
  *
@@ -20,7 +20,6 @@ if (!defined('NOLOGIN'))        { define('NOLOGIN',        1); }
 if (!defined('NOHEADER'))       { define('NOHEADER',       1); }
 if (!defined('NOTOKENRENEWAL')) { define('NOTOKENRENEWAL', 1); }
 
-require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 
 global $DB;
@@ -66,7 +65,7 @@ function ds_find_sig_col(DBmysql $DB, string $table): ?string
     return null;
 }
 
-// ── Authentification GLPI (Token v1/v2) ──────────────────────────────────────
+// ── Authentification GLPI (Token v1/v3) ──────────────────────────────────────
 
 $auth = PluginGestionApiAuth::authenticateRequest(false);
 if (empty($auth['ok'])) {

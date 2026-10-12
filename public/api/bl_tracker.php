@@ -33,7 +33,6 @@ define('NOLOGIN', 1);
 define('NOHEADER', 1);
 define('NOTOKENRENEWAL', 1);
 
-require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 require_once PLUGIN_GESTION_DIR . '/front/SageApi.php';
 
@@ -74,7 +73,7 @@ if (!in_array($method, ['GET', 'POST'], true)) {
    api_bl_tracker_end(405, ['ok' => false, 'error' => 'method_not_allowed']);
 }
 
-$auth = PluginGestionApiAuth::authenticateRequest(false);
+$auth = PluginGestionApiAuth::authenticateRequest(false, true); // session temporaire : rien n'est rejoue vers GLPI
 if (empty($auth['ok'])) {
    api_bl_tracker_end((int)($auth['code'] ?? 401), [
       'ok'      => false,

@@ -8,10 +8,10 @@
  * Aucun stockage GLPI : le fichier temporaire est supprimé après l'envoi.
  *
  * Identification : serial (header X-Device-Serial) + statut appareil.
- * Authentification : Token GLPI v1 (App-Token + User-Token) ou v2 (Bearer OAuth).
+ * Authentification : Token GLPI v1 (App-Token + User-Token) ou v3 (Bearer OAuth).
  *
  * Request Headers :
- *   Authorization: Bearer <token>   (v2)  OU  App-Token + User-Token (v1)  (obligatoire)
+ *   Authorization: Bearer <token>   (v3)  OU  App-Token + User-Token (v1)  (obligatoire)
  *   X-Device-Serial: <serial>                                              (obligatoire)
  *   Content-Type: multipart/form-data    (recommandé)  OU  application/json
  *
@@ -42,7 +42,6 @@ define('NOLOGIN',        1);
 define('NOHEADER',       1);
 define('NOTOKENRENEWAL', 1);
 
-require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -95,7 +94,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     dsi_jexit(405, ['ok' => false, 'error' => 'method_not_allowed']);
 }
 
-// ─── Authentification GLPI (Token v1/v2) — identique aux autres requêtes ──────
+// ─── Authentification GLPI (Token v1/v3) — identique aux autres requêtes ──────
 $auth = PluginGestionApiAuth::authenticateRequest(false);
 if (empty($auth['ok'])) {
     dsi_jexit(

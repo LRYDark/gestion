@@ -8,7 +8,6 @@ if (!empty($token)) {
     define('NOHEADER', 1);
 }
 
-include('../../../inc/includes.php');
 
 if (!isset($_GET['id'])) {
     http_response_code(400);
@@ -77,6 +76,9 @@ if (!empty($token)) {
     } catch (Exception $e) {
         // Si pas de token ET pas de session, rediriger vers login
         $redirect_url = urlencode($_SERVER['REQUEST_URI']);
+        // Fichier charge depuis une methode de GLPI : sans « global », $CFG_GLPI etait vide ici
+        // et la redirection partait toujours vers /glpi, meme quand GLPI est installe ailleurs.
+        global $CFG_GLPI;
         $root_doc = rtrim((string)($CFG_GLPI['root_doc'] ?? '/glpi'), '/');
         header("Location: " . $root_doc . "/front/login.php?redirect=" . $redirect_url);
         exit;

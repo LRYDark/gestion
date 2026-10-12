@@ -5,11 +5,11 @@
  * L'app kiosque refuse une requête de signature.
  * Passe le statut de 'pending' à 'cancelled'.
  *
- * Authentification : Token GLPI v1 (App-Token + User-Token) ou v2 (Bearer OAuth).
+ * Authentification : Token GLPI v1 (App-Token + User-Token) ou v3 (Bearer OAuth).
  *
  * Request Headers :
  *   Content-Type: application/json
- *   Authorization: Bearer <token>           (v2) OU App-Token + User-Token (v1) (obligatoire)
+ *   Authorization: Bearer <token>           (v3) OU App-Token + User-Token (v1) (obligatoire)
  *   X-Device-Serial: <serial>
  *
  * Request Body (JSON) :
@@ -32,7 +32,6 @@ define('NOLOGIN',        1);
 define('NOHEADER',       1);
 define('NOTOKENRENEWAL', 1);
 
-require GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -75,7 +74,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     dref_jexit(405, ['ok' => false, 'error' => 'method_not_allowed']);
 }
 
-// ─── Authentification GLPI (Token v1/v2) ─────────────────────────────────────
+// ─── Authentification GLPI (Token v1/v3) ─────────────────────────────────────
 $auth = PluginGestionApiAuth::authenticateRequest(false);
 if (empty($auth['ok'])) {
     dref_jexit(

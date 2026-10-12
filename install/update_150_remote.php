@@ -56,8 +56,8 @@ function update_150_remote() {
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
    ";
 
-   $DB->doQueryOrDie($create_remote_sign_requests, "Erreur lors de la création de la table glpi_plugin_gestion_remote_sign_requests");
-   $DB->doQueryOrDie($create_signaturedevices, "Erreur lors de la création de la table glpi_plugin_gestion_signaturedevices");
+   $DB->doQuery($create_remote_sign_requests);
+   $DB->doQuery($create_signaturedevices);
 
    // --- 2) Colonnes manquantes ----------------------------------------------
    $res = $DB->doQuery("SHOW COLUMNS FROM `glpi_plugin_gestion_configs`");

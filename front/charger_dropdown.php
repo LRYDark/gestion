@@ -8,7 +8,6 @@ error_reporting(E_ERROR | E_WARNING);
 
 header('Content-Type: application/json');
 
-include ('../../../inc/includes.php'); // Inclure les fichiers nécessaires de GLPI
 
 Session::checkLoginUser();
 require_once(__DIR__ . '/../vendor/autoload.php'); // Utiliser le chargement automatique de Composer

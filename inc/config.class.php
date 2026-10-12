@@ -88,8 +88,6 @@ class PluginGestionConfig extends CommonDBTM
       $config->showFormHeader(['colspan' => 4]);
       // showFormHeader() opens <table><tr><td>; close them properly before rendering card layout
       echo '</td></tr></table>'; 
-      // Dedicated standalone CSRF token for this plugin form/actions (avoids shared token consumption by other requests)
-      echo Html::hidden('plugin_gestion_csrf_token', ['value' => Session::getNewCSRFToken(true)]);
 
       $api_hl_enabled = Config::isHlApiEnabled();
       $api_legacy_enabled = !empty($CFG_GLPI['enable_api']);
@@ -103,7 +101,7 @@ class PluginGestionConfig extends CommonDBTM
       $api_sign_endpoint = $api_rootdoc . '/plugins/gestion/api/bl_sign.php';
       $api_combined_endpoint = $api_rootdoc . '/plugins/gestion/api/combined_sign.php';
       $api_ticket_bls_endpoint = $api_rootdoc . '/plugins/gestion/api/ticket_bls.php';
-      $api_token_endpoint = $api_rootdoc . '/api.php/v2.2/token';
+      $api_token_endpoint = $api_rootdoc . '/api.php/v3.0/token';
       $api_legacy_init_session_endpoint = $api_rootdoc . '/api.php/v1/initSession';
 
    // --- CARD : Gestion ---
@@ -270,19 +268,19 @@ class PluginGestionConfig extends CommonDBTM
                <label class="form-label mb-1 d-block"><?php echo __('API application tierce', 'gestion'); ?></label>
                <div class="d-flex flex-wrap align-items-center gap-2">
                   <?php if ($api_hl_enabled): ?>
-                  <span class="badge bg-success text-white"><?php echo __('API v2 active', 'gestion'); ?></span>
+                  <span class="badge bg-success text-white"><?php echo __('API High-Level active', 'gestion'); ?></span>
                   <?php endif; ?>
                   <?php if ($api_legacy_enabled): ?>
                   <span class="badge bg-warning text-dark"><?php echo __('API legacy active', 'gestion'); ?></span>
                   <?php endif; ?>
                   <a class="btn btn-outline-primary btn-sm"
-                     href="<?php echo Html::entities_deep($api_rootdoc . '/plugins/gestion/front/api_docs.php'); ?>"
+                     href="<?php echo htmlescape($api_rootdoc . '/plugins/gestion/front/api_docs.php'); ?>"
                      target="_blank" rel="noopener">
                      <?php echo __('Voir la documentation API', 'gestion'); ?>
                   </a>
                </div>
                <div class="form-text text-muted">
-                  <?php echo __('Compatible OAuth v2 (Bearer) et legacy (App-Token + user_token/session_token). En v2.2, utiliser un token utilisateur.', 'gestion'); ?>
+                  <?php echo __('Compatible API v3 en OAuth 2 (Bearer) et legacy (App-Token + user_token/session_token). En API v3, utiliser un token utilisateur.', 'gestion'); ?>
                </div>
             </div>
             <?php endif; ?>
@@ -302,19 +300,19 @@ class PluginGestionConfig extends CommonDBTM
                <div class="modal-body">
                   <p class="mb-2"><strong><?php echo __('Pré-requis', 'gestion'); ?></strong></p>
                   <ul class="mb-3">
-                     <li><?php echo __('Activer au moins une API GLPI : v2 (High-Level) ou legacy.', 'gestion'); ?></li>
+                     <li><?php echo __('Activer au moins une API GLPI : High-Level (v3) ou legacy.', 'gestion'); ?></li>
                      <li><?php echo __('Ces endpoints plugin acceptent les deux méthodes d\'authentification.', 'gestion'); ?></li>
                   </ul>
 
-                  <p class="mb-2"><strong><?php echo __('Méthode 1 : OAuth v2 (recommandée)', 'gestion'); ?></strong></p>
+                  <p class="mb-2"><strong><?php echo __('Méthode 1 : API v3 - OAuth 2 (recommandée)', 'gestion'); ?></strong></p>
                   <pre class="bg-light p-2 rounded"><code>Authorization: Bearer &lt;access_token_oauth&gt;</code></pre>
                   <ul class="mb-3">
                      <li><?php echo __('Pour ces endpoints plugin, le token OAuth doit etre lie a un utilisateur.', 'gestion'); ?></li>
-                     <li><?php echo __('En v2.2, utiliser grant_type=password (login GLPI + mot de passe) ou authorization_code.', 'gestion'); ?></li>
+                     <li><?php echo __('En API v3, utiliser grant_type=password (login GLPI + mot de passe) ou authorization_code.', 'gestion'); ?></li>
                      <li><?php echo __('grant_type=client_credentials seul renverra user_context_required.', 'gestion'); ?></li>
                   </ul>
 
-                  <p class="mb-2"><strong><?php echo __('Endpoint OAuth token (GLPI v2.2)', 'gestion'); ?></strong></p>
+                  <p class="mb-2"><strong><?php echo __('Endpoint OAuth token (API GLPI v3)', 'gestion'); ?></strong></p>
                   <pre class="bg-light p-2 rounded"><code>POST <?php echo htmlspecialchars($api_token_endpoint, ENT_QUOTES, 'UTF-8'); ?></code></pre>
                   <pre class="bg-light p-2 rounded"><code>grant_type=password
 client_id=&lt;client_id_oauth&gt;
@@ -434,7 +432,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                      <div class="col-md-4">
                         <label for="gestionApiTestMode" class="form-label"><?php echo __('Mode de test', 'gestion'); ?></label>
                         <select id="gestionApiTestMode" class="form-select">
-                           <option value="v2_password"><?php echo __('OAuth v2.2 (grant password)', 'gestion'); ?></option>
+                           <option value="v2_password"><?php echo __('OAuth 2 (grant password)', 'gestion'); ?></option>
                            <option value="v1_user_token"><?php echo __('Legacy v1 (App-Token + user_token)', 'gestion'); ?></option>
                         </select>
                      </div>
@@ -499,7 +497,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   </div>
                </div>
                <div class="modal-footer">
-                  <a class="btn btn-secondary" target="_blank" rel="noopener" href="<?php echo Html::entities_deep($api_rootdoc . '/plugins/gestion/front/api_docs.php'); ?>"><?php echo __('Voir doc API', 'gestion'); ?></a>
+                  <a class="btn btn-secondary" target="_blank" rel="noopener" href="<?php echo htmlescape($api_rootdoc . '/plugins/gestion/front/api_docs.php'); ?>"><?php echo __('Voir doc API', 'gestion'); ?></a>
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('Fermer', 'gestion'); ?></button>
                </div>
             </div>
@@ -573,7 +571,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   "$Username = '" + escPs(fields.username.value) + "'",
                   "$Password = '" + escPs(fields.password.value) + "'",
                   "",
-                  "$token = Invoke-RestMethod -Method POST -Uri \"$BaseUrl/api.php/v2.2/token\" -ContentType \"application/x-www-form-urlencoded\" -Body @{",
+                  "$token = Invoke-RestMethod -Method POST -Uri \"$BaseUrl/api.php/v3.0/token\" -ContentType \"application/x-www-form-urlencoded\" -Body @{",
                   "    grant_type    = 'password'",
                   "    client_id     = $ClientId",
                   "    client_secret = $ClientSecret",
@@ -631,7 +629,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   tokenForm.set('password', fields.password.value);
                   tokenForm.set('scope', 'api user');
 
-                  const tokenRes = await fetch(base + '/api.php/v2.2/token', {
+                  const tokenRes = await fetch(base + '/api.php/v3.0/token', {
                      method: 'POST',
                      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                      body: tokenForm
@@ -644,7 +642,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                      tokenBody = {};
                   }
                   if (!tokenRes.ok || !tokenBody.access_token) {
-                     setResult("OAuth v2.2 token KO (HTTP " + tokenRes.status + ")\n" + tokenBodyRaw);
+                     setResult("OAuth token KO (HTTP " + tokenRes.status + ")\n" + tokenBodyRaw);
                      return;
                   }
 
@@ -961,8 +959,8 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       'sharePointAccess' => __('Accès SharePoint', 'gestion'),
       'siteID'           => __('Site ID', 'gestion'),
       'graphQuery'       => __('Microsoft Graph Query', 'gestion'),
-      'driveAccess'      => sprintf(__('Accès au Drive : <br> - %s', 'gestion'), Html::entities_deep($config->Global())),
-      'permissions'      => sprintf(__('Permissions SharePoint : <br> - %s', 'gestion'), Html::entities_deep($config->Global()))
+      'driveAccess'      => sprintf(__('Accès au Drive : <br> - %s', 'gestion'), htmlescape($config->Global())),
+      'permissions'      => sprintf(__('Permissions SharePoint : <br> - %s', 'gestion'), htmlescape($config->Global()))
       ];
       ?>
 
@@ -1017,7 +1015,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                         echo "<ul class='list-unstyled mb-0'>";
                         foreach ($result[$key]['roles'] as $group => $roles) {
                            $roleList = implode(', ', array_map('Html::entities_deep', $roles));
-                           echo "<li><strong>".Html::entities_deep($group)." :</strong> $roleList</li>";
+                           echo "<li><strong>".htmlescape($group)." :</strong> $roleList</li>";
                         }
                         echo "</ul>";
                         } else {
@@ -1659,7 +1657,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       <div class="card mb-3">
       <div class="card-header">
          <h3 class="card-title mb-0">
-            <?php echo sprintf(__('Dernière synchronisation Cron : %s', 'gestion'), Html::entities_deep($lastRunText)); ?>
+            <?php echo sprintf(__('Dernière synchronisation Cron : %s', 'gestion'), htmlescape($lastRunText)); ?>
          </h3>
       </div>
 
@@ -2353,7 +2351,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
          $content_html = $ContentHtml;
 
          // Échapper le contenu HTML
-         $content_html_escaped = Toolbox::addslashes_deep($content_html);
+         $content_html_escaped = $DB->escape(str_replace(['&#039;', '&#39;', '&#x27;', '&apos;', '&quot;'], ["'", "'", "'", "'", '"'], $content_html));
    
          // Construire la requête d'insertion
          $insertQuery1 = "INSERT INTO `glpi_notificationtemplates` (`name`, `itemtype`, `date_mod`, `comment`, `css`, `date_creation`) VALUES ('Gestion Mail PDF', 'Ticket', NULL, 'Created by the plugin gestion', '', NULL);";

@@ -5,13 +5,13 @@ if (!defined('GLPI_ROOT')) {
 
 class PluginGestionCri extends CommonDBTM {
 
-   static $rightname = 'plugin_gestion_cri_create';
+   static string $rightname = 'plugin_gestion_cri_create';
 
    /**
     * Limite post_max_size de PHP en octets (0 = illimitee).
     * Sert a bloquer COTE CLIENT les soumissions trop volumineuses : au-dela de
-    * cette limite, PHP vide entierement $_POST (photos/PDF en base64) et le
-    * kernel GLPI rejette alors la requete avec une erreur CSRF trompeuse.
+    * cette limite, PHP vide entierement $_POST (photos/PDF en base64) et la
+    * signature est perdue sans message clair.
     */
    static function getPostMaxBytes(): int {
       $v = trim((string)ini_get('post_max_size'));
@@ -982,8 +982,8 @@ class PluginGestionCri extends CommonDBTM {
 
                echo '      <select id="remote-device" style="padding:6px">';
                foreach ($rows as $d) {
-                  $serial = Html::entities_deep((string)($d['serial'] ?? ''));
-                  $name   = Html::entities_deep((string)($d['name']   ?? ''));
+                  $serial = htmlescape((string)($d['serial'] ?? ''));
+                  $name   = htmlescape((string)($d['name']   ?? ''));
                   $label  = $name !== '' ? $name . ' (' . $serial . ')' : $serial;
                   // value = serial (pas de token)
                   echo '        <option value="' . $serial . '">' . $label . '</option>';
@@ -1530,7 +1530,7 @@ class PluginGestionCri extends CommonDBTM {
                if (isset($DOC->tech_ext) && strlen(trim((string)$DOC->tech_ext)) > 0) {
                   $tech_display = $DOC->tech_ext;
                } else {
-                  $tech_display = getUserName($DOC->users_id);
+                  $tech_display = getUserName((int)$DOC->users_id);
                }
                echo '<p><strong>Livré par :</strong> ' . $tech_display . '</p>';
                if (!empty($DOC->relatedInvoiceToBL)){
@@ -1593,21 +1593,8 @@ class PluginGestionCri extends CommonDBTM {
       // Bouton flottant "Aller en bas"
       echo '<button type="button" class="fab-go-bottom" title="Aller en bas" aria-label="Aller en bas">↓</button>';
 
-      // Token CSRF standalone : Html::closeForm() emettrait le token PARTAGE de la
-      // requete ($CURRENTCSRFTOKEN, reutilise par tous les formulaires rendus dans le
-      // meme rendu AJAX). Des qu'un autre POST le consomme, le kernel GLPI 11
-      // (CheckCsrfListener) rejette la soumission suivante ("CSRF check failed").
-      // Un token standalone est unique a CE formulaire : personne d'autre ne peut le consommer.
-      $csrf_standalone = Session::getNewCSRFToken(true);
-      if ($csrf_standalone === '' && class_exists('PluginGestionLogger')) {
-         // Cas anormal uniquement (jamais atteint en fonctionnement normal).
-         PluginGestionLogger::error('csrf-diag', sprintf(
-            'Rendu formulaire BL "%s" : token VIDE, user #%s',
-            (string)$Doc_Name,
-            (string)(Session::getLoginUserID() ?: 'anonyme')
-         ));
-      }
-      echo Html::hidden('_glpi_csrf_token', ['value' => $csrf_standalone]);
+      // GLPI 12 : plus de jeton CSRF dans le formulaire, le noyau (CheckCsrfListener)
+      // controle l'origine de la requete.
       echo '</form>';
       ?>
       <script>
@@ -2061,14 +2048,6 @@ class PluginGestionCri extends CommonDBTM {
       $target = ((int)($config->fields['DisplayPdfEnd'] ?? 0) === 1) ? ' target="_blank"' : '';
       $rpHtml = preg_replace('/<form\b([^>]*)>/', '<form$1' . $target . '>' . $hidden, $rpHtml, 1);
 
-      // Token CSRF standalone (meme raison que showForm : le token partage du rendu
-      // AJAX peut etre consomme par un autre POST avant la soumission).
-      $rpHtml = preg_replace(
-         '/(<input type="hidden" name="_glpi_csrf_token" value=")[^"]*(")/',
-         '${1}' . Session::getNewCSRFToken(true) . '${2}',
-         $rpHtml
-      );
-
       // Insérer la section BL après l'ouverture du container principal
       $rpHtml = preg_replace('/<div class="form-container">/', '<div class="form-container">' . $blSectionHtml, $rpHtml, 1);
 
@@ -2393,9 +2372,7 @@ class PluginGestionCri extends CommonDBTM {
        *                      photo/PDF et commentaire. C'est aussi le seul
        *                      disponible quand le plugin RP est absent.
        *
-       * Dans les deux cas la liste a cocher est injectee en tete du conteneur,
-       * et le jeton CSRF est renouvele : celui du rendu AJAX peut avoir ete
-       * consomme par un autre POST avant la soumission.
+       * Dans les deux cas la liste a cocher est injectee en tete du conteneur.
        */
       $target = ((int)($config->fields['DisplayPdfEnd'] ?? 0) === 1) ? ' target="_blank"' : '';
 
@@ -2451,11 +2428,6 @@ class PluginGestionCri extends CommonDBTM {
       // reste vivante.
       $html = preg_replace('/<form\b([^>]*)>/', '<form$1' . $target . '>' . $hidden, $html, 1);
 
-      $html = preg_replace(
-         '/(<input type="hidden" name="_glpi_csrf_token" value=")[^"]*(")/',
-         '${1}' . Session::getNewCSRFToken(true) . '${2}',
-         $html
-      );
       /*
        * Injection par `substr_replace` et non `preg_replace`.
        *

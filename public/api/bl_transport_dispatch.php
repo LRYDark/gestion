@@ -30,7 +30,6 @@ if (!defined('NOLOGIN')) define('NOLOGIN', 1);
 if (!defined('NOHEADER')) define('NOHEADER', 1);
 if (!defined('NOTOKENRENEWAL')) define('NOTOKENRENEWAL', 1);
 
-require_once GLPI_ROOT . '/inc/includes.php';
 require_once PLUGIN_GESTION_DIR . '/inc/apiauth.class.php';
 
 global $DB, $CFG_GLPI;
@@ -129,9 +128,6 @@ function api_transport_call_traitement(array $payload, string $rootdoc, array $c
       'Content-Type: application/x-www-form-urlencoded; charset=UTF-8',
       'X-Requested-With: XMLHttpRequest',
    ];
-   if (!empty($payload['_glpi_csrf_token'])) {
-      $headers[] = 'X-Glpi-Csrf-Token: ' . (string)$payload['_glpi_csrf_token'];
-   }
    curl_setopt_array($ch, [
       CURLOPT_RETURNTRANSFER => true,
       CURLOPT_POST => true,
@@ -269,8 +265,6 @@ if ((int)($survey['signed'] ?? 0) === 1
    ]);
 }
 
-$csrf = Session::getNewCSRFToken();
-$_SESSION['glpicsrftoken'] = $csrf;
 $dispatch_token = bin2hex(random_bytes(32));
 $_SESSION['gestion_transport_dispatch_token'] = $dispatch_token;
 
@@ -293,7 +287,6 @@ $payload = [
    'transport_departed_at' => $departed_at,
    'transport_carrier' => $carrier !== '' ? $carrier : 'Transporteur',
    'transport_tracking' => $tracking,
-   '_glpi_csrf_token' => $csrf,
 ];
 
 if (session_status() === PHP_SESSION_ACTIVE) {

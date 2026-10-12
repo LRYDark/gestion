@@ -62,7 +62,7 @@ class PluginGestionUserpref extends CommonDBTM {
    /** Préfixe des positions mémorisées par le navigateur (localStorage) */
    const POS_PREFIX = 'gestion_fab_pos_';
 
-   static $rightname = "plugin_gestion_boutons";
+   static string $rightname = "plugin_gestion_boutons";
 
    /** @var array<int,array> cache par utilisateur */
    private static $cache = [];
@@ -369,7 +369,6 @@ class PluginGestionUserpref extends CommonDBTM {
 
       echo "<form method='post' action='" . PLUGIN_GESTION_WEBDIR . "/front/userpref.form.php'>";
       // Jeton autonome dédié : le formulaire est rendu dans un onglet AJAX
-      echo Html::hidden('plugin_gestion_userpref_csrf_token', ['value' => Session::getNewCSRFToken(true)]);
 
       echo "<div class='card mb-3'>";
       echo "<div class='card-header'><h3 class='card-title'>" . self::getTypeName() . "</h3></div>";
