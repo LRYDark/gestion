@@ -141,6 +141,8 @@ function plugin_init_gestion() { // fonction glpi d'initialisation du plugin
    global $PLUGIN_HOOKS, $CFG_GLPI;
 
    $PLUGIN_HOOKS['csrf_compliant']['gestion'] = true;
+   // Secrets chiffrés avec la clé de GLPI : s'il change de clé, il les rechiffre lui-même.
+   $PLUGIN_HOOKS['secured_fields']['gestion'] = ['glpi_plugin_gestion_configs.SageToken'];
    $PLUGIN_HOOKS['change_profile']['gestion'] = [PluginGestionProfile::class, 'initProfile'];
 
    $plugin = new Plugin();

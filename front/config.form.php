@@ -11,7 +11,7 @@ Session::checkRight('config', UPDATE);
 
 $config = new PluginGestionConfig();
 
-function encryptArray($array) {
+function encryptArray($array, array $stored = []) {
    static $include_keys_map = null;
    if ($include_keys_map === null) {
       $include_keys_map = array_flip(['SageToken']);
@@ -19,10 +19,13 @@ function encryptArray($array) {
    $encrypted_array = [];
 
    foreach ($array as $key => $value) {
-       // Crypter uniquement les clés définies dans $include_keys
-       if (isset($include_keys_map[$key]) && is_scalar($value) && (string)$value !== '') {
-           //$encrypted_array[$key] = encryptData($value);
-           $encrypted_array[$key] = PluginGestionCrypto::encrypt((string)$value);
+       // Secrets chiffrés avec la clé de GLPI. Un secret illisible laissé vide n'est pas écrasé, et rien ne part
+       // en clair si la clé de GLPI est illisible (cf. PluginGestionCrypto::valueToSave()).
+       if (isset($include_keys_map[$key]) && is_scalar($value)) {
+           $to_save = PluginGestionCrypto::valueToSave((string)$value, $stored[$key] ?? null);
+           if ($to_save !== null) {
+               $encrypted_array[$key] = $to_save;
+           }
        } else {
            $encrypted_array[$key] = $value;
        }
@@ -79,7 +82,7 @@ if ($deviceActionPayload !== '' || (isset($_POST['action_device']) && isset($_PO
 
 if (isset($_POST["update"])) {
    pluginGestionCheckCSRF($_POST);
-   $encrypted_post = encryptArray($_POST);
+   $encrypted_post = encryptArray($_POST, $config->fields);
 
    // ===== AJOUTS POUR SIGNATURE FACTURE COMPTOIR =====
       // Encoder en JSON la liste des utilisateurs autorisés (si fournie)

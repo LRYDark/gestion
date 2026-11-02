@@ -39,6 +39,12 @@ de GLPI (`php bin/console cache:clear`, en tant qu'utilisateur du serveur web).
 - Dépôt : `auth.json` (jeton de licence setasign), `.vs/` et un `composer.phar` ne sont plus suivis par git.
 - CI GitHub : syntaxe sur PHP 8.2 à 8.5, installation réelle dans GLPI 11.0.12 (neuve et mise à jour depuis
   la release précédente), chargement de chaque classe, parcours des pages et onglets, audit des dépendances.
+- **Jeton Sage qui « sautait » après une mise à jour** : il était chiffré avec une clé propre au plugin, lue en dur
+  dans `<GLPI>/config/` — pas forcément le dossier de configuration de GLPI — et régénérée sans prévenir quand elle
+  manquait ; une clé changée par GLPI le rendait aussi illisible, et enregistrer la configuration l'effaçait.
+  Il est désormais chiffré avec la clé de GLPI (`GLPIKey`), là où GLPI la range, et déclaré à GLPI
+  (`secured_fields`), qui le rechiffre lui-même s'il change de clé. La mise à jour réécrit l'ancienne valeur au
+  nouveau format ; une valeur illisible est signalée sous le champ, et un champ laissé vide ne l'efface plus.
 
 ## 1.8.3 — 2026-10-06
 
