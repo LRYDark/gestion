@@ -108,11 +108,6 @@ if (isset($_POST["add"])) {
          }
          $doc_url = 'document.send.php?docid='.$NewDoc;
       }
-      if ($pdf_save == 'SharePoint'){
-         $valid = true;
-         $doc_url = $pdf_folder;
-         $tracker = null;
-      }
       if ($pdf_save == 'Sage'){
          $tracker = $fields['tracker'];
          $valid = true;

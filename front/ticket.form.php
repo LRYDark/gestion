@@ -6,10 +6,8 @@ Session::haveRight("ticket", UPDATE);
 global $DB, $CFG_GLPI;
 $doc = new Document();
 
-require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
 require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
 
-$sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 
 // Vérifier que le formulaire a été soumis
@@ -42,18 +40,6 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
         $save = null;
         $relatedInvoiceToBL = null;
 
-        if ($config->mode() == 0){
-            $save = 'SharePoint';
-            // Étape 3 : Spécifiez le chemin relatif du fichier dans SharePoint
-            $file_path = $item . ".pdf"; // Remplacez par le chemin exact de votre fichier
-            // Étape 4 : Récupérez l'URL du fichier
-            $fileUrl = $sharepoint->getFileUrl($file_path);
-
-            if ($sharepoint->checkFileExists($file_path)) $fileExiste = true;
-            $pdfData = $sharepoint->GetTrackerPdfDownload($file_path);
-            $tracker = is_array($pdfData) ? ($pdfData['tracker'] ?? null) : $pdfData;
-            $relatedInvoiceToBL = is_array($pdfData) ? ($pdfData['relatedInvoiceToBL'] ?? null) : null;
-        }
         if ($config->mode() == 1){
             $save = 'Sage';
             $fields = parseDocument($item);
@@ -98,13 +84,6 @@ if (isset($_POST['save_selection']) && isset($_POST['tickets_id'])) {
                 $existedoc = $DB->doQuery("SELECT tickets_id, bl FROM `glpi_plugin_gestion_surveys` WHERE bl = '".$DB->escape($item)."'")->fetch_object(); // Récupérer les informations du document
             }
             if(empty($existedoc->bl)){
-                if ($config->mode() == 0){
-                    $relatedSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'".$DB->escape($relatedInvoiceToBL)."'" : "NULL";
-                    if (!$DB->doQuery("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, bl_number, doc_url, relatedInvoiceToBL, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($item)."', $blNumberSql, '$fileUrl', $relatedSql, '$tracker', '$save', NOW(), NULL)")) {
-                        Session::addMessageAfterRedirect(__("Erreur lors de l'ajout", 'gestion'), false, ERROR);
-                        $success = false; // Si l'insertion échoue, mettre le drapeau de succès à false
-                    }
-                }
                 if ($config->mode() == 1){
                     $relatedSql = ($relatedInvoiceToBL !== null && $relatedInvoiceToBL !== '') ? "'".$DB->escape($relatedInvoiceToBL)."'" : "NULL";
                     if (!$DB->doQuery("INSERT INTO glpi_plugin_gestion_surveys (tickets_id, entities_id, url_bl, bl, bl_number, doc_url, relatedInvoiceToBL, tracker, save, date_creation, doc_date) VALUES ($ticketId, $entityId, '".$DB->escape($itemUrl)."', '".$DB->escape($file_path)."', $blNumberSql, '$fileUrl', $relatedSql, '$tracker', '$save', NOW(), NULL)")) {

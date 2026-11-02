@@ -54,7 +54,6 @@ return array(
     'Smalot\\PdfParser\\RawData\\RawDataParser' => $vendorDir . '/smalot/pdfparser/src/Smalot/PdfParser/RawData/RawDataParser.php',
     'Smalot\\PdfParser\\XObject\\Form' => $vendorDir . '/smalot/pdfparser/src/Smalot/PdfParser/XObject/Form.php',
     'Smalot\\PdfParser\\XObject\\Image' => $vendorDir . '/smalot/pdfparser/src/Smalot/PdfParser/XObject/Image.php',
-    'Symfony\\Polyfill\\Mbstring\\Mbstring' => $vendorDir . '/symfony/polyfill-mbstring/Mbstring.php',
     'setasign\\FpdiPdfParser\\PdfParser\\CrossReference\\CompressedReader' => $vendorDir . '/setasign/fpdi_pdf-parser/src/PdfParser/CrossReference/CompressedReader.php',
     'setasign\\FpdiPdfParser\\PdfParser\\CrossReference\\CorruptedReader' => $vendorDir . '/setasign/fpdi_pdf-parser/src/PdfParser/CrossReference/CorruptedReader.php',
     'setasign\\FpdiPdfParser\\PdfParser\\CrossReference\\CrossReference' => $vendorDir . '/setasign/fpdi_pdf-parser/src/PdfParser/CrossReference/CrossReference.php',

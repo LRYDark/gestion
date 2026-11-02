@@ -37,52 +37,21 @@ class PluginGestionConfig extends CommonDBTM
       global $DB, $CFG_GLPI;
       $config = new self();
       $config->getFromDB(1);
-      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
-
-      $sharepoint = new PluginGestionSharepoint();
-         $errorcon = "";
-         $checkcon ="";
          $mode = true;
 
-      if($config->SharePointOn() == 1 && $config->SageOn() == 0){
-         // Met à jour toutes les lignes avec param = 1 => param = 8
-            $update = "UPDATE glpi_plugin_gestion_configs SET mode = 0 WHERE id = 1";
-            $DB->doQuery($update);
-            $update = "UPDATE glpi_plugin_gestion_configs SET SageSearch = 0 WHERE id = 1";
-            $DB->doQuery($update);
-      }
-      if($config->SharePointOn() == 0 && $config->SageOn() == 1){
-         // Met à jour toutes les lignes avec param = 1 => param = 8
+      if($config->SageOn() == 1){
             $update = "UPDATE glpi_plugin_gestion_configs SET mode = 1 WHERE id = 1";
             $DB->doQuery($update);
-            $update = "UPDATE glpi_plugin_gestion_configs SET SharePointSearch = 0 WHERE id = 1";
-            $DB->doQuery($update);
-      }
-      if($config->SharePointOn() == 0 && $config->SageOn() == 0){
-         // Met à jour toutes les lignes avec param = 1 => param = 8
+      }else{
             $update = "UPDATE glpi_plugin_gestion_configs SET mode = 2 WHERE id = 1";
             $DB->doQuery($update);
             $update = "UPDATE glpi_plugin_gestion_configs SET SageSearch = 0 WHERE id = 1";
             $DB->doQuery($update);
-            $update = "UPDATE glpi_plugin_gestion_configs SET SharePointSearch = 0 WHERE id = 1";
-            $DB->doQuery($update);
             $mode = false;
       }
-      if($config->SageSearch() == 0 && $config->SharePointSearch() == 0){
+      if($config->SageSearch() == 0){
             $update = "UPDATE glpi_plugin_gestion_configs SET LocalSearch = 1 WHERE id = 1";
             $DB->doQuery($update);
-      }
-
-      if($config->mode() == 1){
-         // Vérifie s'il existe au moins une ligne avec param = 1
-         $query = "SELECT id FROM glpi_plugin_gestion_configsfolder WHERE params = 1";
-         $result = $DB->doQuery($query);
-
-         if ($result && $DB->numrows($result) > 0) {
-            // Met à jour toutes les lignes avec param = 1 => param = 8
-            $update = "UPDATE glpi_plugin_gestion_configsfolder SET params = 8 WHERE params = 1";
-            $DB->doQuery($update);
-         }
       }
 
       $config->showFormHeader(['colspan' => 4]);
@@ -246,11 +215,6 @@ class PluginGestionConfig extends CommonDBTM
             <div class="col-md-6">
             <label class="form-label mb-1"><?php echo __('Autorisé la connexion à Sage local', 'gestion'); ?></label>
             <?php Dropdown::showYesNo('SageOn', $config->SageOn(), -1); ?>
-            </div>
-
-            <div class="col-md-6">
-            <label class="form-label mb-1"><?php echo __('Autorisé la connexion à Sharepoint', 'gestion'); ?></label>
-            <?php Dropdown::showYesNo('SharePointOn', $config->SharePointOn(), -1); ?>
             </div>
 
             <div class="col-md-6">
@@ -796,7 +760,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       ?>
       <div class="card mb-3">
       <div class="card-header">
-         <h3 class="card-title mb-0"><?php echo __("Configuration de l'affichage et Tâche cron", 'gestion'); ?></h3>
+         <h3 class="card-title mb-0"><?php echo __("Configuration de l'affichage", 'gestion'); ?></h3>
       </div>
       <div class="card-body">
          <div class="row g-3">
@@ -807,9 +771,9 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                <i class='fa-solid fa-circle-info text-secondary ms-1'
                   data-bs-toggle='tooltip'
                   data-bs-placement='top'
-                  title="<?php echo __("(cela peut provoquer des ralentissements). Vérifiez également la configuration de SharePoint pour l'autorisation de partage par lien.", 'gestion'); ?>"></i>
+                  title="<?php echo __("(cela peut provoquer des ralentissements).", 'gestion'); ?>"></i>
             </label>
-            <?php Dropdown::showYesNo('SharePointLinkDisplay', $config->SharePointLinkDisplay(), -1); ?>
+            <?php Dropdown::showYesNo('PdfPreview', $config->PdfPreview(), -1); ?>
             </div>
 
             <div class="col-md-6">
@@ -850,218 +814,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       </div>
       </div><?php
 
-      //---------------------------------------------------------------------------------
-      $result = [];
-      if(!empty($config->TenantID()) && $config->SharePointOn() == 1){
-         // Utilisation
-         try {
-            $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-            if (isset($result['status']) && $result['status'] === true) {
-               $checkcon = 'Connexion API : <i class="fa fa-check-circle fa-xl text-success"></i></i>' . "\n";
-               try {              
-                  // Étape 2 : Récupérer l'ID du site
-                  $siteId = '';
-                  $siteId = $sharepoint->getSiteId($config->Hostname(), $config->SitePath());
-               } catch (Exception $e) {
-                  $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Erreur : '.$e->getMessage().'"></i>';
-               }
-            } else {
-               $checkcon = 'Connexion API : <i class="fa fa-times-circle fa-xl text-danger"></i>' . "\n";
-               $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-secondary" data-bs-toggle="tooltip" data-bs-placement="top" title="'.$result['message'].'"></i>';
-            }
-         } catch (Exception $e) {
-            $errorcon = '  <i class="fa-solid fa-circle-info fa-xl text-primary" data-bs-toggle="tooltip" data-bs-placement="top" title="Erreur inattendue : '.$e->getMessage().'"></i>';
-         }      
-      }
-
-      if ($config->SharePointOn() == 1): ?>
-      <div class="card mb-3">
-         <div class="card-header">
-            <h3 class="card-title mb-0">
-            <?php echo __('Connexion SharePoint (API Graph) | '.$checkcon.$errorcon, 'gestion'); ?>
-            </h3>
-         </div>
-         <div class="card-body">
-            <div class="row g-3">
-            <div class="col-md-6">
-               <label for="TenantID" class="form-label mb-1"><?php echo __('Tenant ID', 'gestion'); ?></label>
-               <?php echo Html::input('TenantID', ['value' => $config->TenantID(), 'class' => 'form-control', 'id' => 'TenantID']); ?>
-            </div>
-            <div class="col-md-6">
-               <label for="ClientID" class="form-label mb-1"><?php echo __('Client ID', 'gestion'); ?></label>
-               <?php echo Html::input('ClientID', ['value' => $config->ClientID(), 'class' => 'form-control', 'id' => 'ClientID']); ?>
-            </div>
-
-            <div class="col-md-6">
-               <label for="ClientSecret" class="form-label mb-1"><?php echo __('Client Secret', 'gestion'); ?></label>
-               <?php echo Html::input('ClientSecret', ['value' => $config->ClientSecret(), 'class' => 'form-control', 'id' => 'ClientSecret']); ?>
-            </div>
-            <div class="col-md-6">
-               <label for="Hostname" class="form-label mb-1"><?php echo __('Nom d’hôte', 'gestion'); ?></label>
-               <?php echo Html::input('Hostname', ['value' => $config->Hostname(), 'class' => 'form-control', 'id' => 'Hostname']); ?>
-            </div>
-
-            <div class="col-md-6">
-               <label for="SitePath" class="form-label mb-1"><?php echo __('Chemin du Site (/sites/XXXX)', 'gestion'); ?></label>
-               <?php echo Html::input('SitePath', ['value' => $config->SitePath(), 'class' => 'form-control', 'id' => 'SitePath']); ?>
-            </div>
-
-            <div class="col-md-6">
-               <label class="form-label mb-1 d-block"><?php echo __('Recherche de documents dans SharePoint', 'gestion'); ?></label>
-               <?php
-                  $SharePointSearch = $config->SharePointSearch();
-                  echo '<input type="hidden" name="SharePointSearch" value="0">';
-               ?>
-               <div class="form-check form-switch">
-                  <input class="form-check-input"
-                        type="checkbox"
-                        id="SharePointSearch_switch"
-                        name="SharePointSearch"
-                        value="1" <?php echo ($SharePointSearch == 1 ? 'checked' : ''); ?>>
-                  <label class="form-check-label" for="SharePointSearch_switch"><?php echo __('Activer', 'gestion'); ?></label>
-               </div>
-            </div>
-            </div>
-         </div>
-      </div>
-      <?php endif; ?>
-
-      <div class="card mb-3">
-         <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title mb-0"><?php echo __('Connexion SharePoint', 'gestion'); ?></h3>
-            <button type="button"
-                     class="btn btn-outline-primary btn-sm"
-                     data-bs-toggle="modal"
-                     data-bs-target="#customModal">
-               <?php echo __('Statut de connexion SharePoint', 'gestion'); ?>
-            </button>
-         </div>
-
-         <div class="card-body">
-            <p class="text-muted mb-0">
-               <?php echo __('Cliquez sur "Statut de connexion SharePoint" pour afficher le détail des vérifications.', 'gestion'); ?>
-            </p>
-         </div>
-      </div>
-
-      <?php
-
-      // ---------- MODAL ----------
-      $result = $sharepoint->checkSharePointAccess();
-
-      $statusIcons = [
-      1 => '<i class="fa fa-check-circle text-success"></i>', // ✅ Succès
-      0 => '<i class="fa fa-times-circle text-danger"></i>'   // ❌ Échec
-      ];
-
-      $fields = [
-      'accessToken'      => __('Token d\'accès', 'gestion'),
-      'sharePointAccess' => __('Accès SharePoint', 'gestion'),
-      'siteID'           => __('Site ID', 'gestion'),
-      'graphQuery'       => __('Microsoft Graph Query', 'gestion'),
-      'driveAccess'      => sprintf(__('Accès au Drive : <br> - %s', 'gestion'), htmlescape($config->Global())),
-      'permissions'      => sprintf(__('Permissions SharePoint : <br> - %s', 'gestion'), htmlescape($config->Global()))
-      ];
       ?>
-
-      <div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="AddGestionModalLabel" aria-hidden="true">
-      <div class="modal-dialog modal-lg">
-         <div class="modal-content">
-
-            <div class="modal-header">
-            <h5 class="modal-title" id="AddGestionModalLabel">
-               <?php echo __('Statut de connexion SharePoint', 'gestion'); ?>
-               <i class="fa-solid fa-circle-info text-secondary ms-1"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  title="<?php echo __(
-                     "Pensez à vérifier les droits de suppression, de lecture et d'écriture sur le site SharePoint afin d'assurer son bon fonctionnement et une récupération optimale des métadonnées.",
-                     'gestion'
-                  ); ?>"></i>
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<?php echo __('Fermer', 'gestion'); ?>"></button>
-            </div>
-
-            <div class="modal-body">
-            <ul class="list-group">
-
-               <!-- En-tête -->
-               <li class="list-group-item">
-                  <div class="row fw-bold">
-                  <div class="col-4"><?php echo __('Champ', 'gestion'); ?></div>
-                  <div class="col-6"><?php echo __('Statut', 'gestion'); ?></div>
-                  <div class="col-2 text-center"><?php echo __('Validation', 'gestion'); ?></div>
-                  </div>
-               </li>
-
-               <?php
-               foreach ($fields as $key => $label) {
-                  if (!isset($result[$key])) {
-                  continue;
-                  }
-                  $status  = (int)($result[$key]['status'] ?? 0);
-                  $message = (string)($result[$key]['message'] ?? '');
-                  $icon    = ($key !== 'permissions') ? ($statusIcons[$status] ?? $statusIcons[0]) : '';
-
-                  echo "<li class='list-group-item'>";
-                  echo "<div class='row align-items-center gy-1'>";
-
-                     // Colonne Champ
-                     echo "<div class='col-4'><strong>$label</strong></div>";
-
-                     // Colonne Statut (message + cas particuliers)
-                     echo "<div class='col-6'>";
-                        if ($key === 'permissions' && !empty($result[$key]['roles'])) {
-                        echo "<ul class='list-unstyled mb-0'>";
-                        foreach ($result[$key]['roles'] as $group => $roles) {
-                           $roleList = implode(', ', array_map('Html::entities_deep', $roles));
-                           echo "<li><strong>".htmlescape($group)." :</strong> $roleList</li>";
-                        }
-                        echo "</ul>";
-                        } else {
-                        $safeMsg = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
-
-                        // Ajout d'une icône d'information uniquement pour driveAccess
-                        if ($key === 'driveAccess') {
-                           if (strpos($message, 'modifier des fichiers') !== false) {
-                              $safeMsg .= " <i class='fa-solid fa-circle-exclamation text-warning' data-bs-toggle='tooltip'
-                                             data-bs-placement='top'
-                                             title='".__(
-                                                "Le plugin ne pourra pas supprimer ou télécharger automatiquement les documents après signature, il ne sera pas fonctionnel à 100%",
-                                                'gestion'
-                                             )."'></i>";
-                           } elseif (strpos($message, 'uniquement lire les fichiers') !== false) {
-                              $safeMsg .= " <i class='fa-solid fa-circle-info text-secondary' data-bs-toggle='tooltip'
-                                             data-bs-placement='top'
-                                             title='".__(
-                                                "Le plugin ne pourra pas supprimer, télécharger ou modifier automatiquement les documents après signature",
-                                                'gestion'
-                                             )."'></i>";
-                           }
-                        }
-
-                        echo $safeMsg;
-                        }
-                     echo "</div>";
-
-                     // Colonne Validation (icône)
-                     echo "<div class='col-2 text-center'>$icon</div>";
-
-                  echo "</div>";
-                  echo "</li>";
-               }
-               ?>
-
-            </ul>
-            </div>
-
-            <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><?php echo __('Fermer', 'gestion'); ?></button>
-            </div>
-
-         </div>
-      </div>
-      </div>
 
       <script>
          // Bootstrap 5 : init tooltips quand le DOM est prêt
@@ -1070,44 +823,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
             new bootstrap.Tooltip(el);
          });
          });
-
-         // (Optionnel) conserve tes helpers d'accordion si utilisés ailleurs
-         function toggleConfigSection(btn)  {
-         const section = btn.closest('table').querySelector('.config-section');
-         const arrow = btn.querySelector('.arrow');
-         const isVisible = section.style.display === 'table-row-group';
-         section.style.display = isVisible ? 'none' : 'table-row-group';
-         arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
-         }
-         function toggleConfigSection1(btn) {
-         const section = btn.closest('table').querySelector('.config-section1');
-         const arrow = btn.querySelector('.arrow');
-         const isVisible = section.style.display === 'table-row-group';
-         section.style.display = isVisible ? 'none' : 'table-row-group';
-         arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
-         }
-         function toggleConfigSection2(btn) {
-         const section = btn.closest('table').querySelector('.config-section2');
-         const arrow = btn.querySelector('.arrow');
-         const isVisible = section.style.display === 'table-row-group';
-         section.style.display = isVisible ? 'none' : 'table-row-group';
-         arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
-         }
-         function toggleConfigSection3(btn) {
-         const section = btn.closest('table').querySelector('.config-section3');
-         const arrow = btn.querySelector('.arrow');
-         const isVisible = section.style.display === 'table-row-group';
-         section.style.display = isVisible ? 'none' : 'table-row-group';
-         arrow.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(90deg)';
-         }
       </script>
-
-      <style>
-      /* Alignement propre dans la liste du modal */
-      #customModal .list-group-item .row > [class^="col-"] { display: flex; align-items: center; }
-      /* Optionnel : renforce l’alignement vertical */
-      #customModal .list-group-item { padding-top: .6rem; padding-bottom: .6rem; }
-      </style>
 
       <?php if ($config->SageOn() == 1): ?>
       <div class="card mb-3">
@@ -1162,9 +878,8 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
             <div>
                <?php
                $values4 = [];
-               if ($config->SharePointOn() == 1)           $values4[0] = 'Sharepoint';
-               if ($config->SageOn() == 1)                 $values4[1] = 'Sage Local';
-               if ($config->mode() != 0 || $mode == false) $values4[2] = 'Local';
+               if ($config->SageOn() == 1) $values4[1] = 'Sage Local';
+               $values4[2] = 'Local';
 
                Dropdown::showFromArray('mode', $values4, [
                   'value' => $config->mode(),
@@ -1177,41 +892,8 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       </div>
 
       <?php
-      // Carte — choix de la bibliothèque SharePoint (inchangé) + tableau des dossiers
-      if ($mode == true && (!empty($config->TenantID()) || !empty($config->SageToken()))) :
-
-      // --- Sélection de la bibliothèque SharePoint (inchangé)
-      if ($config->SharePointOn() == 1 && (isset($result['status']) && $result['status'] === true)) {
-         // Récupérer les bibliothèques de documents du site
-         $drives  = $sharepoint->getDrives($siteId);
-         $values3 = [];
-         foreach ($drives as $drive) {
-            $name = ($drive['name'] == 'Documents') ? 'Documents partages' : $drive['name'];
-            $values3[$name] = $name;
-         }
-         ?>
-         <div class="card mb-3">
-            <div class="card-header">
-            <h3 class="card-title mb-0">
-               <?php echo __("Bibliothèques SharePoint", "gestion"); ?>
-               <i class='fa-solid fa-circle-exclamation text-warning ms-2'
-                  data-bs-toggle='tooltip' data-bs-placement='top'
-                  title="<?php echo __(
-                     "Attention : toute modification de la bibliothèque après l’utilisation d’une bibliothèque précédente peut entraîner des bugs ou des conflits.",
-                     'gestion'
-                  ); ?>"></i>
-            </h3>
-            </div>
-            <div class="card-body">
-            <?php
-               Dropdown::showFromArray('Global', $values3, [
-                  'value' => $config->Global(),
-               ]);
-            ?>
-            </div>
-         </div>
-         <?php
-      }
+      // Carte — tableau des dossiers
+      if ($mode == true && !empty($config->SageToken())) :
 
       // --- TABLEAU des dossiers (remplace l’ancien “Ajouter un dossier”)
       // Lecture des lignes existantes
@@ -1224,40 +906,11 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       }
 
       // Construit la liste d’options $values2 selon ta logique existante (sans “Supprimer le dossier” car on a un bouton)
-      if ($config->SageOn() == 1 && $config->SharePointOn() == 0) {
+      if ($config->SageOn() == 1) {
          $values2 = [
             2  => __('Dossier de destination (Dépot Local)', 'gestion'),
-            5  => __('Envoyé un mail si visible dans le tracker', 'gestion'),
             8  => __('__Non attribué__', 'gestion'),
-            10 => __('Eléments de recheche', 'gestion'),
          ];
-      } elseif ($config->SageOn() == 0 && $config->SharePointOn() == 1) {
-         $values2 = [
-            1  => __('Dossier de récupération (Recursive SharePoint)', 'gestion'),
-            2  => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
-            5  => __('Envoyé un mail si visible dans le tracker', 'gestion'),
-            8  => __('__Non attribué__', 'gestion'),
-            10 => __('Eléments de recheche', 'gestion'),
-         ];
-      } elseif ($config->SageOn() == 1 && $config->SharePointOn() == 1) {
-         if ($config->mode() == 1) {
-            $values2 = [
-            2  => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
-            3  => __('Dossier de destination (Dépot Local)', 'gestion'),
-            5  => __('Envoyé un mail si visible dans le tracker', 'gestion'),
-            8  => __('__Non attribué__', 'gestion'),
-            10 => __('Eléments de recheche', 'gestion'),
-            ];
-         } else {
-            $values2 = [
-            1  => __('Dossier de récupération (Recursive SharePoint)', 'gestion'),
-            2  => __('Dossier de destination (Dépot Global SharePoint)', 'gestion'),
-            3  => __('Dossier de destination (Dépot Local)', 'gestion'),
-            5  => __('Envoyé un mail si visible dans le tracker', 'gestion'),
-            8  => __('__Non attribué__', 'gestion'),
-            10 => __('Eléments de recheche', 'gestion'),
-            ];
-         }
       } else {
          // fallback si rien d'activé (devrait rester vide normalement)
          $values2 = [
@@ -1271,7 +924,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
             <h3 class="card-title mb-0">
             <?php echo __("Dossiers d'enregistrement du Site", 'gestion'); ?>
             <small class="text-muted d-block">
-               <?php echo __("Voir SharePoint : le nom des dossiers contenus dans la bibliothèque principale", 'gestion'); ?>
+               <?php echo __("Dossier d'archivage local des PDF signés, sous files/_plugins/gestion", 'gestion'); ?>
             </small>
             </h3>
          </div>
@@ -1530,19 +1183,12 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       <?php endif;
 
    // --------------------------------------------------------------------- Extraction d'un tracker
-      // -- valeurs actuelles
-      $ExtractYesNo        = (int)$config->ExtractYesNo();
-      $MailTrackerYesNo    = (int)$config->MailTrackerYesNo();
-      $extractSep          = (string)$config->extract();
-      $gabaritTracker      = (int)$config->gabarit_tracker();
-      $EntitiesExtract     = (int)$config->EntitiesExtract();
-      $EntitiesExtractVal  = (string)$config->EntitiesExtractValue();
-      $mode                = (int)$config->mode();
+      $ExtractYesNo = (int)$config->ExtractYesNo();
       ?>
 
       <div class="card mb-3">
       <div class="card-header">
-         <h3 class="card-title mb-0"><?php echo __('Entités et Tracker', 'gestion'); ?></h3>
+         <h3 class="card-title mb-0"><?php echo __('Tracker', 'gestion'); ?></h3>
       </div>
 
       <div class="card-body">
@@ -1553,144 +1199,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
             <label class="form-label mb-1"><?php echo __("Extraction d'un tracker", 'gestion'); ?></label>
             <?php Dropdown::showYesNo('ExtractYesNo', $ExtractYesNo, -1); ?>
             </div>
-
-            <?php if ($ExtractYesNo === 1): ?>
-            <?php if ($mode === 0): ?>
-               <div class="col-md-6">
-                  <label for="extract" class="form-label mb-1">
-                  <?php echo __("Séparateurs pour l'extraction du tracker", 'gestion'); ?>
-                  </label>
-                  <?php
-                  echo Html::input('extract', [
-                     'value' => $extractSep,
-                     'class' => 'form-control',
-                     'id'    => 'extract'
-                  ]);
-                  ?>
-               </div>
-            <?php endif; ?>
-
-            <div class="col-md-6">
-               <label class="form-label mb-1">
-                  <?php echo __("Envoyé un mail si le contenu d'un tracker est détécté (Tâche Cron)", 'gestion'); ?>
-               </label>
-               <?php Dropdown::showYesNo('MailTrackerYesNo', $MailTrackerYesNo, -1); ?>
-            </div>
-
-            <?php if ($MailTrackerYesNo === 1): ?>
-               <div class="col-md-6">
-                  <label for="MailTracker" class="form-label mb-1"><?php echo __('Mail', 'gestion'); ?></label>
-                  <?php
-                  echo Html::input('MailTracker', [
-                     'value' => $config->MailTracker(),
-                     'class' => 'form-control',
-                     'id'    => 'MailTracker'
-                  ]);
-                  ?>
-               </div>
-
-               <div class="col-md-6">
-                  <label class="form-label mb-1">
-                  <?php echo __('Gabarit : Modèle de notifications pour la Tâche Cron (Tracker)', 'gestion'); ?>
-                  </label>
-                  <?php
-                  Dropdown::show('NotificationTemplate', [
-                     'name'                 => 'gabarit_tracker',
-                     'value'                => $gabaritTracker,
-                     'display_emptychoice'  => 1,
-                     'emptylabel'           => '-----',
-                     'specific_tags'        => [],
-                     'itemtype'             => 'NotificationTemplate',
-                     'displaywith'          => [],
-                     'used'                 => [],
-                     'toadd'                => [],
-                     'entity_restrict'      => 0,
-                  ]);
-                  ?>
-               </div>
-            <?php endif; ?>
-            <?php endif; ?>
-
-            <div class="col-12"><hr class="my-2"></div>
-
-            <!-- Extraire l'entité du dossier parent -->
-            <div class="col-md-6">
-            <label class="form-label mb-1"><?php echo __("Extraire l'entité du dossier parent", 'gestion'); ?></label>
-            <?php Dropdown::showYesNo('EntitiesExtract', $EntitiesExtract, -1); ?>
-            </div>
-
-            <?php if ($EntitiesExtract === 1 && $mode === 0): ?>
-            <div class="col-md-6">
-               <label for="EntitiesExtractValue" class="form-label mb-1">
-                  <?php echo __("Séparateurs pour l'extraction de l'entité depuis la Bibliothèques du site", 'gestion'); ?>
-               </label>
-               <div class="d-flex align-items-center gap-2">
-                  <span><?php echo __('Après le chemin :', 'gestion'); ?></span>
-                  <?php
-                  echo Html::input('EntitiesExtractValue', [
-                     'value' => $EntitiesExtractVal,
-                     'class' => 'form-control',
-                     'id'    => 'EntitiesExtractValue',
-                     'style' => 'max-width:36rem'
-                  ]);
-                  ?>
-               </div>
-            </div>
-            <?php endif; ?>
          </div>
-      </div>
-      </div>
-
-      <?php
-      // On conserve ta logique: si l'extraction tracker est OFF, on force MailTrackerYesNo à 0
-      if ($ExtractYesNo !== 1 && $MailTrackerYesNo === 1) {
-      $sql  = "UPDATE glpi_plugin_gestion_configs SET MailTrackerYesNo = ? WHERE id = 1";
-      $stmt = $DB->prepare($sql);
-      $stmt->execute([0]);
-      }
-
-//------------------------------------------------------------------- Dernière synchronisation Cron
-      $lastrun = $DB->doQuery("SELECT lastrun FROM glpi_crontasks WHERE name = 'GestionPdf'")->fetch_object();
-      $lastRunText = isset($lastrun->lastrun) ? $lastrun->lastrun : '';
-      ?>
-
-      <div class="card mb-3">
-      <div class="card-header">
-         <h3 class="card-title mb-0">
-            <?php echo sprintf(__('Dernière synchronisation Cron : %s', 'gestion'), htmlescape($lastRunText)); ?>
-         </h3>
-      </div>
-
-      <div class="card-body">
-
-         <div class="mb-2 text-muted">
-            <?php
-            if ($config->mode() == 0) {
-               echo __('Filtre de recherche, 500 documents max par ordre de modification et d\'ajout.', 'gestion') . '<br>';
-            }
-            echo __('Requête : de la date et heure suivante : ', 'gestion');
-            ?>
-         </div>
-
-         <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
-            <?php
-            Html::showDateTimeField('LastCronTask', [
-               'value'      => $config->LastCronTask(),
-               'canedit'    => true,
-               'maybeempty' => true,
-               'mindate'    => '',
-               'mintime'    => '',
-               'maxdate'    => date('Y-m-d H:i:s'),
-            ]);
-            ?>
-            <span class="text-muted">
-            &nbsp;→ <?php echo __('Jusqu\'à la date et heure d’exécution de la tâche cron.', 'gestion'); ?>
-            </span>
-         </div>
-
-         <!-- Astuce d’UI éventuelle (masquer un bouton spécifique si nécessaire) -->
-         <style>button[btn-id="0"]{display:none!important}</style>
-
       </div>
       </div>
       <?php
@@ -2040,12 +1549,6 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
    function formulaire(){
       return $this->fields['formulaire'] ?? null;
    }
-   function Global(){
-      return $this->fields['Global'] ?? '';
-   }
-   function LastCronTask(){
-      return $this->fields['LastCronTask'] ?? '';
-   }
    function SignatureX(){
       return $this->fields['SignatureX'] ?? 36;
    }
@@ -2057,21 +1560,6 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
    }
    function ExtractYesNo(){
       return $this->fields['ExtractYesNo'] ?? 0;
-   }
-   function extract(){
-      return $this->fields['extract'] ?? '';
-   }
-   function MailTrackerYesNo(){
-      return $this->fields['MailTrackerYesNo'] ?? 0;
-   }
-   function MailTracker(){
-      return $this->fields['MailTracker'] ?? '';
-   }
-   function EntitiesExtract(){
-      return $this->fields['EntitiesExtract'] ?? 0;
-   }
-   function EntitiesExtractValue(){
-      return $this->fields['EntitiesExtractValue'] ?? '';
    }
    function SignataireX(){
       return $this->fields['SignataireX'] ?? 20;
@@ -2100,8 +1588,8 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
    function InvoiceMail(){
       return $this->fields['InvoiceMail'] ?? '';
    }
-   function SharePointLinkDisplay(){
-      return $this->fields['SharePointLinkDisplay'] ?? 0;
+   function PdfPreview(){
+      return $this->fields['PdfPreview'] ?? 0;
    }
    function DisplayPdfEnd(){
       return $this->fields['DisplayPdfEnd'] ?? 0;
@@ -2135,23 +1623,22 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
    function ConfigModes(){
       return $this->fields['ConfigModes'] ?? 0;
    }
-   function gabarit_tracker(){
-      return $this->fields['gabarit_tracker'] ?? 0;
-   }
+   /*
+    * 1 = Sage, 2 = Local. L'ancien 0 (SharePoint, abandonné) se lit comme le
+    * mode qui le remplace, au cas où la migration 1.8.4 n'aurait pas tourné.
+    */
    function mode(){
-      return $this->fields['mode'] ?? 2;
-   }
-   function SharePointOn(){
-      return $this->fields['SharePointOn'] ?? 0;
+      $mode = (int)($this->fields['mode'] ?? 2);
+      if ($mode === 0) {
+         $mode = ((int)$this->SageOn() === 1) ? 1 : 2;
+      }
+      return $mode;
    }
    function SageOn(){
       return $this->fields['SageOn'] ?? 0;
    }
    function SageSearch(){
       return $this->fields['SageSearch'] ?? 0;
-   }
-   function SharePointSearch(){
-      return $this->fields['SharePointSearch'] ?? 0;
    }
    function LocalSearch(){
       return $this->fields['LocalSearch'] ?? 0;
@@ -2189,11 +1676,6 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
    }
 
    function SageToken()     { return PluginGestionCrypto::decrypt($this->fields['SageToken']     ?? ''); }
-   function TenantID()      { return PluginGestionCrypto::decrypt($this->fields['TenantID']      ?? ''); }
-   function ClientID()      { return PluginGestionCrypto::decrypt($this->fields['ClientID']      ?? ''); }
-   function ClientSecret()  { return PluginGestionCrypto::decrypt($this->fields['ClientSecret']  ?? ''); }
-   function Hostname()      { return PluginGestionCrypto::decrypt($this->fields['Hostname']      ?? ''); }
-   function SitePath()      { return PluginGestionCrypto::decrypt($this->fields['SitePath']      ?? ''); }
    // return fonction
 
    function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)
@@ -2227,7 +1709,7 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
          return;
       }
 
-      $encrypted_fields = ['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SageToken'];
+      $encrypted_fields = ['SageToken'];
       $available_fields = [];
       $columns_result = $DB->doQuery("SHOW COLUMNS FROM `" . $DB->escape($table) . "`");
       if ($columns_result) {
@@ -2292,16 +1774,10 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
 
          $query = "CREATE TABLE IF NOT EXISTS $table (
                   `id` int {$default_key_sign} NOT NULL auto_increment,
-                  `TenantID` TEXT NULL,
-                  `ClientID` TEXT NULL,
-                  `ClientSecret` TEXT NULL,
-                  `Hostname` TEXT NULL,
-                  `SitePath` TEXT NULL,
-                  `Global` VARCHAR(255) NULL,
                   `ZenDocMail` VARCHAR(255) NULL,
                   `InvoiceMail` VARCHAR(255) NULL,
                   `NumberViews` INT(10) NOT NULL DEFAULT '100',
-                  `SharePointLinkDisplay` TINYINT NOT NULL DEFAULT '0',
+                  `PdfPreview` TINYINT NOT NULL DEFAULT '0',
                   `MailTo` TINYINT NOT NULL DEFAULT '0',
                   `CombinedMailMode` TINYINT NOT NULL DEFAULT '0',
                   `NoTaskSignMode` TINYINT NOT NULL DEFAULT '0',
@@ -2371,59 +1847,59 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
          $DB->doQuery($query) or die($DB->error());
       }
       
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.2.0'){
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.2.0', '>')){
          include(PLUGIN_GESTION_DIR . "/install/update_120_130.php");
          update120to130(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.3.1'){
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.3.1', '>')){
          include(PLUGIN_GESTION_DIR . "/install/update_132_next.php");
          update(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.4.3'){
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.4.3', '>')){
          include(PLUGIN_GESTION_DIR . "/install/update_144_next.php");
          update_144_next(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.4.4'){
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.4.4', '>')){
          include(PLUGIN_GESTION_DIR . "/install/update_150_remote.php");
          update_150_remote(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.5.0'){
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.5.0', '>')){
          include(PLUGIN_GESTION_DIR . "/install/update_151_next.php");
          update_151_next(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.5.1'){
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.5.1', '>')){
          include(PLUGIN_GESTION_DIR . "/install/update_152_next.php");
          update_152_next(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.5.2'){ // NEW 1.5.3
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.5.2', '>')){ // NEW 1.5.3
          include(PLUGIN_GESTION_DIR . "/install/update_153_next.php");
          update_153_next(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.5.9'){ // NEW 1.6.0
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.5.9', '>')){ // NEW 1.6.0
          include(PLUGIN_GESTION_DIR . "/install/update_160_next.php");
          update_160_next(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.6.2'){ // NEW 1.6.3
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.6.2', '>')){ // NEW 1.6.3
          include(PLUGIN_GESTION_DIR . "/install/update_163_next.php");
          update_163_next(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.6.3'){ // NEW 1.6.4
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.6.3', '>')){ // NEW 1.6.4
          include(PLUGIN_GESTION_DIR . "/install/update_164_next.php");
          update_164_next(); 
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.6.4'){ // NEW 1.7.0
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.6.4', '>')){ // NEW 1.7.0
          include(PLUGIN_GESTION_DIR . "/install/update_170_next.php");
          update_170_next();
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.7.3'){ // NEW 1.7.4
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.7.3', '>')){ // NEW 1.7.4
          include(PLUGIN_GESTION_DIR . "/install/update_174_next.php");
          update_174_next();
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.7.4'){ // NEW 1.7.5
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.7.4', '>')){ // NEW 1.7.5
          include(PLUGIN_GESTION_DIR . "/install/update_175_next.php");
          update_175_next();
       }
-      if($DB->tableExists($table) && $_SESSION['PLUGIN_GESTION_VERSION'] > '1.7.6'){ // NEW 1.7.7
+      if($DB->tableExists($table) && version_compare(PLUGIN_GESTION_VERSION, '1.7.6', '>')){ // NEW 1.7.7
          include(PLUGIN_GESTION_DIR . "/install/update_177_next.php");
          update_177_next();
       }

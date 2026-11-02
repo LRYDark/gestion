@@ -258,16 +258,14 @@ if (file_put_contents($tmpPath, $fileBytes) === false) {
 }
 
 // ─── Envoi mail via MailSend (pièce jointe + multi-destinataires gérés) ──────
-require_once PLUGIN_GESTION_DIR . '/front/SharePointGraph.php';
-
 $subject  = 'Facture scannée';
 $bodyHtml = 'Veuillez trouver ci-joint la facture scannée depuis la tablette.';
 
 $mailOk = null;
 try {
-    $sharepoint = new PluginGestionSharepoint();
+    $mailer = new PluginGestionMail();
     // MailSend($EMAIL, $gabarit_id=0 -> utilise Subject/Body fournis, $outputPath=pièce jointe, ...)
-    $mailOk = $sharepoint->MailSend(
+    $mailOk = $mailer->MailSend(
         implode(',', $recipientList), // 1ʳᵉ = TO, suivantes = CC
         0,
         $tmpPath,

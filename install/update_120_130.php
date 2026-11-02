@@ -36,70 +36,35 @@
 function update120to130() {
    global $DB;
 
-   // Vérifier si les colonnes existent déjà
-   $columns = $DB->doQuery("SHOW COLUMNS FROM `glpi_plugin_gestion_configs`")->fetch_all(MYSQLI_ASSOC);
-
-   // Liste des colonnes à vérifier
-   $required_columns = [
-      'extract',
-      'ExtractYesNo',
-      'MailTracker',
-      'MailTrackerYesNo',
-      'EntitiesExtract',
-      'gabarit_tracker',
-      'formulaire',
-      'LastCronTask'
+   /*
+    * Colonne par colonne, et plus en bloc : l'ancien ALTER ajoutait TOUTES les
+    * colonnes dès qu'une seule manquait. Depuis l'abandon de SharePoint (1.8.4),
+    * `extract`, `MailTracker`, `MailTrackerYesNo`, `EntitiesExtract`,
+    * `gabarit_tracker` et `LastCronTask` sont supprimées : l'ajout groupé aurait
+    * recréé ExtractYesNo et formulaire, déjà là, et la mise à jour serait morte
+    * sur « Duplicate column ». Ces colonnes ne sont plus créées, ni le gabarit
+    * « Gestion Mail PDF (Tracker) » qui ne servait qu'à leur tâche cron.
+    */
+   $columns = [
+      'ExtractYesNo' => "TINYINT NOT NULL DEFAULT '0'",
+      'formulaire'   => "INT(10) NOT NULL DEFAULT '0'",
    ];
+   foreach ($columns as $column => $definition) {
+      if (!$DB->fieldExists('glpi_plugin_gestion_configs', $column, false)) {
+         $DB->doQuery("ALTER TABLE `glpi_plugin_gestion_configs` ADD COLUMN `$column` $definition") or die($DB->error());
+      }
+   }
 
-   // Liste pour les colonnes manquantes
-   $missing_columns = array_diff($required_columns, array_column($columns, 'Field'));
-
-   if (!empty($missing_columns)) {
-      $query= "ALTER TABLE glpi_plugin_gestion_configs
-               ADD COLUMN `extract` VARCHAR(255) NULL,
-               ADD COLUMN `ExtractYesNo` TINYINT NOT NULL DEFAULT '0',
-               ADD COLUMN `MailTracker` VARCHAR(255) NULL,
-               ADD COLUMN `MailTrackerYesNo` TINYINT NOT NULL DEFAULT '0',
-               ADD COLUMN `EntitiesExtract` TINYINT NOT NULL DEFAULT '0',
-               ADD COLUMN `gabarit_tracker` INT(10) NOT NULL DEFAULT '0',
-               ADD COLUMN `formulaire` INT(10) NOT NULL DEFAULT '0',
-               ADD COLUMN `LastCronTask` TIMESTAMP DEFAULT NULL;";
+   $table = 'glpi_plugin_gestion_tickets';
+   if($DB->tableExists($table)){
+      $query = "RENAME TABLE glpi_plugin_gestion_tickets TO glpi_plugin_gestion_surveys;";
       $DB->doQuery($query) or die($DB->error());
 
-      $table = 'glpi_plugin_gestion_tickets';
-      if($DB->tableExists($table)){
-         $query = "RENAME TABLE glpi_plugin_gestion_tickets TO glpi_plugin_gestion_surveys;";
-         $DB->doQuery($query) or die($DB->error());
-
-         $query= "ALTER TABLE glpi_plugin_gestion_surveys
-            ADD COLUMN `tracker` VARCHAR(255) NULL,
-            ADD COLUMN `doc_url` TEXT NULL,
-            ADD COLUMN `doc_date` TIMESTAMP NULL;";
-         $DB->doQuery($query) or die($DB->error()); 
-      }
-
-      require_once PLUGIN_GESTION_DIR.'/install/MailContent2.php';
-      $content_html2 = $ContentHtml2;
-
-      // Échapper le contenu HTML
-      $content_html2_escaped = $DB->escape(str_replace(['&#039;', '&#39;', '&#x27;', '&apos;', '&quot;'], ["'", "'", "'", "'", '"'], $content_html2));
-
-      // Construire la requête d'insertion
-      $insertQuery1 = "INSERT INTO `glpi_notificationtemplates` (`name`, `itemtype`, `date_mod`, `comment`, `css`, `date_creation`) VALUES ('Gestion Mail PDF (Tracker)', 'Ticket', NULL, 'Created by the plugin gestion (Tracker)', '', NULL);";
-      // Exécuter la requête
-      $DB->doQuery($insertQuery1);
-
-      // Construire la requête d'insertion
-      $insertQuery2 = "INSERT INTO `glpi_notificationtemplatetranslations` 
-         (`notificationtemplates_id`, `language`, `subject`, `content_text`, `content_html`) 
-         VALUES (LAST_INSERT_ID(), 'fr_FR', '[GLPI] | Document ##gestion.tracker## généré', '', '{$content_html2_escaped}')";
-      // Exécuter la requête
-      $DB->doQuery($insertQuery2);
-
-      $ID = $DB->doQuery("SELECT id FROM glpi_notificationtemplates WHERE NAME = 'Gestion Mail PDF (Tracker)' AND comment = 'Created by the plugin gestion (Tracker)'")->fetch_object();
-
-      $query= "UPDATE glpi_plugin_gestion_configs SET gabarit_tracker = $ID->id WHERE id=1;";
-      $DB->doQuery($query) or die($DB->error());   
+      $query= "ALTER TABLE glpi_plugin_gestion_surveys
+         ADD COLUMN `tracker` VARCHAR(255) NULL,
+         ADD COLUMN `doc_url` TEXT NULL,
+         ADD COLUMN `doc_date` TIMESTAMP NULL;";
+      $DB->doQuery($query) or die($DB->error());
    }
 }
   

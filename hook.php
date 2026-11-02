@@ -119,14 +119,11 @@ function plugin_gestion_install() { // fonction installation du plugin
       }
    }
 
-   CronTask::Register(PluginGestionReminder::class, PluginGestionReminder::CRON_TASK_NAME, DAY_TIMESTAMP);
-
    // update_180_181 : mise à jour unique 1.8.1 — purge des actions automatiques
    // fantômes de la lignée du plugin (héritage du nom « rpauto » :
    // PluginRpautoReminder::cronRpautoMail indéfinie à chaque passage du cron),
    // et table de garde de la file d'attente des signatures hors-ligne.
-   // Appelé APRÈS CronTask::Register() : la tâche valide du plugin existe alors
-   // en base, la purge ne supprime donc que ce qui n'est plus exécutable.
+   // La purge ne supprime que ce qui n'est plus exécutable.
    $update181 = dirname(__FILE__) . '/install/update_180_181.php';
    if (file_exists($update181)) {
       require_once $update181;
@@ -142,6 +139,16 @@ function plugin_gestion_install() { // fonction installation du plugin
       require_once $update182;
       if (function_exists('update_181_182')) {
          update_181_182();
+      }
+   }
+
+   // update_183_184 : abandon de SharePoint — réglages, dossiers, tâche cron
+   // « GestionPdf » et gabarit du mail tracker retirés.
+   $update184 = dirname(__FILE__) . '/install/update_183_184.php';
+   if (file_exists($update184)) {
+      require_once $update184;
+      if (function_exists('update_183_184')) {
+         update_183_184();
       }
    }
 

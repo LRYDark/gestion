@@ -10,13 +10,10 @@ header('Content-Type: application/json');
 
 
 Session::checkLoginUser();
-require_once(__DIR__ . '/../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
-require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
 require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
 
 global $DB, $CFG_GLPI;
 
-$sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 $mode = (int)$config->mode();
 
@@ -76,34 +73,6 @@ if (isset($_GET['verifyDoc']) && !empty($_GET['verifyDoc']) && $mode === 1) {
 // Initialisation du tableau des groupes
 $groups = [];
 $selected_ids = [];
-
-if ($mode === 0){
-    if(!empty($config->fields['Global'])) {
-        try {
-            $bibliotheque = $config->Global();
-            $contents = $sharepoint->searchSharePoint();            
-            // Filtrer et ajouter les fichiers PDF
-            foreach ($contents as $item) {
-                if (strtolower(pathinfo($item['name'], PATHINFO_EXTENSION)) === 'pdf') {
-                    $file_name = pathinfo($item['name'], PATHINFO_FILENAME);
-                    $url = $item['webUrl'] . '/';
-
-                    // Utiliser une expression régulière pour capturer le chemin après 'root:/'
-                    if (preg_match("/" . preg_quote($bibliotheque, "/") . "\/(.*)\/[^\/]+\.pdf/", $url, $matches)) {
-                        $relativePath = $matches[1];
-                        $relativePath = implode('/', array_map('rawurlencode', explode('/', $relativePath)));
-                    }
-                    $groups[$relativePath . '/' . $file_name] = $file_name;
-                }
-            }
-        } catch (Exception $e) {
-            // Gestion des erreurs SharePoint
-            http_response_code(500);
-            echo json_encode(['error' => 'Erreur SharePoint: ' . $e->getMessage()]);
-            exit;
-        }
-    }
-}
 
 if ($mode === 2){
     $relativePath = '_plugins/gestion/Documents';

@@ -7,14 +7,13 @@
  *   - bl_only : BL coches SEULS                        => [BL1, BL2, ...]
  *
  * Commun aux deux : une seule signature client appliquee a chaque document, un
- * PDF fusionne archive selon la config (SharePoint/Local, range par annee/mois),
+ * PDF fusionne archive dans le dossier local (range par annee/mois),
  * maile au client et a ZenDoc, et chaque BL coche marque signe pointant vers ce
  * PDF fusionne (doc_url).
  */
 
 require_once(__DIR__ . '/../vendor/autoload.php');
 
-require_once PLUGIN_GESTION_DIR . '/front/SharePointGraph.php';
 require_once PLUGIN_GESTION_DIR . '/front/SageApi.php';
 require_once PLUGIN_GESTION_DIR . '/front/sign_bl.core.php';
 
@@ -113,7 +112,7 @@ if (!$bl_only
 }
 
 $config             = PluginGestionConfig::getInstance();
-$sharepoint         = new PluginGestionSharepoint();
+$mailer             = new PluginGestionMail();
 $combined_mail_mode = (int)$config->CombinedMailMode();
 
 // ---- Verifier les BL : appartiennent au ticket + non signes ----
@@ -257,9 +256,8 @@ $_POST['mailtoclient'] = $saved_mailto;
 
 /*
  * Le rapport est INCLUS, pas appele : il s'execute dans cette portee et y
- * reaffecte `$config` avec la configuration du plugin RP. Plus bas,
- * `$config->SharePointOn()` n'existe pas sur cet objet — erreur fatale — et les
- * envois de mail lisaient MailTo et ZenDocMail sur des champs absents : le
+ * reaffecte `$config` avec la configuration du plugin RP. Plus bas, les envois
+ * de mail lisaient alors MailTo et ZenDocMail sur des champs absents : le
  * client ne recevait jamais ses documents signes.
  *
  * `getInstance()` est idempotent : on reprend simplement la bonne.
@@ -416,7 +414,7 @@ try {
    exit;
 }
 
-// ---- 4. Determiner la destination d'archivage (comme traitement.php) ----
+// ---- 4. Determiner le dossier d'archivage local (comme traitement.php) ----
 $FolderDes = 'Local';
 $folder_name = 'DocumentsSigned';
 $q = "SELECT folder_name, params FROM glpi_plugin_gestion_configsfolder WHERE params IN (2,3)
@@ -425,15 +423,6 @@ $res = $DB->doQuery($q);
 if ($res && $DB->numrows($res) > 0) {
    $d = $DB->fetchassoc($res);
    $folder_name = $d['folder_name'];
-   $used = $d['params'];
-   if ($used == 2 && $config->SharePointOn() == 1) {
-      // SharePoint actif : on valide la connexion (sinon repli local).
-      $chk = $sharepoint->validateSharePointConnection($config->Hostname() . ':' . $config->SitePath());
-      $FolderDes = (isset($chk['status']) && $chk['status'] === true) ? 'SharePoint' : 'Local';
-   } else {
-      // SharePoint desactive (ou params=3) : depot LOCAL, pas de tentative SharePoint.
-      $FolderDes = 'Local';
-   }
 }
 
 // ---- 5. Archiver le PDF fusionne + recuperer son URL ----
@@ -454,47 +443,41 @@ $merged_doc_url = '';
 $merged_doc_id  = 0;
 $merged_url_bl  = '';
 try {
-   if ($FolderDes == 'SharePoint') {
-      $sharepoint->uploadFileToFolder($folderPath, $mergedName, $mergedPath);
-      $merged_url_bl  = $folderPath . '/';
-      $merged_doc_url = $sharepoint->getFileUrl($folderPath . '/' . $mergedName);
-   } else {
-      $destDir = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folderPath;
+   $destDir = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folderPath;
 
-      /*
-       * Creation recursive du dossier <Entite>/<annee>/<mois>, qui n'existe pas
-       * au premier document du mois — et echec ANNONCE. Sans dossier, la copie
-       * echoue ; le Document GLPI cree juste apres pointerait alors vers un
-       * fichier absent, ce qui produit le « Fichier introuvable sur le disque »
-       * des listes. On leve donc l'erreur ici, avant d'enregistrer quoi que ce
-       * soit, plutot que de laisser une trace muette derriere soi.
-       */
-      if (!is_dir($destDir) && !@mkdir($destDir, 0755, true) && !is_dir($destDir)) {
-         throw new RuntimeException("Impossible de créer le dossier d'archivage : $destDir");
-      }
-      $destPath = $destDir . '/' . $mergedName;
-      if (!@copy($mergedPath, $destPath)) {
-         throw new RuntimeException("Impossible d'écrire le PDF fusionné dans : $destPath");
-      }
-      $merged_url_bl = "_plugins/gestion/" . $folderPath . '/';
-      $doc = new Document();
-      $input = [
-         'name'        => addslashes($mergedName),
-         'filename'    => addslashes($mergedName),
-         'filepath'    => addslashes($merged_url_bl . $mergedName),
-         'mime'        => 'application/pdf',
-         'users_id'    => $tech_id,
-         'entities_id' => 0,
-         'tickets_id'  => 0,
-         'is_recursive'=> 1,
-      ];
-      $merged_doc_id  = (int)$doc->add($input);
-      if ($merged_doc_id) {
-         // GLPI 11 blackliste filepath/sha1sum dans Document::add => reecriture directe.
-         pluginGestionFixDocumentFile($merged_doc_id, $merged_url_bl . $mergedName);
-      }
-      $merged_doc_url = $merged_doc_id ? ("document.send.php?docid=" . $merged_doc_id) : '';
+   /*
+    * Creation recursive du dossier <Entite>/<annee>/<mois>, qui n'existe pas
+    * au premier document du mois — et echec ANNONCE. Sans dossier, la copie
+    * echoue ; le Document GLPI cree juste apres pointerait alors vers un
+    * fichier absent, ce qui produit le « Fichier introuvable sur le disque »
+    * des listes. On leve donc l'erreur ici, avant d'enregistrer quoi que ce
+    * soit, plutot que de laisser une trace muette derriere soi.
+    */
+   if (!is_dir($destDir) && !@mkdir($destDir, 0755, true) && !is_dir($destDir)) {
+      throw new RuntimeException("Impossible de créer le dossier d'archivage : $destDir");
    }
+   $destPath = $destDir . '/' . $mergedName;
+   if (!@copy($mergedPath, $destPath)) {
+      throw new RuntimeException("Impossible d'écrire le PDF fusionné dans : $destPath");
+   }
+   $merged_url_bl = "_plugins/gestion/" . $folderPath . '/';
+   $doc = new Document();
+   $input = [
+      'name'        => addslashes($mergedName),
+      'filename'    => addslashes($mergedName),
+      'filepath'    => addslashes($merged_url_bl . $mergedName),
+      'mime'        => 'application/pdf',
+      'users_id'    => $tech_id,
+      'entities_id' => 0,
+      'tickets_id'  => 0,
+      'is_recursive'=> 1,
+   ];
+   $merged_doc_id  = (int)$doc->add($input);
+   if ($merged_doc_id) {
+      // GLPI 11 blackliste filepath/sha1sum dans Document::add => reecriture directe.
+      pluginGestionFixDocumentFile($merged_doc_id, $merged_url_bl . $mergedName);
+   }
+   $merged_doc_url = $merged_doc_id ? ("document.send.php?docid=" . $merged_doc_id) : '';
 } catch (Throwable $e) {
    gestion_multi_message("Archivage du PDF fusionne en erreur : " . $e->getMessage(), WARNING);
 }
@@ -506,10 +489,9 @@ try {
  * les rendrait insignables — `signed = 1` les retire de toutes les listes — au
  * profit d'un PDF que personne ne pourra jamais ouvrir. Le technicien perd sa
  * signature, mais rien n'est casse : il recommence une fois le dossier
- * accessible. SharePoint n'entre pas dans ce controle : son echec est deja
- * signale et ne produit pas de Document local a verifier.
+ * accessible.
  */
-if ($FolderDes !== 'SharePoint' && $merged_doc_id <= 0) {
+if ($merged_doc_id <= 0) {
    @unlink($signaturePath);
    foreach ($signed_bl_pdfs as $p) { if (file_exists($p)) { @unlink($p); } }
    if ($rp_repointed && !empty($rp_pdf) && file_exists($rp_pdf)) { @unlink($rp_pdf); }
@@ -534,7 +516,7 @@ if ($FolderDes !== 'SharePoint' && $merged_doc_id <= 0) {
  * Le Document RP devenu inutile est purge : son fichier vient d'etre fusionne
  * dans un autre, le garder ne laisserait qu'une ligne pointant dans le vide.
  *
- * Sans document fusionne local — destination SharePoint — on ne repointe rien :
+ * Sans document fusionne local, on ne repointe rien :
  * RP garde son propre PDF, qui n'est alors pas supprime (cf. nettoyage final).
  * Chaque plugin reste ainsi autonome quand la fusion ne produit pas de document
  * GLPI a partager.
@@ -629,7 +611,7 @@ if (class_exists('PluginPrintgestionTracking')) {
 // on envoie donc le fusionne une seule fois (independamment de CombinedMailMode).
 if ($client_mail_enabled == 1 && !empty($config->fields['MailTo'])
     && $client_email !== '' && $client_email !== 'vide') {
-   $sharepoint->MailSend($client_email, $config->fields['gabarit'], $mergedPath, "Mail envoye a " . $client_email, null, null, null, null);
+   $mailer->MailSend($client_email, $config->fields['gabarit'], $mergedPath, "Mail envoye a " . $client_email, null, null, null, null);
 }
 if (!empty($config->fields['ZenDocMail'])) {
    $bl_list = implode(', ', array_map(fn($d) => $d->bl, array_filter($valid_bls, fn($d) => !isset($failed_bls[(int)$d->id]))));
@@ -637,7 +619,7 @@ if (!empty($config->fields['ZenDocMail'])) {
    if (!empty($substituted_bls)) {
       $msg .= "<br><br>PDF d'origine introuvable, page de remplacement signee pour : " . implode(', ', $substituted_bls);
    }
-   $sharepoint->MailSend($config->fields['ZenDocMail'], 0, $mergedPath, "Envoye vers ZenDoc", null, null, null, null, ($report_merged ? "BL + Rapport signes" : "BL signes"), $msg);
+   $mailer->MailSend($config->fields['ZenDocMail'], 0, $mergedPath, "Envoye vers ZenDoc", null, null, null, null, ($report_merged ? "BL + Rapport signes" : "BL signes"), $msg);
 }
 
 // ---- 8. Nettoyage ----

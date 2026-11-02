@@ -1,5 +1,5 @@
 <?php
-define('PLUGIN_GESTION_VERSION', '1.9.0'); // version du plugin
+define('PLUGIN_GESTION_VERSION', '1.9.1'); // version du plugin
 
 /**
  * Révision des fichiers JS/CSS.
@@ -34,7 +34,7 @@ if (!function_exists('pluginGestionBlNumber')) {
  * PDF source d'un bon, s'il est DEJA sur le serveur — et si c'est bien le sien.
  *
  * Un Document GLPI est souvent rattache au bon : c'est celui que l'apercu du
- * modal affiche. S'en servir evite de retourner interroger Sage ou SharePoint
+ * modal affiche. S'en servir evite de retourner interroger Sage
  * pour un fichier qu'on a sous la main, et permet de signer un bon dont le
  * document a disparu de sa source depuis son rattachement.
  *

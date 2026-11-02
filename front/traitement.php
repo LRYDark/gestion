@@ -1,7 +1,6 @@
 <?php
 require_once('../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
 
-require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
 require_once PLUGIN_GESTION_DIR.'/front/SageApi.php';
 // Page de remplacement d'un bon dont le PDF a disparu (pluginGestionMissingBlPage).
 require_once PLUGIN_GESTION_DIR.'/front/sign_bl.core.php';
@@ -12,7 +11,7 @@ use setasign\Fpdi\Fpdi;
 use setasign\Fpdi\PdfParser\StreamReader;
 use Smalot\PdfParser\Parser;
 
-$sharepoint = new PluginGestionSharepoint();
+$mailer = new PluginGestionMail();
 $config = new PluginGestionConfig();
 $doc = new Document();
 $combined_mode = !empty($_POST['combined_mode']);
@@ -131,41 +130,18 @@ try {
     if ($result && $DB->numrows($result) > 0) {
         $data = $DB->fetchassoc($result);
         $folder_name = $data['folder_name'];
-        $used_param = $data['params'];
 
-        if ($used_param == 2) {
-            if ($config->SharePointOn() == 1) {
-                $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-                if(isset($result['status']) && $result['status'] === true){
-                    $FolderDes = 'SharePoint';
-                }else{
-                    $used_param = 3;
-                    gestion_message("Erreur d'enregistrement du PDF dans SharePoint, Enregistrement dans le dossier Local", WARNING);
-                }
-            } else {
-                // SharePoint desactive : ici params=2 = depot LOCAL (cf. libelle config) => pas de tentative SharePoint, pas d'alerte.
-                $used_param = 3;
-            }
-        }
+        // params = 2 ou 3 : dans les deux cas, le dossier d'archivage local.
+        $FolderDes = 'Local';
+        $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folder_name;
 
-        if ($used_param == 3) {
-            $FolderDes = 'Local';
-            if (is_dir($folder_name)) {
-                $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folder_name;
-            } else {
-                $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/DocumentsSigned";
-            }
-
-            $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folder_name;
-
-            // Vérifie si le dossier existe, sinon le crée
-            if (!is_dir($destinationPath)) {
-                if (!mkdir($destinationPath, 0755, true)) {
-                    // En cas d’échec de création
-                    gestion_message("Erreur : impossible de créer le dossier $destinationPath", ERROR);
-                    Html::back();
-                    exit;
-                }
+        // Vérifie si le dossier existe, sinon le crée
+        if (!is_dir($destinationPath)) {
+            if (!mkdir($destinationPath, 0755, true)) {
+                // En cas d’échec de création
+                gestion_message("Erreur : impossible de créer le dossier $destinationPath", ERROR);
+                Html::back();
+                exit;
             }
         }
     } else {
@@ -308,40 +284,12 @@ if (file_put_contents($signaturePath, $signatureData) === false) {
  * designe le PDF FUSIONNE du lot ; s'en servir produisait un document ou
  * chaque « bon signe » contenait le lot entier.
  *
- * Les trois branches ci-dessous restent le repli : sans document propre, on va
- * bien le chercher a la source declaree.
+ * Les deux branches ci-dessous restent le repli : sans document propre, on va
+ * bien le chercher a la source declaree. Un ancien bon d'une source abandonnee
+ * (SharePoint) n'en a plus : il passe par la page de remplacement plus bas.
  */
 $existingPdfPath = pluginGestionLocalSourcePdf($DOC);
 
-if ($existingPdfPath === '' && $DOC->save == "SharePoint"){ //Récup BL depuis sharepoint
-    try {
-        $folderPath = ""; // Par défaut, $folderPath est vide
-        if (!empty($DOC->url_bl)){
-            $folderPath = $DOC->url_bl . "/";
-        }
-        // Étape 3 : Définir le chemin relatif du fichier
-        $filePath = $folderPath.$DOC_NAME;
-
-        // Étape 4 : Obtenir l'URL de téléchargement
-        $downloadUrl = $sharepoint->getDownloadUrl($filePath);
-
-        // Étape 5 : Télécharger le fichier depuis l'URL
-        $destinationPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
-        $sharepoint->downloadFileFromUrl($downloadUrl, $destinationPath);
-    } catch (Exception $e) {
-        /*
-         * Un bon supprimé de SharePoint (ou une source injoignable) est traité
-         * plus bas comme une source introuvable : une page de remplacement en
-         * tiendra lieu. La cause est journalisée ici.
-         */
-        if (class_exists('PluginGestionLogger')) {
-            PluginGestionLogger::warning('signature', 'BL ' . $DOC_NAME . ' (source SharePoint) : ' . $e->getMessage());
-        }
-    }
-
-    // Vérifiez que le PDF source existe
-    $existingPdfPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_".$nombreAleatoire.".pdf";
-}
 if ($existingPdfPath === '' && $DOC->save == "Local"){ //Récup BL depuis local
     // Vérifiez que le PDF source existe
     $url = str_replace("_plugins", "", $DOC->url_bl.$DOC->bl);
@@ -353,7 +301,7 @@ if ($existingPdfPath === '' && $DOC->save == "Sage"){ //Récup BL depuis Sage
 }
 
 /*
- * Source introuvable : supprimée de Sage / SharePoint, ou fichier local disparu.
+ * Source introuvable : supprimée de Sage, ou fichier local disparu.
  *
  * S'arrêter ici perdait la signature que le client venait de donner, et en
  * mode combiné laissait un rapport orphelin dans RP. Le bon est donc signé
@@ -770,7 +718,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     // ENVOIE DES MAILS #GLPI11#
     $allow_client_mail = (!$combined_mode) || ((int)$config->CombinedMailMode() === 1);
     if ($allow_client_mail && $MAILTOCLIENT == 1 && $config->fields['MailTo'] == 1 && $EMAIL != 'vide'){        
-        $sharepoint->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoye a " . $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
+        $mailer->MailSend($EMAIL, $config->fields['gabarit'], $outputPathTemp, "Mail envoye a " . $EMAIL , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
     }
 
     if ($DOC->tickets_id == 0) {$IdTicket = "Aucun ticket lié";} else { $IdTicket = $DOC->tickets_id; }
@@ -788,13 +736,13 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         }
             if (!$combined_mode) {
                 if (!empty($config->fields['ZenDocMail'])){ 
-                    $sharepoint->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
+                    $mailer->MailSend($config->fields['ZenDocMail'].','.$config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
                 }else{
-                    $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
+                    $mailer->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
                 }
             } else {
                 if (!empty($config->fields['CounterInvoiceMail'])) {
-                    $sharepoint->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
+                    $mailer->MailSend($config->fields['CounterInvoiceMail'], 0, $outputPathTemp, " ", $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL, "Bon de Livraison signé + règlement comptoir ", $ValueForSigned);
                 }
             }
     }else{
@@ -825,7 +773,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
                     throw new RuntimeException("Le PDF du BL dépasse 15 Mo : envoi ZenDoc annulé pour éviter un mail sans pièce jointe.");
                 }
             }
-            $zendoc_ok = $sharepoint->MailSend(
+            $zendoc_ok = $mailer->MailSend(
                 $config->fields['ZenDocMail'],
                 0,
                 $outputPathTemp,
@@ -850,17 +798,6 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     // Source introuvable : rien à supprimer — `$existingPdfPath` désigne alors la
     // page de remplacement temporaire, effacée en fin de traitement.
     if($config->ConfigModes() == 0 && !$bl_source_missing){
-        if($DOC->save == "SharePoint"){
-            try {
-                $folderPathFile = ""; // Par défaut, $folderPath est vide
-                if (!empty($DOC->url_bl)){
-                    $folderPathFile = $DOC->url_bl .'/'. $DOC_NAME;
-                }             
-                $sharepoint->deleteFileByPath($folderPathFile);
-            } catch (Exception $e) {
-                gestion_message("Erreur : " . $e->getMessage(), ERROR);
-            }
-        }
         if($DOC->save == "Local"){
             try {
                 $queryDelete = "DELETE FROM `glpi_documents` WHERE `id` = " . (int)$DOC->doc_id;
@@ -892,7 +829,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     }
 }
 
-////////////////// Upload du fichier signé dans SharePoint ou localement //////////////////
+////////////////// Archivage local du fichier signé //////////////////
     try {
         if ($DOC->entities_id == 0 || $DOC->entities_id == NULL){
             $EntitiesName = "AUTRES";
@@ -911,9 +848,6 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         $monthsFr = [1=>'janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
         $monthName = $monthsFr[$monthIndex] ?? strtolower(date('F'));
         $folderPath = rtrim($folderPath, '/'). '/' . $year . '/' . $monthName;
-        if ($FolderDes == 'SharePoint'){
-            $sharepoint->uploadFileToFolder($folderPath, $fileName, $outputPathTemp);
-        } 
         if ($FolderDes == 'Local'){
             $destDir = GLPI_PLUGIN_DOC_DIR . "/gestion/" . $folderPath;
 
@@ -949,7 +883,7 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
     } catch (Exception $e) {
         gestion_message("Erreur : " . $e->getMessage(), ERROR);
     }
-////////////////// Upload du fichier signé dans SharePoint ou localement //////////////////
+////////////////// Archivage local du fichier signé //////////////////
 
     try {
         if (!empty($folderPath)){
@@ -957,12 +891,6 @@ if ($pdf->Output('F', $outputPathTemp) === '') {
         }
     
         // Étape 4 : Récupérez l'URL du fichier
-        if ($FolderDes == 'SharePoint'){
-            //Spécifiez le chemin relatif du fichier dans SharePoint
-            $file_path = $folderPath . $fileName; // Remplacez par le chemin exact de votre fichier
-            $fileUrl = $sharepoint->getFileUrl($file_path);
-            $NewDoc = 0;
-        }
         if ($FolderDes == 'Local'){
             $folderPath = "_plugins/gestion/". $folderPath; // Chemin relatif pour le stockage local
              if (!str_ends_with($DOC_NAME, '.pdf')) {

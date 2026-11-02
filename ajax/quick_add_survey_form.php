@@ -75,9 +75,6 @@ try {
       $doc_url = function_exists('plugin_gestion_build_view_pdf_url')
          ? plugin_gestion_build_view_pdf_url($searchKey, true)
          : (rtrim((string)($CFG_GLPI['url_base'] ?? ''), '/') . '/' . trim((string)PLUGIN_GESTION_NOTFULL_WEBDIR, '/') . '/view_pdf.php?id=' . rawurlencode($searchKey));
-   } else if ($save === 'SharePoint') {
-      $doc_url = $pdf_folder;
-      $tracker = null;
    } else if ($save === 'Local') {
       $input = [
          'name'        => addslashes(str_replace("?", chr(176), $pdf_filename)),

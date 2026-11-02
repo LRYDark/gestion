@@ -7,15 +7,17 @@
         "smalot/pdfparser": "^2.11"
     },
     "require-dev": {
-        "glpi-project/tools": "^0.7.4",
-        "symfony/console": "^6.4",
-        "symfony/string": "^6.4"
+        "glpi-project/tools": "^0.7.4"
+    },
+    "replace": {
+        "symfony/polyfill-mbstring": "*"
     },
     "config": {
         "optimize-autoloader": true,
         "platform": {
             "php": "8.2.0"
         },
+        "prepend-autoloader": false,
         "sort-packages": true
     },
     "repositories": {

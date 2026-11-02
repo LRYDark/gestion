@@ -1,42 +1,14 @@
 <?php
 header('Content-Type: application/json');
 
-require_once(__DIR__ . '/../vendor/autoload.php'); // Utiliser le chargement automatique de Composer
-require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
 require_once PLUGIN_GESTION_DIR.'/front/SageApi.php'; // Assurer l'import de SageApi
 
 global $DB, $CFG_GLPI;
-$sharepoint = new PluginGestionSharepoint();
 $config = new PluginGestionConfig();
 
 $search = strtolower(trim((string)($_GET['q'] ?? '')));
 $search = substr($search, 0, 255);
 $results = [];
-
-if ($config->SharePointSearch() == 1 && $config->SharePointOn() == 1 ){
-    $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-    if(isset($result['status']) && $result['status'] === true){
-        // SharePoint
-        $sharepoint_results = $sharepoint->searchSharePointGlobal($search);
-        if (is_array($sharepoint_results)) {
-            // Ajouter le badge SharePoint à chaque résultat
-            foreach ($sharepoint_results as &$result) {
-                // Ajouter la source SharePoint
-                $result['source'] = 'sharepoint';
-                
-                // Ajouter le badge SharePoint au HTML
-                if (isset($result['html'])) {
-                    $result['html'] .= ' <span style="color:white;background-color:#0078d4;padding:2px 6px;border-radius:4px;font-size:11px;">☁️ SHAREPOINT</span>';
-                } else {
-                    $result['html'] = $result['text'] . ' <span style="color:white;background-color:#0078d4;padding:2px 6px;border-radius:4px;font-size:11px;">☁️ SHAREPOINT</span>';
-                }
-                
-            }
-            
-            $results = array_merge($results, $sharepoint_results);
-        }
-    }
-}
 
 if ($config->SageSearch() == 1 && $config->SageOn() == 1){
     // Recherche Sage - L'API ne fait que vérifier l'existence avec l'élément complet
@@ -142,9 +114,9 @@ if ($config->LocalSearch() == 1){
     }
 }
 
-// Trier les résultats pour mettre les résultats dans l'ordre : Sage, SharePoint, Local
+// Trier les résultats pour mettre les résultats dans l'ordre : Sage, Local
 usort($results, function($a, $b) {
-    $sourceOrder = ['sage' => 1, 'sharepoint' => 2, 'local' => 3];
+    $sourceOrder = ['sage' => 1, 'local' => 2];
     
     $aOrder = isset($a['source']) && isset($sourceOrder[$a['source']]) ? $sourceOrder[$a['source']] : 999;
     $bOrder = isset($b['source']) && isset($sourceOrder[$b['source']]) ? $sourceOrder[$b['source']] : 999;

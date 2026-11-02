@@ -45,28 +45,12 @@ class PluginGestionTicketConfig extends CommonDBTM
                 $gestion_button_enabled = false;
               }
               
-              // ---------------- Connexions (Sage / SharePoint / Local) ----------------
+              // ---------------- Connexions (Sage / Local) ----------------
                 $config = new PluginGestionConfig();
-                require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
-                $sharepoint = new PluginGestionSharepoint();
 
                 $connexion = false;
-                if ($config->SageOn() == 1 && $config->SharePointOn() == 0) {
-                    if (!empty($config->SageToken())) {
-                        $connexion = true;
-                    }
-                }
-                if ($config->SageOn() == 0 && $config->SharePointOn() == 1) {
-                    $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-                    if (isset($result['status']) && $result['status'] === true) {
-                        $connexion = true;
-                    }
-                }
-                if ($config->SageOn() == 1 && $config->SharePointOn() == 1) {
-                    $result = $sharepoint->validateSharePointConnection($config->Hostname().':'.$config->SitePath());
-                    if ((isset($result['status']) && $result['status'] === true) || !empty($config->SageToken())) {
-                        $connexion = true;
-                    }
+                if ($config->SageOn() == 1 && !empty($config->SageToken())) {
+                    $connexion = true;
                 }
                 if ($config->mode() == 2) {
                     $connexion = true;
@@ -178,7 +162,7 @@ class PluginGestionTicketConfig extends CommonDBTM
                         <?php } else { ?>
                           <div class="alert alert-danger">
                             Une erreur est survenue dans la configuration de la méthode de récupération des documents
-                            (Sage local, SharePoint ou dossier local).<br><br>
+                            (Sage local ou dossier local).<br><br>
                             Veuillez contacter votre administrateur afin de vérifier la configuration du plugin.
                           </div>
                         <?php } ?>

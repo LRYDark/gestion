@@ -6,19 +6,11 @@ namespace Composer\Autoload;
 
 class ComposerStaticInitd047530077b935c34fc47110c73af985
 {
-    public static $files = array (
-        '0e6d7bf4a5811bfa5cf40c5ccd6fae6a' => __DIR__ . '/..' . '/symfony/polyfill-mbstring/bootstrap.php',
-    );
-
     public static $prefixLengthsPsr4 = array (
         's' =>
         array (
             'setasign\\Fpdi\\' => 14,
             'setasign\\FpdiPdfParser\\' => 23,
-        ),
-        'S' =>
-        array (
-            'Symfony\\Polyfill\\Mbstring\\' => 26,
         ),
     );
 
@@ -30,10 +22,6 @@ class ComposerStaticInitd047530077b935c34fc47110c73af985
         'setasign\\FpdiPdfParser\\' =>
         array (
             0 => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src',
-        ),
-        'Symfony\\Polyfill\\Mbstring\\' =>
-        array (
-            0 => __DIR__ . '/..' . '/symfony/polyfill-mbstring',
         ),
     );
 
@@ -96,7 +84,6 @@ class ComposerStaticInitd047530077b935c34fc47110c73af985
         'Smalot\\PdfParser\\RawData\\RawDataParser' => __DIR__ . '/..' . '/smalot/pdfparser/src/Smalot/PdfParser/RawData/RawDataParser.php',
         'Smalot\\PdfParser\\XObject\\Form' => __DIR__ . '/..' . '/smalot/pdfparser/src/Smalot/PdfParser/XObject/Form.php',
         'Smalot\\PdfParser\\XObject\\Image' => __DIR__ . '/..' . '/smalot/pdfparser/src/Smalot/PdfParser/XObject/Image.php',
-        'Symfony\\Polyfill\\Mbstring\\Mbstring' => __DIR__ . '/..' . '/symfony/polyfill-mbstring/Mbstring.php',
         'setasign\\FpdiPdfParser\\PdfParser\\CrossReference\\CompressedReader' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/CrossReference/CompressedReader.php',
         'setasign\\FpdiPdfParser\\PdfParser\\CrossReference\\CorruptedReader' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/CrossReference/CorruptedReader.php',
         'setasign\\FpdiPdfParser\\PdfParser\\CrossReference\\CrossReference' => __DIR__ . '/..' . '/setasign/fpdi_pdf-parser/src/PdfParser/CrossReference/CrossReference.php',
