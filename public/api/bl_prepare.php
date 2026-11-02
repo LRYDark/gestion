@@ -209,34 +209,6 @@ function api_prepare_search_results(DBmysql $DB, PluginGestionConfig $config, st
    $results = [];
    $normalized = strtolower($search);
 
-   // SharePoint (si actif)
-   if ((int)$config->SharePointSearch() === 1 && (int)$config->SharePointOn() === 1) {
-      try {
-         require_once PLUGIN_GESTION_DIR . '/front/SharePointGraph.php';
-         $sp = new PluginGestionSharepoint();
-         $check = $sp->validateSharePointConnection($config->Hostname() . ':' . $config->SitePath());
-         if (is_array($check) && !empty($check['status'])) {
-            $spResults = $sp->searchSharePointGlobal($normalized);
-            if (is_array($spResults)) {
-               foreach ($spResults as $item) {
-                  if (!is_array($item)) {
-                     continue;
-                  }
-                  $item['source'] = 'sharepoint';
-                  $item['save'] = $item['save'] ?? 'SharePoint';
-                  if (empty($item['html'])) {
-                     $item['html'] = (string)($item['text'] ?? $item['filename'] ?? '');
-                  }
-                  $item['html'] .= ' <span style="color:white;background-color:#0078d4;padding:2px 6px;border-radius:4px;font-size:11px;">SHAREPOINT</span>';
-                  $results[] = $item;
-               }
-            }
-         }
-      } catch (Throwable $e) {
-         // non bloquant
-      }
-   }
-
    // Sage (verification exacte sur identifiant de document complet)
    if ((int)$config->SageSearch() === 1 && (int)$config->SageOn() === 1) {
       $term = trim($search);
@@ -323,7 +295,7 @@ function api_prepare_search_results(DBmysql $DB, PluginGestionConfig $config, st
    }
 
    usort($results, static function ($a, $b) {
-      $order = ['sage' => 1, 'sharepoint' => 2, 'local' => 3];
+      $order = ['sage' => 1, 'local' => 2];
       $ao = $order[strtolower((string)($a['source'] ?? ''))] ?? 999;
       $bo = $order[strtolower((string)($b['source'] ?? ''))] ?? 999;
       if ($ao !== $bo) {
@@ -445,30 +417,6 @@ function api_prepare_from_search_selection(
       $url_bl = $folder;
       $web_rel = str_replace('_plugins', '', rtrim($folder, '/') . '/' . $filename);
       $doc_url = rtrim($rootdoc, '/') . '/files' . $web_rel;
-   } elseif (strcasecmp($save, 'SharePoint') === 0) {
-      $save = 'SharePoint';
-      $url_bl = $folder;
-      $doc_url = $folder;
-      if ((int)$config->ExtractYesNo() === 1) {
-         try {
-            require_once PLUGIN_GESTION_DIR . '/front/SharePointGraph.php';
-            $sp = new PluginGestionSharepoint();
-            $fp = rtrim($folder, '/') . '/' . (preg_match('/\.pdf$/i', $filename) ? $filename : ($filename . '.pdf'));
-            $extracted = $sp->GetTrackerPdfDownload($fp);
-            if (is_array($extracted)) {
-               if (!empty($extracted['tracker'])) {
-                  $tracker = (string)$extracted['tracker'];
-               }
-               if (!empty($extracted['relatedInvoiceToBL'])) {
-                  $relatedInvoiceToBL = (string)$extracted['relatedInvoiceToBL'];
-               }
-            } elseif (!empty($extracted)) {
-               $tracker = (string)$extracted;
-            }
-         } catch (Throwable $e) {
-            // non bloquant
-         }
-      }
    } else {
       return ['ok' => false, 'error' => 'unknown_source'];
    }

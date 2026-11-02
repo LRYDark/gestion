@@ -69,13 +69,13 @@ class FilterHelper
                 return $this->decodeFilterASCII85Decode($data);
 
             case 'LZWDecode':
-                return $this->decodeFilterLZWDecode($data);
+                return $this->decodeFilterLZWDecode($data, $decodeMemoryLimit);
 
             case 'FlateDecode':
                 return $this->decodeFilterFlateDecode($data, $decodeMemoryLimit);
 
             case 'RunLengthDecode':
-                return $this->decodeFilterRunLengthDecode($data);
+                return $this->decodeFilterRunLengthDecode($data, $decodeMemoryLimit);
 
             case 'CCITTFaxDecode':
                 throw new NotImplementedException('Decode CCITTFaxDecode not implemented yet.');
@@ -209,7 +209,7 @@ class FilterHelper
                     if (255 < $tuple >> 24) {
                         $chr24Part = \chr(($tuple >> 24) % 256);
                     } else {
-                        $chr24Part = \chr($tuple >> 24);
+                        $chr24Part = \chr(($tuple >> 24) & 0xFF);
                     }
 
                     if (255 < $tuple) {
@@ -232,15 +232,15 @@ class FilterHelper
         // last tuple (if any)
         switch ($group_pos) {
             case 4:
-                $decoded .= \chr($tuple >> 24).\chr($tuple >> 16).\chr($tuple >> 8);
+                $decoded .= \chr(($tuple >> 24) & 0xFF).\chr(($tuple >> 16) & 0xFF).\chr(($tuple >> 8) & 0xFF);
                 break;
 
             case 3:
-                $decoded .= \chr($tuple >> 24).\chr($tuple >> 16);
+                $decoded .= \chr(($tuple >> 24) & 0xFF).\chr(($tuple >> 16) & 0xFF);
                 break;
 
             case 2:
-                $decoded .= \chr($tuple >> 24);
+                $decoded .= \chr(($tuple >> 24) & 0xFF);
                 break;
 
             case 1:
@@ -261,6 +261,8 @@ class FilterHelper
      * @return string data string
      *
      * @throws \Exception
+     *
+     * @see https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf#page=33 ISO 32000-1:2008, 7.4.4 (LZWDecode and FlateDecode filters)
      */
     protected function decodeFilterFlateDecode(string $data, int $decodeMemoryLimit): ?string
     {
@@ -300,11 +302,16 @@ class FilterHelper
      *
      * Decompresses data encoded using the LZW (Lempel-Ziv-Welch) adaptive compression method, reproducing the original text or binary data.
      *
-     * @param string $data Data to decode
+     * @param string $data              Data to decode
+     * @param int    $decodeMemoryLimit Maximum decoded size in bytes; 0 for no limit
      *
      * @return string Data string
+     *
+     * @throws \Exception
+     *
+     * @see https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf#page=33 ISO 32000-1:2008, 7.4.4 (LZWDecode and FlateDecode filters)
      */
-    protected function decodeFilterLZWDecode(string $data): string
+    protected function decodeFilterLZWDecode(string $data, int $decodeMemoryLimit = 0): string
     {
         // initialize string to return
         $decoded = '';
@@ -374,6 +381,12 @@ class FilterHelper
                     $bitlen = 10;
                 }
             }
+
+            // Bound the decompressed size, like decodeFilterFlateDecode() does, so
+            // a small stream cannot expand without limit.
+            if (0 < $decodeMemoryLimit && \strlen($decoded) > $decodeMemoryLimit) {
+                throw new \Exception('decodeFilterLZWDecode: decode memory limit exceeded');
+            }
         }
 
         return $decoded;
@@ -384,9 +397,16 @@ class FilterHelper
      *
      * Decompresses data encoded using a byte-oriented run-length encoding algorithm.
      *
-     * @param string $data Data to decode
+     * @param string $data              Data to decode
+     * @param int    $decodeMemoryLimit Maximum decoded size in bytes; 0 for no limit
+     *
+     * @return string Data string
+     *
+     * @throws \Exception
+     *
+     * @see https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf#page=37 ISO 32000-1:2008, 7.4.5 (RunLengthDecode filter)
      */
-    protected function decodeFilterRunLengthDecode(string $data): string
+    protected function decodeFilterRunLengthDecode(string $data, int $decodeMemoryLimit = 0): string
     {
         // initialize string to return
         $decoded = '';
@@ -411,6 +431,12 @@ class FilterHelper
                 $decoded .= str_repeat($data[$i + 1], 257 - $byte);
                 // move to next block
                 $i += 2;
+            }
+
+            // Bound the decompressed size, like decodeFilterFlateDecode() does, so
+            // a small stream cannot expand without limit.
+            if (0 < $decodeMemoryLimit && \strlen($decoded) > $decodeMemoryLimit) {
+                throw new \Exception('decodeFilterRunLengthDecode: decode memory limit exceeded');
             }
         }
 

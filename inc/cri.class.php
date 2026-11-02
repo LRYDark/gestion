@@ -487,8 +487,6 @@ class PluginGestionCri extends CommonDBTM {
       $config     = PluginGestionConfig::getInstance();
       $documents  = new Document();
       $job        = new Ticket();
-      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
-      $sharepoint = new PluginGestionSharepoint();
 
       $job->getfromDB($ID);
       $email = '';
@@ -501,7 +499,7 @@ class PluginGestionCri extends CommonDBTM {
       $DOC = $DB->doQuery("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$id'")->fetch_object();
       $Doc_Name = $DOC->bl;
       $doc_id  = $DOC->doc_id;
-      $DocUrlSharePoint = "";
+      $DocUrlPreview = "";
    
       //$email = $DB->doQuery("SELECT GROUP_CONCAT(email SEPARATOR ',') AS emails FROM ( SELECT DISTINCT u.email AS email FROM glpi_useremails u JOIN glpi_users us ON us.id = u.users_id JOIN glpi_tickets t ON t.id = $ID WHERE us.entities_id = t.entities_id AND u.email IS NOT NULL AND u.email <> '' AND us.is_deleted = 0 UNION SELECT DISTINCT e.email FROM glpi_entities e JOIN glpi_tickets t ON t.entities_id = e.id WHERE t.id = $ID AND e.email IS NOT NULL AND e.email <> '' ) AS mails;")->fetch_object();   
       $ticket_id_mails = (int)$ID;
@@ -598,30 +596,29 @@ class PluginGestionCri extends CommonDBTM {
           * deux fois le meme document et laisserait croire qu'il est le seul
           * concerne.
           */
-         if ($config->fields['SharePointLinkDisplay'] == 1 && empty($options['multi_bl'])) {
+         if ($config->PdfPreview() == 1 && empty($options['multi_bl'])) {
             echo '<div class="form-card">';
                try {
-                  if ($DOC->save == 'SharePoint'){
-                     $DocUrlSharePoint = $DOC->doc_url;
-                     $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);
-                  }
+                  // Par défaut — ancien bon d'une source abandonnée (SharePoint) : le lien enregistré.
+                  $DocUrlPreview = (string)$DOC->doc_url;
+                  $fileDownloadUrl = $DocUrlPreview;
                   if ($DOC->save == 'Local'){
                      $fileDownloadUrl = $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
-                     $DocUrlSharePoint = $fileDownloadUrl;
+                     $DocUrlPreview = $fileDownloadUrl;
                   }
                   if ($DOC->save == 'Sage'){
-                     $DocUrlSharePoint = function_exists('plugin_gestion_normalize_view_pdf_url')
+                     $DocUrlPreview = function_exists('plugin_gestion_normalize_view_pdf_url')
                         ? plugin_gestion_normalize_view_pdf_url((string)$DOC->doc_url)
                         : (string)$DOC->doc_url;
                      if (function_exists('plugin_gestion_ensure_pdf_token')) {
-                        $DocUrlSharePoint = plugin_gestion_ensure_pdf_token($DocUrlSharePoint);
+                        $DocUrlPreview = plugin_gestion_ensure_pdf_token($DocUrlPreview);
                      }
-                     $fileDownloadUrl = $DocUrlSharePoint;
+                     $fileDownloadUrl = $DocUrlPreview;
                   }
 
                   echo '<div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">';
                      echo '<span>Visualisation du document</span>';
-                     echo '<a href="' . $DocUrlSharePoint . '" target="_blank" class="pdf-link" title="Voir le PDF en plein écran"><i class="ti ti-arrows-maximize"></i> Plein écran</a>';
+                     echo '<a href="' . $DocUrlPreview . '" target="_blank" class="pdf-link" title="Voir le PDF en plein écran"><i class="ti ti-arrows-maximize"></i> Plein écran</a>';
                   echo '</div>';
                   echo '<div class="form-content">';
                   echo '<object data="' . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . '#view=FitH" '
@@ -1044,13 +1041,13 @@ class PluginGestionCri extends CommonDBTM {
                            . '/view_pdf.php?id=' . rawurlencode($doc_id_remote)
                            . '&token=' . $temp_token_remote;
                      } else {
-                        // URL non-view_pdf (ex: SharePoint) : ajouter le token en paramètre
+                        // URL non-view_pdf (ex: document local) : ajouter le token en paramètre
                         $decoded_url = html_entity_decode($fileDownloadUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                         $sep = (strpos($decoded_url, '?') !== false) ? '&' : '?';
                         $autoParams['document_url'] = $decoded_url . $sep . 'token=' . $temp_token_remote;
                      }
                   } else {
-                     // Fallback : URL sans token (SharePoint autonome, etc.)
+                     // Fallback : URL sans token (document local, etc.)
                      $autoParams['document_url'] = html_entity_decode($fileDownloadUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                   }
                }
@@ -1542,29 +1539,28 @@ class PluginGestionCri extends CommonDBTM {
          // === CARTE PDF SIGNÉ ===
          echo '<div class="form-card">';
 
-            if ($config->fields['SharePointLinkDisplay'] == 1) {
+            if ($config->PdfPreview() == 1) {
                try {
-                  if ($DOC->save == 'SharePoint'){
-                     $DocUrlSharePoint = $DOC->doc_url;
-                     $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);
-                  }
+                  // Par défaut — ancien bon d'une source abandonnée (SharePoint) : le lien enregistré.
+                  $DocUrlPreview = (string)$DOC->doc_url;
+                  $fileDownloadUrl = $DocUrlPreview;
                   if ($DOC->save == 'Local'){
                      $fileDownloadUrl = $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
-                     $DocUrlSharePoint = $fileDownloadUrl;
+                     $DocUrlPreview = $fileDownloadUrl;
                   }
                   if ($DOC->save == 'Sage'){
-                     $DocUrlSharePoint = function_exists('plugin_gestion_normalize_view_pdf_url')
+                     $DocUrlPreview = function_exists('plugin_gestion_normalize_view_pdf_url')
                         ? plugin_gestion_normalize_view_pdf_url((string)$DOC->doc_url)
                         : (string)$DOC->doc_url;
                      if (function_exists('plugin_gestion_ensure_pdf_token')) {
-                        $DocUrlSharePoint = plugin_gestion_ensure_pdf_token($DocUrlSharePoint);
+                        $DocUrlPreview = plugin_gestion_ensure_pdf_token($DocUrlPreview);
                      }
-                     $fileDownloadUrl = $DocUrlSharePoint;
+                     $fileDownloadUrl = $DocUrlPreview;
                   }
 
                   echo '<div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">';
                      echo '<span>Document signé</span>';
-                     echo '<a href="' . $DocUrlSharePoint . '" target="_blank" class="pdf-link" title="Voir le PDF en plein écran"><i class="ti ti-arrows-maximize"></i> Plein écran</a>';
+                     echo '<a href="' . $DocUrlPreview . '" target="_blank" class="pdf-link" title="Voir le PDF en plein écran"><i class="ti ti-arrows-maximize"></i> Plein écran</a>';
                   echo '</div>';
                   echo '<div class="form-content">';
                   echo '<object data="' . htmlspecialchars($fileDownloadUrl, ENT_QUOTES, 'UTF-8') . '#view=FitH" '
@@ -1695,8 +1691,6 @@ class PluginGestionCri extends CommonDBTM {
       echo '<link rel="stylesheet" href="' . PLUGIN_GESTION_WEBDIR . '/public/css/signature_gestion.css?r=' . (defined('PLUGIN_GESTION_ASSETS_REV') ? PLUGIN_GESTION_ASSETS_REV : '1') . '">';
 
       $config     = PluginGestionConfig::getInstance();
-      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
-      $sharepoint = new PluginGestionSharepoint();
 
       $bl_id = (int)$bl_id;
       $DOC = $DB->doQuery("SELECT * FROM `glpi_plugin_gestion_surveys` WHERE id = '$bl_id'")->fetch_object();
@@ -1706,29 +1700,28 @@ class PluginGestionCri extends CommonDBTM {
       }
 
       $Doc_Name = $DOC->bl;
-      $DocUrlSharePoint = "";
+      $DocUrlPreview = "";
       $fileDownloadUrl = "";
       $baseUrl = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/') . '/front';
 
       // Préparation des URLs PDF si prévisualisation activée
-      if ($config->fields['SharePointLinkDisplay'] == 1) {
+      if ($config->PdfPreview() == 1) {
          try {
-            if ($DOC->save == 'SharePoint'){
-               $DocUrlSharePoint = $DOC->doc_url;
-               $fileDownloadUrl = $sharepoint->getDownloadUrlByPath($DOC->doc_url);
-            }
+            // Par défaut — ancien bon d'une source abandonnée (SharePoint) : le lien enregistré.
+            $DocUrlPreview = (string)$DOC->doc_url;
+            $fileDownloadUrl = $DocUrlPreview;
             if ($DOC->save == 'Local'){
                $fileDownloadUrl = $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
-               $DocUrlSharePoint = $fileDownloadUrl;
+               $DocUrlPreview = $fileDownloadUrl;
             }
             if ($DOC->save == 'Sage'){
-               $DocUrlSharePoint = function_exists('plugin_gestion_normalize_view_pdf_url')
+               $DocUrlPreview = function_exists('plugin_gestion_normalize_view_pdf_url')
                   ? plugin_gestion_normalize_view_pdf_url((string)$DOC->doc_url)
                   : (string)$DOC->doc_url;
                if (function_exists('plugin_gestion_ensure_pdf_token')) {
-                  $DocUrlSharePoint = plugin_gestion_ensure_pdf_token($DocUrlSharePoint);
+                  $DocUrlPreview = plugin_gestion_ensure_pdf_token($DocUrlPreview);
                }
-               $fileDownloadUrl = $DocUrlSharePoint;
+               $fileDownloadUrl = $DocUrlPreview;
             }
          } catch (Exception $e) {
             $fileDownloadUrl = "";
@@ -1752,12 +1745,12 @@ class PluginGestionCri extends CommonDBTM {
          </div>
       </div>
 
-      <?php if ($config->fields['SharePointLinkDisplay'] == 1) { ?>
+      <?php if ($config->PdfPreview() == 1) { ?>
       <div class="form-card">
          <div class="form-label" style="display:flex;align-items:center;justify-content:space-between;">
             <span>Visualisation du document</span>
-            <?php if (!empty($DocUrlSharePoint)) { ?>
-               <a href="<?php echo $DocUrlSharePoint; ?>" target="_blank" class="pdf-link" title="Voir le PDF en plein écran"><i class="ti ti-arrows-maximize"></i> Plein écran</a>
+            <?php if (!empty($DocUrlPreview)) { ?>
+               <a href="<?php echo $DocUrlPreview; ?>" target="_blank" class="pdf-link" title="Voir le PDF en plein écran"><i class="ti ti-arrows-maximize"></i> Plein écran</a>
             <?php } ?>
          </div>
          <div class="form-content">
@@ -2172,8 +2165,6 @@ class PluginGestionCri extends CommonDBTM {
       }
 
       $config = PluginGestionConfig::getInstance();
-      require_once PLUGIN_GESTION_DIR.'/front/SharePointGraph.php';
-      $sharepoint = new PluginGestionSharepoint();
 
       $ticket_id = (int)$ticket_id;
 
@@ -2190,10 +2181,9 @@ class PluginGestionCri extends CommonDBTM {
          return;
       }
 
-      $previewUrl = function($DOC) use ($sharepoint, $CFG_GLPI) {
+      $previewUrl = function($DOC) use ($CFG_GLPI) {
          $baseUrl = rtrim($CFG_GLPI['root_doc'] ?? '/glpi', '/') . '/front';
          try {
-            if ($DOC->save == 'SharePoint') return $sharepoint->getDownloadUrlByPath($DOC->doc_url);
             if ($DOC->save == 'Local')      return $baseUrl.'/document.send.php?docid='.$DOC->doc_id;
             if ($DOC->save == 'Sage') {
                $u = function_exists('plugin_gestion_normalize_view_pdf_url') ? plugin_gestion_normalize_view_pdf_url((string)$DOC->doc_url) : (string)$DOC->doc_url;
@@ -2238,7 +2228,7 @@ class PluginGestionCri extends CommonDBTM {
             : 'Décochez un BL pour ne pas le signer maintenant.')
          . '</div>';
       foreach ($bls as $b) {
-         $url     = ($config->fields['SharePointLinkDisplay'] == 1) ? $previewUrl($b) : '';
+         $url     = ($config->PdfPreview() == 1) ? $previewUrl($b) : '';
          $checked = ($check_only === 0 || $check_only === (int)$b->id) ? ' checked' : '';
          echo '<div class="form-card" style="border:1px solid #dee2e6;">';
          echo '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;text-align:left;">';

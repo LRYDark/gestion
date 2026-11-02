@@ -334,8 +334,8 @@ class PluginGestionOfflinequeue {
     *
     * `ignore_user_abort` est le point CENTRAL de tout le dispositif.
     *
-    * La signature d'un bon enchaîne génération, fusion des PDF, dépôt
-    * SharePoint et mail au client — plusieurs secondes, parfois plus. Si le
+    * La signature d'un bon enchaîne génération, fusion des PDF, archivage
+    * et mail au client — plusieurs secondes, parfois plus. Si le
     * téléphone raccroche, et sur un réseau qui passe mal il raccroche, PHP
     * s'interrompt à la prochaine écriture : document produit, base incomplète,
     * mail jamais parti. Le rejeu créerait alors un second document.

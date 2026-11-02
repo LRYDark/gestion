@@ -1,7 +1,5 @@
 <?php
 include('../../../inc/includes.php');
-// Le chargeur GLPI ne connait pas la classe definie dans front/SharePointGraph.php, on l'inclut explicitement.
-require_once dirname(__DIR__) . '/front/SharePointGraph.php';
 
 Html::header_nocache();
 Session::checkLoginUser();
@@ -551,17 +549,17 @@ switch ($action) {
             throw new RuntimeException("Enregistrement introuvable.");
          }
 
-         $sharepoint = new PluginGestionSharepoint();
+         $mailer     = new PluginGestionMail();
          $config     = PluginGestionConfig::getInstance();
 
-         $filePath = plugin_gestion_build_signed_pdf_copy($survey, $sharepoint);
+         $filePath = plugin_gestion_build_signed_pdf_copy($survey);
          $fileName = $survey->fields['bl'];
          if (substr($fileName, -4) !== '.pdf') {
             $fileName .= '.pdf';
          }
 
          $tracker = $survey->fields['tracker'] ?? null;
-         $sharepoint->MailSend(
+         $mailer->MailSend(
             $emails,
             $config->fields['gabarit'],
             $filePath,
@@ -642,7 +640,7 @@ function plugin_gestion_to_absolute_url(string $url): string
    return $url;
 }
 
-function plugin_gestion_build_signed_pdf_copy(PluginGestionSurvey $survey, PluginGestionSharepoint $sharepoint): string {
+function plugin_gestion_build_signed_pdf_copy(PluginGestionSurvey $survey): string {
    global $CFG_GLPI;
 
    $tmpDir = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/resend";
@@ -660,16 +658,8 @@ function plugin_gestion_build_signed_pdf_copy(PluginGestionSurvey $survey, Plugi
    $sourceFound = false;
 
    if ($saveMode === 'SharePoint') {
-      $downloadUrl = $sharepoint->getDownloadUrlByPath($survey->fields['doc_url']);
-      if (!$downloadUrl) {
-         throw new RuntimeException("Impossible de recuperer le fichier sur SharePoint.");
-      }
-      $content = plugin_gestion_http_get_bytes((string)$downloadUrl);
-      if ($content === false) {
-         throw new RuntimeException("Telechargement du document signe impossible.");
-      }
-      file_put_contents($tempPath, $content);
-      $sourceFound = true;
+      // Source abandonnée : le fichier n'est plus récupérable depuis GLPI.
+      throw new RuntimeException("Ce bon a été archivé dans SharePoint, qui n'est plus pris en charge : renvoi impossible.");
    } elseif ($saveMode === 'Local') {
       $doc = new Document();
       if (!empty($survey->fields['doc_id']) && $doc->getFromDB($survey->fields['doc_id'])) {

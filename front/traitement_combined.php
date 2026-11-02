@@ -2,7 +2,6 @@
 include('../../../inc/includes.php');
 require_once(__DIR__ . '/../vendor/autoload.php');
 
-require_once PLUGIN_GESTION_DIR . '/front/SharePointGraph.php';
 require_once PLUGIN_GESTION_DIR . '/front/SageApi.php';
 
 use setasign\Fpdi\Fpdi;
@@ -156,7 +155,7 @@ $_POST['mailtoclient'] = $client_mail_enabled;
 // Signer le BL via le traitement standard (en mode combine)
 $_POST['combined_mode'] = 1;
 /*
- * Si la source du bon a disparu (supprimé de Sage / SharePoint, fichier local
+ * Si la source du bon a disparu (supprimé de Sage, fichier local
  * absent), le traitement signe une page de remplacement à sa place et le
  * signale en retour par GESTION_LAST_SIGNED_BL_SOURCE_MISSING : les libellés
  * et les mails ci-dessous le disent.
@@ -219,7 +218,7 @@ try {
  * son fichier part avec lui, il ne sert plus à rien.
  *
  * Rien de tout cela si l'archivage n'a pas produit de Document local
- * (destination SharePoint) ou si la copie échoue : chaque plugin garde alors le
+ * ou si la copie échoue : chaque plugin garde alors le
  * sien, exactement comme avant. Les mails, eux, ne changent pas : ils partent
  * du fusionné temporaire, selon le réglage « Mode d'envoi mail au client ».
  */
@@ -282,11 +281,11 @@ if ($rp_doc_id > 0 && file_exists($mergedPath) && filesize($mergedPath) > 0) {
 
 // Envoi mails (client/Zendoc)
 // Envoi Zendoc (PDF fusionné)
-$sharepoint = new PluginGestionSharepoint();
+$mailer = new PluginGestionMail();
 
 // Envoi mail client (PDF fusionne)
 if ($combined_mail_mode === 0 && $client_mail_enabled == 1 && !empty($config->fields['MailTo']) && $client_email !== '' && $client_email !== 'vide') {
-   $sharepoint->MailSend($client_email, $config->fields['gabarit'], $mergedPath, "Mail envoye a ". $client_email , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
+   $mailer->MailSend($client_email, $config->fields['gabarit'], $mergedPath, "Mail envoye a ". $client_email , $id_survey = NULL, $tracker = NULL, $webUrl = NULL, $fileName = NULL);
 }
 
 if (!empty($config->fields['ZenDocMail'])) {
@@ -299,7 +298,7 @@ if (!empty($config->fields['ZenDocMail'])) {
    if (!empty($related)) {
       $msg .= "<br><br>Documents/Informations associé au bon de livraison : $related";
    }
-   $sharepoint->MailSend(
+   $mailer->MailSend(
       $config->fields['ZenDocMail'],
       0,
       $mergedPath,
@@ -316,7 +315,7 @@ if (!empty($config->fields['ZenDocMail'])) {
 if ($bl_source_missing) {
    gestion_combined_message(
       "BL + Rapport signés et fusionnés. Le PDF d'origine du bon " . (string)($_POST['DOC'] ?? '')
-      . " était introuvable (Sage / SharePoint / local) : une page de remplacement (numéro, nom, signature) en tient lieu.",
+      . " était introuvable (Sage / local) : une page de remplacement (numéro, nom, signature) en tient lieu.",
       WARNING
    );
 } else {

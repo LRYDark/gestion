@@ -34,18 +34,8 @@
  * @return bool for success (will die for most error)
  * */
 function update() {
-   global $DB;
-
-   // Vérifier si la colonne EntitiesExtractValue existe déjà
-   $checkQuery = "SHOW COLUMNS FROM `glpi_plugin_gestion_configs` LIKE 'EntitiesExtractValue'";
-   $result = $DB->doQuery($checkQuery);
-
-   if ($result->num_rows == 0) {
-      // Si la colonne n'existe pas, on l'ajoute
-      $query = "ALTER TABLE `glpi_plugin_gestion_configs`
-               ADD COLUMN `EntitiesExtractValue` VARCHAR(255) NULL;";
-      $DB->doQuery($query) or die($DB->error());
-   }
+   // Ajoutait `EntitiesExtractValue`, réglage de la tâche cron SharePoint :
+   // colonne supprimée avec SharePoint en 1.8.4 (update_183_184), plus rien à créer.
 }
   
 ?>

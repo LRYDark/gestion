@@ -197,8 +197,8 @@ class PluginGestionTicket extends CommonDBTM {
     * qui permet de n'offrir QU'UNE façon de supprimer, la barre « Actions »,
     * au lieu d'un bouton par ligne qui doublonnait avec elle.
     *
-    * Ne touche pas aux fichiers hébergés hors de GLPI. Un bon stocké dans
-    * SharePoint ou servi par Sage reste en place chez son hébergeur : le
+    * Ne touche pas aux fichiers hébergés hors de GLPI. Un bon servi par Sage
+    * (ou un ancien bon SharePoint) reste en place chez son hébergeur : le
     * supprimer à distance depuis un ticket serait irréversible et invisible
     * pour les autres utilisateurs de la bibliothèque. Le cas est signalé.
     */

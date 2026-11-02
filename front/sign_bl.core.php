@@ -12,7 +12,6 @@ if (!defined('GLPI_ROOT')) {
    die("Sorry. You can't access directly to this file");
 }
 
-require_once PLUGIN_GESTION_DIR . '/front/SharePointGraph.php';
 require_once PLUGIN_GESTION_DIR . '/front/SageApi.php';
 
 use setasign\Fpdi\Fpdi;
@@ -47,11 +46,10 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
       global $DB, $CFG_GLPI;
 
       $config     = PluginGestionConfig::getInstance();
-      $sharepoint = new PluginGestionSharepoint();
       $rand       = rand(1, 100000);
       $DOC_NAME   = (string)$DOC->bl;
 
-      // ---- 1. Recuperer le PDF source du BL (local / SharePoint / Sage) ----
+      // ---- 1. Recuperer le PDF source du BL (local / Sage) ----
       $existingPdfPath = '';
 
       /*
@@ -67,36 +65,6 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
       try {
          if ($existingPdfPath !== '') {
             // Rien a faire : la copie locale sert de source.
-         } elseif ($DOC->save == "SharePoint") {
-            /*
-             * Deuxieme tentative, comme pour Sage (cf. downloadDocument).
-             *
-             * Un telechargement rate ne prouve pas que le document est absent :
-             * une coupure reseau ou un jeton Graph expire au mauvais moment
-             * donnent le meme resultat qu'une suppression. On reessaie une fois
-             * avant de conclure ; si le fichier arrive, personne n'a rien vu.
-             */
-            $folderPath      = !empty($DOC->url_bl) ? ($DOC->url_bl . "/") : "";
-            $filePath        = $folderPath . $DOC_NAME;
-            $existingPdfPath = GLPI_PLUGIN_DOC_DIR . "/gestion/FilesTempSharePoint/SharePoint_Temp_" . $rand . ".pdf";
-
-            for ($sp_try = 1; $sp_try <= 2; $sp_try++) {
-               try {
-                  $downloadUrl = $sharepoint->getDownloadUrl($filePath);
-                  $sharepoint->downloadFileFromUrl($downloadUrl, $existingPdfPath);
-               } catch (Throwable $sp_e) {
-                  // Avalee tant qu'il reste un essai ; relancee au dernier.
-                  if ($sp_try >= 2) {
-                     throw $sp_e;
-                  }
-               }
-               if (file_exists($existingPdfPath)) {
-                  break;
-               }
-               if ($sp_try < 2) {
-                  usleep(700000);
-               }
-            }
          } elseif ($DOC->save == "Local") {
             $url = str_replace("_plugins", "", $DOC->url_bl . $DOC->bl);
             $existingPdfPath = GLPI_PLUGIN_DOC_DIR . $url;
@@ -141,7 +109,7 @@ if (!function_exists('pluginGestionRenderSignedBl')) {
              * `warning` et non `error` : un document absent de sa source n'est
              * pas une défaillance du plugin. La cause précise — 404, accès
              * refusé, source injoignable — a déjà été journalisée juste avant
-             * par la couche qui a interrogé Sage ou SharePoint.
+             * par la couche qui a interrogé Sage.
              */
             PluginGestionLogger::warning(
                'signature',

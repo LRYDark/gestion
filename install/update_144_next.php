@@ -36,35 +36,26 @@
 function update_144_next() {
    global $DB;
 
-   // Vérifier si les colonnes existent déjà
-   $columns = $DB->doQuery("SHOW COLUMNS FROM `glpi_plugin_gestion_configs`")->fetch_all(MYSQLI_ASSOC);
-
-   // Liste des colonnes à vérifier
-   $required_columns = [
-      'SageOn',
-      'SageUrlApi',
-      'SharePointOn',
-      'SageToken',
-      'SageSearch',
-      'SharePointSearch',
-      'LocalSearch',
-      'mode'
+   /*
+    * Colonne par colonne, et plus en bloc : `SharePointOn` et `SharePointSearch`
+    * sont supprimées avec SharePoint en 1.8.4 (update_183_184). L'ancien ALTER
+    * groupé les aurait recréées avec toutes les autres, déjà présentes, et la
+    * mise à jour serait morte sur « Duplicate column ».
+    *
+    * `mode` naît à 2 (Local) : l'ancien défaut 0 désignait SharePoint.
+    */
+   $columns = [
+      'SageToken'   => "VARCHAR(255) NULL",
+      'SageUrlApi'  => "VARCHAR(255) NULL",
+      'SageSearch'  => "TINYINT NOT NULL DEFAULT '0'",
+      'LocalSearch' => "TINYINT NOT NULL DEFAULT '0'",
+      'SageOn'      => "TINYINT NOT NULL DEFAULT '0'",
+      'mode'        => "TINYINT NOT NULL DEFAULT '2'",
    ];
-
-   // Liste pour les colonnes manquantes
-   $missing_columns = array_diff($required_columns, array_column($columns, 'Field'));
-
-   if (!empty($missing_columns)) {
-      $query= "ALTER TABLE glpi_plugin_gestion_configs
-               ADD COLUMN `SageToken` VARCHAR(255) NULL,
-               ADD COLUMN `SageUrlApi` VARCHAR(255) NULL,
-               ADD COLUMN `SageSearch` TINYINT NOT NULL DEFAULT '0',
-               ADD COLUMN `SharePointSearch` TINYINT NOT NULL DEFAULT '0',
-               ADD COLUMN `LocalSearch` TINYINT NOT NULL DEFAULT '0',
-               ADD COLUMN `SageOn` TINYINT NOT NULL DEFAULT '0',
-               ADD COLUMN `SharePointOn` TINYINT NOT NULL DEFAULT '0',
-               ADD COLUMN `mode` TINYINT NOT NULL DEFAULT '0';";
-      $DB->doQuery($query) or die($DB->error());
+   foreach ($columns as $column => $definition) {
+      if (!$DB->fieldExists('glpi_plugin_gestion_configs', $column, false)) {
+         $DB->doQuery("ALTER TABLE `glpi_plugin_gestion_configs` ADD COLUMN `$column` $definition") or die($DB->error());
+      }
    }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////

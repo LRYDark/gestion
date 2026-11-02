@@ -112,7 +112,7 @@ curl -X POST "<?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/bl_si
   <div class="doc-card" data-doc-item data-search="bl_prepare bl q query search save filename folder signed technicians remote_technicians preview amount ht ttc">
     <div class="doc-meta">GET/POST <?php echo htmlspecialchars($rootdoc . '/plugins/gestion/api/bl_prepare.php', ENT_QUOTES); ?></div>
     <h4>`bl_prepare.php`</h4>
-    <p><?php echo __('Prépare un BL Sage (par numéro), ou prépare un document depuis un résultat de recherche (Sage/SharePoint/Local), ou renvoie une recherche BL.', 'gestion'); ?></p>
+    <p><?php echo __('Prépare un BL Sage (par numéro), ou prépare un document depuis un résultat de recherche (Sage/Local), ou renvoie une recherche BL.', 'gestion'); ?></p>
     <div class="doc-note">
       <span class="method method-get">GET</span><?php echo __('recommandé pour `bl`, `q/query`, `action=technicians`', 'gestion'); ?><br>
       <span class="method method-post">POST JSON</span><?php echo __('recommandé pour la préparation depuis une sélection de recherche (`save`, `filename`, `folder`, `signed`)', 'gestion'); ?>
@@ -159,7 +159,7 @@ GET .../bl_prepare.php?bl=BL199550
 
 // 4) Préparation depuis sélection de recherche (POST JSON)
 {
-  "save": "Local|SharePoint|Sage",
+  "save": "Local|Sage",
   "filename": "BL199550_CLIENT.pdf",
   "folder": "_plugins/.../" ,
   "signed": 0

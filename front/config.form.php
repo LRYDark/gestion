@@ -14,7 +14,7 @@ $config = new PluginGestionConfig();
 function encryptArray($array) {
    static $include_keys_map = null;
    if ($include_keys_map === null) {
-      $include_keys_map = array_flip(['TenantID', 'ClientID', 'ClientSecret', 'Hostname', 'SitePath', 'SageToken']);
+      $include_keys_map = array_flip(['SageToken']);
    }
    $encrypted_array = [];
 

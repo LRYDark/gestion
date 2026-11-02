@@ -1,0 +1,7 @@
+# Environnement de développement local, jamais dans le plugin.
+.vs/
+.idea/
+composer.phar
+/composer
+# Jeton de la licence setasign (fpdi_pdf-parser) : ne doit pas être publié.
+auth.json

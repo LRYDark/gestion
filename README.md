@@ -1,25 +1,25 @@
 # Gestion signature PDF (Gestion BL)
 
-Plugin GLPI de gestion et signature de BL PDF (bons de livraison / documents assimilés), avec plusieurs sources de recherche (`Local`, `SharePoint`, `Sage`), flux de signature web/API, signature déportée (kiosque/appareil), intégrations mobiles et possibilité de flux combiné BL + RP.
+Plugin GLPI de gestion et signature de BL PDF (bons de livraison / documents assimilés), avec deux sources de recherche (`Local`, `Sage`), flux de signature web/API, signature déportée (kiosque/appareil), intégrations mobiles et possibilité de flux combiné BL + RP.
 
 Le plugin est un socle métier: il permet de retrouver un document, le lier au ticket, le prévisualiser, le signer, l'archiver/envoyer, et exposer ce flux via APIs pour applications externes.
 
 ## Ce que fait le plugin (lecture rapide)
 
-- Recherche des BL/PDF depuis plusieurs sources (`Local`, `SharePoint`, `Sage`).
+- Recherche des BL/PDF depuis deux sources (`Local`, `Sage`).
 - Prévisualisation et signature de PDF depuis l'interface GLPI.
 - Gestion de la position de la signature, du signataire, de la date et du technicien sur le PDF.
 - Signature déportée (poste kiosque / appareil) via endpoints API `device_*`.
 - Flux API pour apps mobiles / web (`bl_prepare`, `bl_sign`, `ticket_bls`, etc.).
 - Flux combiné BL + RP (si le plugin `rp` est installé).
-- Fonctions complémentaires: extraction tracker, mail tracker, facturation comptoir, signature à l'ajout de tâche.
+- Fonctions complémentaires: extraction tracker, facturation comptoir, signature à l'ajout de tâche.
 
 ## Fonctionnement (parcours type)
 
 ### Parcours standard (technicien depuis GLPI)
 
-1. L'administrateur active les modes de recherche souhaités (`Local`, `SharePoint`, `Sage`).
-2. L'administrateur configure les sources (dossiers, SharePoint, API Sage) et le positionnement de signature sur PDF.
+1. L'administrateur active les modes de recherche souhaités (`Local`, `Sage`).
+2. L'administrateur configure les sources (dossiers, API Sage) et le positionnement de signature sur PDF.
 3. Le technicien ouvre le menu du plugin (`survey.php`) ou un ticket selon votre workflow.
 4. Le plugin recherche les BL disponibles.
 5. Le technicien sélectionne un BL, le prévisualise, puis signe.
@@ -34,8 +34,7 @@ Le plugin est un socle métier: il permet de retrouver un document, le lier au t
 
 ### Parcours automatisé / complémentaire
 
-- `GestionPdf` (cron) peut traiter des tâches liées au mode SharePoint / synchronisation selon votre configuration.
-- L'extraction tracker peut analyser un chemin/nom et déclencher des actions (ou mail tracker) selon les règles configurées.
+- L'extraction tracker affiche le tracker lu dans le BL Sage à son association au ticket.
 - Le plugin peut déclencher une signature BL lors de l'ajout d'une tâche si cette fonctionnalité est activée.
 
 ## Modes de fonctionnement (important)
@@ -46,17 +45,8 @@ Le plugin recherche les documents dans les dossiers GLPI / partages configurés.
 
 À utiliser si:
 - vos PDF sont déjà présents localement sur le serveur GLPI
-- vous voulez éviter une dépendance Graph/Sage pour la recherche
+- vous voulez éviter une dépendance à Sage pour la recherche
 - vous avez un workflow simple et rapide de consultation/signature
-
-### Mode `SharePoint`
-
-Le plugin interroge SharePoint via Microsoft Graph pour rechercher les documents.
-
-À utiliser si:
-- vos BL sont publiés dans SharePoint
-- vous avez plusieurs sites/bibliothèques à parcourir
-- vous voulez centraliser la source documentaire côté Microsoft 365
 
 ### Mode `Sage`
 
@@ -65,6 +55,15 @@ Le plugin interroge une API Sage locale/externe (selon votre architecture) pour 
 À utiliser si:
 - la vérité métier est côté Sage
 - vous voulez récupérer des BL en temps réel sans dépôt local manuel
+
+### SharePoint : abandonné en 1.8.4
+
+La recherche et le dépôt des bons dans SharePoint (Microsoft Graph), avec la tâche cron
+`GestionPdf` qui y cherchait les nouveaux PDF, ont été retirés : trop lourds à maintenir
+pour une méthode qui ne servait plus. La migration 1.8.4 (`install/update_183_184.php`)
+bascule un mode SharePoint vers Sage (ou Local), supprime les réglages Azure et la tâche
+cron. Les bons déjà enregistrés depuis SharePoint gardent leur lien d'origine ; une
+signature éventuelle passe par la page de remplacement, comme pour toute source introuvable.
 
 ## Configuration plugin (lecture rapide par zone)
 
@@ -82,7 +81,7 @@ Exemples d'options utilisées dans cette zone:
 - `gabarit` (`NotificationTemplate`): modèle de notification utilisé pour les mails.
 - `ZenDocMail`: envoi/archivage vers une adresse ou circuit documentaire (selon votre implémentation ZenDoc).
 - `InvoiceMail` (« Envoi facture par mail »): destinataire(s) du document scanné envoyé depuis la tablette via `device_send_invoice`. Plusieurs adresses possibles (séparées par `,` `;` ou espace) ; la 1ʳᵉ est en `To`, les suivantes en `Cc`.
-- `ConfigModes`, `SageOn`, `SharePointOn`, `LocalSearch`: activent les modes disponibles et la source principale de recherche.
+- `ConfigModes`, `SageOn`, `LocalSearch`: activent les modes disponibles et la source principale de recherche.
 
 En résumé, cette zone décide "que fait le plugin une fois la signature faite" et "quelles sources sont autorisées".
 
@@ -104,24 +103,7 @@ Pourquoi c'est important:
 Bon réflexe:
 - tester avec un BL réel de chaque modèle utilisé avant déploiement global.
 
-### 3. Source SharePoint (connexion et recherche)
-
-Options typiques:
-- `TenantID`, `ClientID`, `ClientSecret`
-- `Hostname`, `SitePath`
-- `SharePointSearch`
-- `Global`
-
-Ce que ça active:
-- authentification Microsoft Graph
-- ciblage du site SharePoint
-- mode de recherche des documents dans SharePoint
-- comportements de recherche globale ou ciblée (selon la logique de votre instance)
-
-Quand l'utiliser:
-- si les BL sont centralisés dans SharePoint et doivent rester la source documentaire officielle
-
-### 4. Source Sage (API)
+### 3. Source Sage (API)
 
 Options typiques:
 - `SageUrlApi`
@@ -136,30 +118,20 @@ Ce que ça active:
 Quand l'utiliser:
 - si le BL doit être retrouvé via l'ERP plutôt que dans un dossier local
 
-### 5. Entités et Tracker (extraction / routage)
+### 4. Tracker
 
-C'est la zone qui répond exactement à l'exemple "Entités et Tracker : Extraction d'un tracker oui/non".
-
-Options typiques:
+Option:
 - `ExtractYesNo` (extraction d'un tracker: oui/non)
-- `extract` (séparateurs / logique d'extraction)
-- `MailTrackerYesNo` (envoyer un mail si extraction OK / condition remplie)
-- `MailTracker`
-- `gabarit_tracker`
-- `EntitiesExtract`
-- `EntitiesExtractValue`
 
-À quoi ça sert (en pratique):
-- extraire une information (tracker / identifiant) depuis un chemin, nom de fichier ou référence
-- décider si cette extraction est active ou non
-- déclencher un envoi mail spécifique lié au tracker
-- adapter l'extraction selon l'entité GLPI
-
-Pourquoi c'est utile:
-- automatiser une partie de la qualification ou de la notification
+À quoi ça sert:
+- afficher, à l'association d'un BL Sage au ticket, le tracker lu dans le document
 - éviter une re-saisie manuelle d'un identifiant présent dans le document
 
-### 6. Signature BL à l'ajout de tâche (workflow terrain / technicien)
+Le mail « tracker », l'extraction de l'entité depuis le chemin et leurs réglages
+(`extract`, `MailTracker*`, `gabarit_tracker`, `EntitiesExtract*`) dépendaient de la tâche
+cron SharePoint : ils ont disparu avec elle en 1.8.4.
+
+### 5. Signature BL à l'ajout de tâche (workflow terrain / technicien)
 
 C'est la zone qui répond à l'exemple "Signature BL à l'ajout de tâche, Technicien(s) autorisé(s)".
 
@@ -177,7 +149,7 @@ Exemple d'usage:
 - vous autorisez seulement l'équipe terrain à signer les BL à la fin d'une tâche
 - vous déclenchez la signature quand la tâche passe à un état de fin / réalisation
 
-### 7. Signature déportée / kiosque / appareils
+### 6. Signature déportée / kiosque / appareils
 
 Options / zones associées:
 - `RemoteSignatureOn`
@@ -193,7 +165,7 @@ Pourquoi c'est utile:
 - améliore l'expérience terrain / accueil
 - sécurise le flux en évitant l'usage d'une simple page ouverte avec token (voir note > 1.7.0)
 
-### 8. Facturation comptoir
+### 7. Facturation comptoir
 
 Options de type `CounterInvoice*` (ex: mail interne, texte d'affichage, intitulés) servent à:
 - paramétrer le libellé et la communication autour du règlement comptoir
@@ -202,18 +174,16 @@ Options de type `CounterInvoice*` (ex: mail interne, texte d'affichage, intitul�
 Quand l'utiliser:
 - si vous avez un accueil/comptoir avec validation / paiement sur place
 
-### 9. Affichage / performance / comportements annexes
+### 8. Affichage / performance / comportements annexes
 
 Exemples d'options:
-- `SharePointLinkDisplay`
+- `PdfPreview` (prévisualisation du PDF avant signature ; s'appelait `SharePointLinkDisplay` avant 1.8.4)
 - `NumberViews`
 - `formulaire`
-- `LastCronTask` (état/trace côté configuration selon la version)
 
 Ces options servent à:
 - piloter certaines informations visibles dans l'interface
 - ajuster le nombre de résultats/éléments affichés
-- suivre l'état de certains traitements périodiques
 
 ## Menus / écrans utilisés (vue fonctionnelle)
 
@@ -227,7 +197,7 @@ Ces options servent à:
 
 ### Rangement des PDF signés
 `<dossier configuré>/<Entité>/<année>/<mois>/<fichier>` — appliqué à **tous** les points
-d'écriture, local comme SharePoint :
+d'écriture :
 - `front/traitement.php` (signature d'un BL seul) ;
 - `front/traitement_combined.php` (BL + rapport), qui inclut `traitement.php` ;
 - `front/traitement_combined_multi.php` (plusieurs BL + un rapport fusionnés).
@@ -377,9 +347,6 @@ le « Fichier introuvable sur le disque » des listes. `traitement.php` et
 quoi que ce soit signé : le technicien recommence, plutôt que de découvrir des semaines plus
 tard des bons `signed = 1` pointant vers rien.
 
-Côté SharePoint, Microsoft Graph crée les dossiers intermédiaires à l'upload
-(`PUT /root:/{chemin}/{fichier}:/content`) — rien à prévoir.
-
 ### Onglet Ticket « Gestion BL » : liste et suppression définitive
 Le tableau à cinq colonnes est remplacé par une **liste**, identique à celle des cartes du
 plugin RP : numéro de BL en gras **suivi du badge** **Signé** / **À faire signer**, ID /
@@ -397,10 +364,9 @@ la voie empruntée. La ligne disparaissait jusqu'ici seule, en laissant le PDF s
 le Document GLPI est maintenant **purgé** (`delete(..., 1)`), ce qui déclenche
 `Document::cleanDBonPurge()` et retire le fichier.
 
-> Un bon stocké dans **SharePoint** ou servi par **Sage** n'est **pas** supprimé chez son
+> Un bon servi par **Sage** (ou un ancien bon SharePoint) n'est **pas** supprimé chez son
 > hébergeur : seule la trace GLPI l'est, et l'utilisateur en est averti. Supprimer à distance
-> depuis un ticket serait irréversible et invisible pour les autres utilisateurs de la
-> bibliothèque.
+> depuis un ticket serait irréversible et invisible pour les autres utilisateurs.
 
 `isMobile()` a disparu avec le tableau — elle n'y masquait que des colonnes trop larges, et
 étant déclarée dans le corps d'une méthode elle aurait provoqué un « Cannot redeclare » au
@@ -440,11 +406,9 @@ groupée de tous les bons reste le parcours combiné de RP.
 
 - GLPI 11.x (selon version du plugin installée)
 - PHP compatible GLPI
-- Extension `sodium` (chiffrement des secrets SharePoint/Sage)
-- SharePoint / Microsoft Graph (optionnel, si mode SharePoint)
+- Extension `sodium` (chiffrement du jeton Sage)
 - API Sage (optionnel, si mode Sage)
 - Plugin `rp` (optionnel, pour flux combinés BL + RP)
-- Cron GLPI fonctionnel (si vous utilisez les traitements planifiés du plugin)
 
 ## Droits / profils
 
@@ -455,12 +419,8 @@ groupée de tous les bons reste le parcours combiné de RP.
 
 ## Tâches cron
 
-Le plugin enregistre la tâche cron `GestionPdf`.
-
-Rôle du cron (selon options activées):
-- traitements liés à SharePoint / synchronisation
-- opérations périodiques du plugin
-- mise à jour de certains états exploités par l'interface
+Aucune depuis 1.8.4 : la seule tâche du plugin, `GestionPdf`, cherchait les nouveaux PDF dans
+SharePoint. La migration 1.8.4 la supprime.
 
 ## Journalisation
 
@@ -481,7 +441,7 @@ uniquement**.
 
 Contextes utilisés :
 - `signature`, `signature-combinee`, `signature-groupee` : flux de signature BL / Rapport+BL.
-  Une ligne par bon en échec, avec sa **source** (SharePoint / Sage / Local), sa **référence**
+  Une ligne par bon en échec, avec sa **source** (Sage / Local), sa **référence**
   et la cause — un « signature impossible » anonyme ne permettait pas de savoir lequel des
   bons du ticket avait échoué.
 - `mail` : échecs de transport.
@@ -510,10 +470,10 @@ Pour les versions **supérieures à 1.7.0**, il y a **abandon de la page web `de
 
 ## Vérifications rapides après mise à jour
 
-- Tester la configuration et la sauvegarde des sources (`Local`, `SharePoint`, `Sage`).
+- Tester la configuration et la sauvegarde des sources (`Local`, `Sage`).
 - Tester une recherche BL sur chaque source activée.
 - Tester la prévisualisation PDF puis la signature.
 - Tester `traitement.php` (et `traitement_combined.php` si `rp` est utilisé).
 - Tester `front/api_docs.php` et un flux API `bl_prepare -> bl_sign`.
 - Tester les endpoints `device_*` si vous utilisez la signature déportée.
-- Vérifier le cron `GestionPdf` et les logs GLPI/PHP/web.
+- Vérifier les logs GLPI/PHP/web.
