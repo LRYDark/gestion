@@ -95,6 +95,19 @@ jobs:
             --db-user=root --db-password=glpi --default-language=fr_FR --no-telemetry --no-interaction
           echo "PLUGIN=$(grep -oP 'function plugin_version_\K\w+' plugin/setup.php)" >> "$GITHUB_ENV"
 
+      # Plugins dont celui-ci a besoin (ex. creditalert -> credit) : une ligne « clé URL-de-l'archive »
+      # dans .github/ci/plugins-requis.txt.
+      - name: Plugins requis
+        run: |
+          f=plugin/.github/ci/plugins-requis.txt
+          [ -f "$f" ] || { echo "Aucun."; exit 0; }
+          grep -vE '^\s*(#|$)' "$f" | while read -r key url; do
+            echo "Installation de $key ($url)"
+            curl -fsSL "$url" | tar -xj -C glpi/plugins
+            php glpi/bin/console plugin:install "$key" --username=glpi --no-interaction
+            php glpi/bin/console plugin:activate "$key" --no-interaction
+          done
+
       - name: Version précédente du plugin (mise à jour)
         if: matrix.scenario == 'mise-a-jour'
         run: |

@@ -52,6 +52,21 @@ def check(path, label=None):
     seen.add(path)
     before = log_size()
     status, body, _ = get(path)
+    # GLPI 12 : zone sensible (configuration, utilisateur, profil…) — il redemande le mot de passe avant
+    # d'afficher la page (pages/reauth/prompt.html.twig, champ « user_input »).
+    if 'name="user_input"' in body:
+        form = re.search(r'<form[^>]*method="(\w+)"[^>]*action="([^"]+)"', body) \
+            or re.search(r'<form[^>]*action="([^"]+)"[^>]*method="(\w+)"', body)
+        if form:
+            method, action = (form.group(1), form.group(2)) if form.re.pattern.startswith('<form[^>]*method') \
+                else (form.group(2), form.group(1))
+            action = html.unescape(action)
+            fields = {'user_input': 'glpi'}
+            if method.lower() == 'get':
+                get(action + ('&' if '?' in action else '?') + urllib.parse.urlencode(fields))
+            else:
+                get(action, fields)
+            status, body, _ = get(path)
     problems = []
     if status >= 500:
         problems.append(f'HTTP {status}')
@@ -115,6 +130,11 @@ for path, label in pages:
     body = check(path, label)
     if path == '/front/central.php':
         central = body
+    if '.form.php' in path and not tabs_of(body):
+        titles = [re.sub(r'<[^>]+>', '', t).strip() for t in re.findall(r'<h[1-3][^>]*>(.*?)</h[1-3]>', body, re.S)]
+        alerts = [re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', a)).strip()[:200]
+                  for a in re.findall(r'<div[^>]+class="[^"]*alert[^"]*"[^>]*>(.*?)</div>', body, re.S)]
+        print(f'     (aucun onglet trouvé ; {len(body)} octets ; titres : {titles[:6]} ; alertes : {alerts[:3]})')
     for tab in tabs_of(body):
         check(tab, f'{label} › onglet {urllib.parse.parse_qs(urllib.parse.urlparse(tab).query).get("_glpi_tab", ["?"])[0]}')
 
