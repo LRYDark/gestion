@@ -45,6 +45,10 @@ de GLPI (`php bin/console cache:clear`, en tant qu'utilisateur du serveur web).
   Il est désormais chiffré avec la clé de GLPI (`GLPIKey`), là où GLPI la range, et déclaré à GLPI
   (`secured_fields`), qui le rechiffre lui-même s'il change de clé. La mise à jour réécrit l'ancienne valeur au
   nouveau format ; une valeur illisible est signalée sous le champ, et un champ laissé vide ne l'efface plus.
+- **Affichage** : le message « Élément modifié » après l'enregistrement de la configuration affichait du code HTML
+  (`<span class="d-flex …">`) ; et l'indicateur de chargement apparaissait sur le bouton « Bannir » du premier
+  appareil au lieu d'« Enregistrer ». Les actions des appareils ne sont plus des boutons d'envoi du formulaire :
+  Entrée dans un champ ne peut plus bannir un appareil.
 
 ## 1.8.3 — 2026-10-06
 

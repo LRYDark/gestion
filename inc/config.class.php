@@ -19,7 +19,8 @@ class PluginGestionConfig extends CommonDBTM
 
    static function getTypeName($nb = 0)
    {
-      return __('<span class="d-flex align-items-center"><i class="fa-solid fa-clipboard-check me-2"></i>Gestion BL</span>', "gestion");
+      // Texte simple : GLPI l'échappe dans ses messages (« Élément modifié : … ») ; l'icône est dans l'onglet.
+      return __('Gestion BL', 'gestion');
    }
 
    static function getInstance()
@@ -1398,32 +1399,26 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
                   </td>
                   <td class="text-center">
                      <?php if ($isBanned): ?>
-                     <button type="submit"
-                             name="device_action_submit"
-                             value="<?php echo 'unban:' . $devId; ?>"
-                             formnovalidate
+                     <button type="button"
+                             data-gestion-device-action="<?php echo 'unban:' . $devId; ?>"
                              class="btn btn-success btn-sm d-inline"
                              title="<?php echo __('Débannir', 'gestion'); ?>">
                         <i class="fa fa-check"></i> <?php echo __('Débannir', 'gestion'); ?>
                      </button>
                      <?php else: ?>
-                     <button type="submit"
-                             name="device_action_submit"
-                             value="<?php echo 'ban:' . $devId; ?>"
-                             formnovalidate
+                     <button type="button"
+                             data-gestion-device-action="<?php echo 'ban:' . $devId; ?>"
+                             data-gestion-confirm="<?php echo htmlspecialchars(__('Confirmer le bannissement de cet appareil ?', 'gestion'), ENT_QUOTES, 'UTF-8'); ?>"
                              class="btn btn-warning btn-sm d-inline"
-                             title="<?php echo __('Bannir', 'gestion'); ?>"
-                             onclick="return confirm('<?php echo __('Confirmer le bannissement de cet appareil ?', 'gestion'); ?>')">
+                             title="<?php echo __('Bannir', 'gestion'); ?>">
                         <i class="fa fa-ban"></i> <?php echo __('Bannir', 'gestion'); ?>
                      </button>
                      <?php endif; ?>
-                     <button type="submit"
-                             name="device_action_submit"
-                             value="<?php echo 'delete:' . $devId; ?>"
-                             formnovalidate
+                     <button type="button"
+                             data-gestion-device-action="<?php echo 'delete:' . $devId; ?>"
+                             data-gestion-confirm="<?php echo htmlspecialchars(__('Supprimer définitivement cet appareil ?', 'gestion'), ENT_QUOTES, 'UTF-8'); ?>"
                              class="btn btn-outline-danger btn-sm d-inline ms-1"
-                             title="<?php echo __('Supprimer', 'gestion'); ?>"
-                             onclick="return confirm('<?php echo __('Supprimer définitivement cet appareil ?', 'gestion'); ?>')">
+                             title="<?php echo __('Supprimer', 'gestion'); ?>">
                         <i class="fa fa-trash"></i>
                      </button>
                   </td>
@@ -1518,10 +1513,51 @@ Session-Token: &lt;session_token_v1&gt;   (obtenu via initSession)</code></pre>
       echo "<table class='tab_cadre_fixe'>";
          echo "<tr class='tab_bg_1'>";
             echo "<td class='right'>";
-               echo "<input type='submit' class='submit' name='update' value=\"" . __('Save') . "\">";
+               // Un vrai <button name="update"> : GLPI met son indicateur de chargement sur le bouton cliqué. Avec
+               // un <input>, il le mettait sur le premier <button type="submit"> du formulaire — « Bannir ».
+               echo "<button type='submit' class='btn btn-primary' name='update' value='1'>"
+                  . "<i class='ti ti-device-floppy me-1'></i>" . htmlescape(__('Save')) . "</button>";
             echo "</td>";
          echo "</tr>";
       echo "</table>";
+
+      /*
+       * Actions des appareils (bannir, débannir, supprimer) : de simples boutons, plus des boutons d'envoi du
+       * formulaire. Envoi par script, avec la même confirmation qu'avant.
+       *
+       * Boutons d'envoi, ils étaient pris pour le bouton par défaut du formulaire : Entrée dans un champ bannissait
+       * le premier appareil, et GLPI affichait son indicateur de chargement sur « Bannir » à l'enregistrement.
+       * Le script n'est posé qu'une fois, l'onglet pouvant être rechargé sans recharger la page.
+       */
+      echo Html::scriptBlock(<<<'JS'
+         if (!window.gestionDeviceActionsBound) {
+            window.gestionDeviceActionsBound = true;
+            document.addEventListener('click', function (e) {
+               const btn = e.target.closest('[data-gestion-device-action]');
+               if (!btn) {
+                  return;
+               }
+               e.preventDefault();
+               const question = btn.getAttribute('data-gestion-confirm');
+               if (question && !window.confirm(question)) {
+                  return;
+               }
+               const form = btn.closest('form');
+               if (!form) {
+                  return;
+               }
+               const input = document.createElement('input');
+               input.type  = 'hidden';
+               input.name  = 'device_action_submit';
+               input.value = btn.getAttribute('data-gestion-device-action');
+               form.appendChild(input);
+               // L'action quitte la page : pas d'alerte « modifications non enregistrées ».
+               window.glpiUnsavedFormChanges = false;
+               btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+               form.submit();
+            });
+         }
+JS);
 
       // showFormButtons() closes a table before rendering buttons; open a minimal one to keep valid HTML
       echo "<table class='tab_cadre_fixe'>";
